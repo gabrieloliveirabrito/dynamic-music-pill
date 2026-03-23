@@ -1923,9 +1923,30 @@ export class MusicController {
         if (foundIdx !== -1) {
             let existing = this._trackHistory[foundIdx];
             if (now - existing.time < 30000) {
-                if (artUrl && (!existing.artUrl || existing.artUrl === '')) {
-                    existing.artUrl = artUrl;
-                    existing.avgColor = null;
+                if (artUrl && existing.artUrl !== artUrl) {
+                    let localArtUrl = artUrl;
+                    if (artUrl.startsWith('file://')) {
+                        try {
+                            let hashKey = GLib.compute_checksum_for_string(
+                                GLib.ChecksumType.MD5, title + '|' + (artist || '') + '|' + artUrl, -1);
+                            let cacheDir = GLib.build_filenamev([GLib.get_user_cache_dir(), 'dynamic-music-pill', 'art']);
+                            GLib.mkdir_with_parents(cacheDir, 0o755);
+                            let destPath = GLib.build_filenamev([cacheDir, 'hist_' + hashKey + '.jpg']);
+                            let srcFile  = Gio.File.new_for_uri(artUrl);
+                            let destFile = Gio.File.new_for_path(destPath);
+                            if (!destFile.query_exists(null)) {
+                                srcFile.copy(destFile, Gio.FileCopyFlags.NONE, null, null);
+                            }
+                            localArtUrl = destFile.get_uri();
+                        } catch(e) {}
+                    }
+
+                    if (existing.artUrl !== localArtUrl) {
+                        this._deleteHistoryArt(existing.artUrl);
+                        existing.artUrl = localArtUrl;
+                        existing.avgColor = null;
+                        try { this._settings.set_string('playback-history', JSON.stringify(this._trackHistory)); } catch(e) {}
+                    }
                 }
                 return;
             }
