@@ -1453,13 +1453,17 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
 
         const changelog = [
         	{
-                version: "V30 - Latest Update",
+                version: "1.0.0 - Latest Update",
                 subtitle: "Custom Buttons & Bug Fixes",
                 expanded: true,
                 notes: "✨ New Features:\n" +
                        "• Custom Control Buttons: Add up to two extra buttons to the pop-up controls row. Each can be assigned to Volume, Seek Step, Audio Output, Sleep Timer, Playback Speed, or Recently Played history.\n" +
                        "• First-Time Hint: A one-time tip in the pop-up suggests checking settings for more options (custom buttons, scroll actions, etc.). Dismissible with a click or via the settings button.\n\n" +
+					   "• Scroll on Hover Only: A new setting to scroll long text only when hovering over the pill.\n" +
                        "🐛 Bug Fixes:\n" +
+					   "• Fixed GNOME Shell freezes (metadata crash) when player state unexpectedly becomes undefined.\n" +
+                       "• Fixed History showing incorrect album art for slow players (Zen Browser/Web apps) and prevents rapid-skip duplicates.\n" +
+                       "• Fixed Dash to Dock autohide breaking after locking and unlocking the screen.\n" +
                        "• Fixed two pills appearing in the dock (could occur unreliably after Lock and Unlock).\n" +
                        "• Fixed duplicate title and artist display.\n" +
                        "• Fixed visualizer failing to update when transitioning between pill and pop-up with Dash to Dock.\n" +
