@@ -113,6 +113,11 @@ export class MusicController {
         this._lyricIfaceInfo = null;
         
         this._createPill();
+        
+        GLib.idle_add(GLib.PRIORITY_LOW, () => {
+            this._cleanupDiskCache();
+            return GLib.SOURCE_REMOVE;
+        });
     }
 
     _createPill() {
@@ -950,9 +955,66 @@ export class MusicController {
         if (this._artCache.has(key)) this._artCache.delete(key);
         this._artCache.set(key, value);
         if (this._artCache.size > this._artCacheMax) {
-            this._artCache.delete(this._artCache.keys().next().value);
+            let evictedKey = this._artCache.keys().next().value;
+            this._artCache.delete(evictedKey);
         }
+        
+        if (this._cleaningTimeout) {
+            GLib.Source.remove(this._cleaningTimeout);
+        }
+        this._cleaningTimeout = GLib.timeout_add(GLib.PRIORITY_LOW, 5000, () => {
+            this._cleaningTimeout = null;
+            if (!this._isShuttingDown) {
+                this._cleanupDiskCache();
+            }
+            return GLib.SOURCE_REMOVE;
+        });
     }
+
+    _cleanupDiskCache() {
+        try {
+            let dir = Gio.File.new_for_path(this._ownArtCacheDir);
+            if (!dir.query_exists(null)) return;
+            
+            let en = dir.enumerate_children('standard::name,time::modified', Gio.FileQueryInfoFlags.NONE, null);
+            let fi;
+            let cacheFiles = [];
+            let histFiles = [];
+            
+            while ((fi = en.next_file(null)) !== null) {
+                let name = fi.get_name();
+                let time = fi.get_attribute_uint64('time::modified') || 0;
+                if (name.startsWith('hist_')) {
+                    histFiles.push({ name: name, time: time });
+                } else if (name.endsWith('.jpg') || name.endsWith('.png')) {
+                    cacheFiles.push({ name: name, time: time });
+                }
+            }
+            en.close(null);
+            
+            cacheFiles.sort((a, b) => b.time - a.time);
+            histFiles.sort((a, b) => b.time - a.time);
+            
+            if (cacheFiles.length > this._artCacheMax) {
+                for (let i = this._artCacheMax; i < cacheFiles.length; i++) {
+                    let f = dir.get_child(cacheFiles[i].name);
+                    f.delete_async(GLib.PRIORITY_LOW, null, (obj, res) => {
+                        try { obj.delete_finish(res); } catch (e) {}
+                    });
+                }
+            }
+            
+            if (histFiles.length > 30) {
+                for (let i = 30; i < histFiles.length; i++) {
+                    let f = dir.get_child(histFiles[i].name);
+                    f.delete_async(GLib.PRIORITY_LOW, null, (obj, res) => {
+                        try { obj.delete_finish(res); } catch (e) {}
+                    });
+                }
+            }
+        } catch (e) { }
+    }
+
 
     _resolvePlayerIcon(p) {
         try {
@@ -1913,8 +1975,9 @@ export class MusicController {
         
         let now = Date.now();
         let foundIdx = -1;
+        let safeArtist = artist || '';
         for (let i = 0; i < this._trackHistory.length && i < 10; i++) {
-            if (this._trackHistory[i].title === title && this._trackHistory[i].artist === artist) {
+            if (this._trackHistory[i].title === title && this._trackHistory[i].artist === safeArtist) {
                 foundIdx = i;
                 break;
             }
@@ -1922,7 +1985,8 @@ export class MusicController {
         
         if (foundIdx !== -1) {
             let existing = this._trackHistory[foundIdx];
-            if (now - existing.time < 30000) {
+            if (foundIdx === 0 || (now - existing.time < 30000)) {
+                existing.time = now;
                 if (artUrl && existing.artUrl !== artUrl) {
                     let localArtUrl = artUrl;
                     if (artUrl.startsWith('file://')) {
