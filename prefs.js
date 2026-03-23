@@ -204,6 +204,19 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
         scrollTextRow.add_suffix(scrollTextToggle);
         genGroup.add(scrollTextRow);
 
+        const scrollHoverRow = new Adw.ActionRow({
+            title: _('Scroll Only on Hover'),
+            subtitle: _('Pause scrolling text until the mouse hovers over it')
+        });
+        const scrollHoverToggle = new Gtk.Switch({
+            active: settings.get_boolean('scroll-on-hover-only'),
+            valign: Gtk.Align.CENTER
+        });
+        settings.bind('scroll-on-hover-only', scrollHoverToggle, 'active', Gio.SettingsBindFlags.DEFAULT);
+        settings.bind('scroll-text', scrollHoverRow, 'sensitive', Gio.SettingsBindFlags.DEFAULT);
+        scrollHoverRow.add_suffix(scrollHoverToggle);
+        genGroup.add(scrollHoverRow);
+
 		// Lyrics Display
         const lyricsRow = new Adw.ActionRow({
             title: _('Lyrics Display'),

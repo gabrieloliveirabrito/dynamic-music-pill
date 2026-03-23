@@ -125,10 +125,25 @@ function _applyDisable() {
     }
 }
 
+function _refreshDockManager() {
+    let ext = Main.extensionManager.lookup('dash-to-dock@micxgx.gmail.com');
+    if (!ext || ext.state !== 1) {
+        ext = Main.extensionManager.lookup('ubuntu-dock@ubuntu.com');
+    }
+    if (ext && ext.state === 1 && ext.stateObj) {
+        if (ext.stateObj.dockManager) {
+            _dtdDockManager = ext.stateObj.dockManager;
+        } else if (ext.stateObj._dockManager) {
+            _dtdDockManager = ext.stateObj._dockManager;
+        }
+    }
+}
+
 export function disableDashToDockAutohide() {
     try {
         dtdDisableRequests++;
         if (dtdDisableRequests === 1) {
+            _refreshDockManager();
             if (_dtdDockManager) {
                 _applyDisable();
             } else {
@@ -153,6 +168,7 @@ export function restoreDashToDockAutohide() {
         if (dtdDisableRequests > 0) {
             dtdDisableRequests--;
             if (dtdDisableRequests === 0) {
+                _refreshDockManager();
                 if (_dtdDockManager) {
                     _applyRestore();
                 }

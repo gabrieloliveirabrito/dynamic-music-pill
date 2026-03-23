@@ -198,6 +198,10 @@ export const MusicPill = GObject.registerClass(
             }, this);
 
             this.connectObject('enter-event', () => {
+                this._hoverMode = true;
+                if (this._titleScroll) this._titleScroll.setHoverMode(true);
+                if (this._artistScroll) this._artistScroll.setHoverMode(true);
+
                 let delay = this._settings.get_int('hover-delay');
                 if (this._hoverTimeout) { GLib.Source.remove(this._hoverTimeout); }
                 this._hoverTimeout = GLib.timeout_add_once(GLib.PRIORITY_DEFAULT, delay, () => {
@@ -211,6 +215,10 @@ export const MusicPill = GObject.registerClass(
             }, this);
 
             this.connectObject('leave-event', () => {
+                this._hoverMode = false;
+                if (this._titleScroll) this._titleScroll.setHoverMode(false);
+                if (this._artistScroll) this._artistScroll.setHoverMode(false);
+
                 if (this._hoverTimeout) {
                     GLib.Source.remove(this._hoverTimeout);
                     this._hoverTimeout = null;
@@ -1189,8 +1197,11 @@ export const MusicPill = GObject.registerClass(
         }
 
         _loadColorFromArt(artUrl) {
+            if (this._cancellable) {
+                this._cancellable.cancel();
+            }
+            this._cancellable = new Gio.Cancellable();
             let file = Gio.File.new_for_uri(artUrl);
-            if (!this._cancellable) this._cancellable = new Gio.Cancellable();
 
             file.load_contents_async(this._cancellable, (f, res) => {
                 try {

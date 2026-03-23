@@ -111,6 +111,7 @@ export const ScrollLabel = GObject.registerClass(
             this._text = "";
             this._gameMode = false;
             this._isScrolling = false;
+            this._hoverMode = false;
             this._container = new PixelSnappedBox({ x_expand: true, y_expand: true, x_align: Clutter.ActorAlign.CENTER, y_align: Clutter.ActorAlign.CENTER });
             this._container.layout_manager.orientation = Clutter.Orientation.HORIZONTAL;
             this.add_child(this._container);
@@ -128,6 +129,7 @@ export const ScrollLabel = GObject.registerClass(
             this._container.add_child(this._label2);
 
             this._settings.connectObject('changed::scroll-text', () => this.setText(this._text, true), this);
+            this._settings.connectObject('changed::scroll-on-hover-only', () => this._checkResize(), this);
 
             this.connectObject('notify::allocation', () => {
                 if (this._resizeTimer) { GLib.Source.remove(this._resizeTimer); this._resizeTimer = null; }
@@ -197,6 +199,13 @@ export const ScrollLabel = GObject.registerClass(
             else this._checkResize();
         }
 
+        setHoverMode(active) {
+            this._hoverMode = active;
+            if (this._settings && this._settings.get_boolean('scroll-on-hover-only')) {
+                this._checkResize();
+            }
+        }
+
         _checkResize() {
             if (!this._text || this._gameMode) return;
 
@@ -218,6 +227,10 @@ export const ScrollLabel = GObject.registerClass(
                 let textWidth = this._label1.get_preferred_width(-1)[1];
 
                 let needsScroll = (textWidth > boxWidth + 5) && (this._settings.get_boolean('scroll-text') || this._lyricTime > 0);
+                if (needsScroll && this._settings.get_boolean('scroll-on-hover-only') && !this._hoverMode && this._lyricTime <= 0) {
+                    needsScroll = false;
+                }
+                
                 let isScrolling = (this._scrollTimer != null) || this._isScrolling;
 
                 if (needsScroll && !isScrolling) {
@@ -268,6 +281,9 @@ export const ScrollLabel = GObject.registerClass(
             }
 
             if (!this._settings.get_boolean('scroll-text') && !this._lyricTime) {
+                return;
+            }
+            if (this._settings.get_boolean('scroll-on-hover-only') && !this._hoverMode && !this._lyricTime) {
                 return;
             }
 
