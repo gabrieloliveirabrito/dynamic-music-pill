@@ -211,6 +211,8 @@ gnome-extensions enable dynamic-music-pill@andbal
 ```
 ### NixOS Installation
 
+> **Note:** The nixpkgs version may lag behind the latest release. Use the Flake method below to always get the newest version directly from GitHub.
+
 The extension is also available in the official [nixpkgs](https://search.nixos.org/packages?query=gnomeExtensions.dynamic-music-pill) repository:
 
 ```nix
