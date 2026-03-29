@@ -1450,8 +1450,40 @@ export class MusicController {
 		    }
 		}
 	    } else {
-		this._artCacheSet(cacheKey, currentArt);
-		artUrl = currentArt;
+		let httpHash = GLib.compute_checksum_for_string(
+		    GLib.ChecksumType.MD5, currentArt + '|' + (title || '') + '|' + (artist || ''), -1);
+		let httpCachedPath = GLib.build_filenamev([
+		    this._ownArtCacheDir, httpHash + '.png']);
+		let httpCachedFile = Gio.File.new_for_path(httpCachedPath);
+
+		if (httpCachedFile.query_exists(null)) {
+		    artUrl = httpCachedFile.get_uri();
+		    this._artCacheSet(cacheKey, artUrl);
+		} else {
+		    artUrl = (this._pill && this._pill._lastArtUrl) ? this._pill._lastArtUrl : null;
+
+		    let httpSrcFile = Gio.File.new_for_uri(currentArt);
+		    httpSrcFile.load_contents_async(null, (f, res) => {
+			try {
+			    let [ok, bytes] = f.load_contents_finish(res);
+			    if (ok && bytes && bytes.get_size() > 0) {
+				let outStream = httpCachedFile.replace(null, false, Gio.FileCreateFlags.REPLACE_DESTINATION, null);
+				outStream.write_bytes(bytes, null);
+				outStream.close(null);
+
+				let newUri = httpCachedFile.get_uri();
+				this._artCacheSet(cacheKey, newUri);
+				if (this._pill && this._pill._lastArtUrl !== newUri && this._getActivePlayer()) {
+				    GLib.idle_add_once(GLib.PRIORITY_DEFAULT, () => {
+					this._updateUI();
+				    });
+				}
+			    }
+			} catch (e) {
+			    console.debug('[Dynamic Music Pill] HTTP art download failed: ' + e.message);
+			}
+		    });
+		}
 	    }
 	}
 
@@ -1476,9 +1508,14 @@ export class MusicController {
                         if (thumbPath) {
                             let thumbFile = Gio.File.new_for_path(thumbPath);
                             if (thumbFile.query_exists(null)) {
-                                thumbFile.copy(ownFile, Gio.FileCopyFlags.OVERWRITE, null, null);
-                                artUrl = ownFile.get_uri();
-                                this._artCacheSet(cacheKey, artUrl);
+                                artUrl = thumbFile.get_uri();
+                                thumbFile.copy_async(ownFile, Gio.FileCopyFlags.OVERWRITE,
+                                    GLib.PRIORITY_DEFAULT, null, null, (src, res) => {
+                                        try {
+                                            src.copy_finish(res);
+                                            this._artCacheSet(cacheKey, ownFile.get_uri());
+                                        } catch (e) { }
+                                    });
                             }
                         }
                     }
