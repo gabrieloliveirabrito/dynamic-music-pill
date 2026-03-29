@@ -1197,41 +1197,51 @@ export const MusicPill = GObject.registerClass(
         }
 
         _loadColorFromArt(artUrl) {
-            if (this._cancellable) {
-                this._cancellable.cancel();
-            }
-            this._cancellable = new Gio.Cancellable();
             let file = Gio.File.new_for_uri(artUrl);
+            if (this._colorCancellable) {
+                this._colorCancellable.cancel();
+            }
+            this._colorCancellable = new Gio.Cancellable();
 
-            file.load_contents_async(this._cancellable, (f, res) => {
+            file.load_contents_async(this._colorCancellable, (f, res) => {
                 try {
                     let [ok, bytes] = f.load_contents_finish(res);
                     if (ok && this._visualizer) {
                         let stream = Gio.MemoryInputStream.new_from_bytes(bytes);
-                        let pixbuf = GdkPixbuf.Pixbuf.new_from_stream(stream, null);
-                        this._targetColor = getAverageColor(pixbuf);
+                        GdkPixbuf.Pixbuf.new_from_stream_async(stream, this._colorCancellable, (source, pixRes) => {
+                            try {
+                                let pixbuf = GdkPixbuf.Pixbuf.new_from_stream_finish(pixRes);
+                                if (!pixbuf || !this._visualizer) return;
 
-                        if (this._controller && this._controller._trackHistory && this._controller._trackHistory.length > 0) {
-                            let entry = this._controller._trackHistory[0];
-                            if (!entry.avgColor) {
-                                entry.avgColor = { r: Math.round(this._targetColor.r), g: Math.round(this._targetColor.g), b: Math.round(this._targetColor.b) };
-                                try { this._controller._settings.set_string('playback-history', JSON.stringify(this._controller._trackHistory)); } catch (e) { }
+                                this._targetColor = getAverageColor(pixbuf);
+
+                                if (this._controller && this._controller._trackHistory && this._controller._trackHistory.length > 0) {
+                                    let entry = this._controller._trackHistory[0];
+                                    if (!entry.avgColor) {
+                                        entry.avgColor = { r: Math.round(this._targetColor.r), g: Math.round(this._targetColor.g), b: Math.round(this._targetColor.b) };
+                                        try { this._controller._settings.set_string('playback-history', JSON.stringify(this._controller._trackHistory)); } catch (e) { }
+                                    }
+                                }
+
+                                try {
+                                    if (this._interfaceSettings && this._settings.get_boolean('sync-accent-color')) {
+                                        let closestAccent = getClosestGnomeAccent(this._targetColor.r, this._targetColor.g, this._targetColor.b);
+                                        this._interfaceSettings.set_string('accent-color', closestAccent);
+                                    }
+                                } catch (err) {
+                                    console.debug('[Dynamic Music Pill] Native accent sync failed: ', err.message);
+                                }
+
+                                if (this._visualizer && this._visualizer.setColor) {
+                                    this._visualizer.setColor(this._targetColor);
+                                    this._startColorTransition();
+                                }
+                            } catch (pixErr) {
+                                if (!pixErr.matches || !pixErr.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED)) {
+                                    console.debug('Failed to decode art pixbuf: ' + pixErr.message);
+                                }
                             }
-                        }
-
-                        try {
-                            if (this._interfaceSettings && this._settings.get_boolean('sync-accent-color')) {
-                                let closestAccent = getClosestGnomeAccent(this._targetColor.r, this._targetColor.g, this._targetColor.b);
-                                this._interfaceSettings.set_string('accent-color', closestAccent);
-                            }
-                        } catch (err) {
-                            console.debug('[Dynamic Music Pill] Native accent sync failed: ', err.message);
-                        }
-
-                        if (this._visualizer && this._visualizer.setColor) {
-                            this._visualizer.setColor(this._targetColor);
-                            this._startColorTransition();
-                        }
+                        });
                     }
                 } catch (e) {
                     if (!e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED)) {
@@ -1330,4 +1340,3 @@ export const MusicPill = GObject.registerClass(
             }
         }
     });
-
