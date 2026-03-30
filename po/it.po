@@ -4,159 +4,163 @@ msgstr ""
 "Project-Id-Version: Dynamic Music Pill\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2026-03-23 23:42+0100\n"
-"PO-Revision-Date: 2026-02-17 00:00+0100\n"
-"Last-Translator: \n"
-"Language-Team: Italian\n"
+"PO-Revision-Date: 2026-03-26 15:09+0000\n"
+"Last-Translator: slytheduck <enderyuk@proton.me>\n"
+"Language-Team: Italian <https://hosted.weblate.org/projects/dynamic-music-"
+"pill/settings/it/>\n"
 "Language: it\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"Plural-Forms: nplurals=2; plural=n != 1;\n"
+"X-Generator: Weblate 5.17-dev\n"
 
 #: src/controller.js:1378
 msgid "Unknown Player"
-msgstr ""
+msgstr "Sorgente sconosciuta"
 
 #: src/controller.js:1379
 msgid "No active media"
-msgstr ""
+msgstr "Nessuna riproduzione attiva"
 
 #: src/controller.js:1844
 msgid "Auto (Smart)"
-msgstr ""
+msgstr "Automatico (Intelligente)"
 
 #: src/controller.js:1864 src/controller.js:1882 src/controller.js:1905
 #: src/controller.js:1931
 msgid "Not supported"
-msgstr ""
+msgstr "Non supportato"
 
 #: src/uiExpandedPlayer.js:376
 msgid "First time? Check settings for custom buttons, scroll actions & more"
 msgstr ""
+"È la prima volta? Controlla le impostazioni per personalizzare pulsanti, "
+"azioni di scorrimento e altro"
 
 #: src/uiExpandedPlayer.js:663
 msgid "Unknown Title"
-msgstr ""
+msgstr "Titolo sconosciuto"
 
 #: src/uiExpandedPlayer.js:666
 msgid "Unknown Artist"
-msgstr ""
+msgstr "Artista sconosciuto"
 
 #: src/uiExpandedPlayer.js:1249
 msgid "Volume"
-msgstr ""
+msgstr "Volume"
 
 #: src/uiExpandedPlayer.js:1253
 msgid "No audio stream available"
-msgstr ""
+msgstr "Audio non disponibile"
 
 #: src/uiExpandedPlayer.js:1278 src/uiExpandedPlayer.js:1288
 msgid "Unmute"
-msgstr ""
+msgstr "Attiva audio"
 
 #: src/uiExpandedPlayer.js:1278 src/uiExpandedPlayer.js:1288
 msgid "Mute"
-msgstr ""
+msgstr "Disattiva audio"
 
 #: src/uiExpandedPlayer.js:1324
 msgid "Seek"
-msgstr ""
+msgstr "Scorri"
 
 #: src/uiExpandedPlayer.js:1328
 msgid "This player does not support seeking"
-msgstr ""
+msgstr "Questo player non consente di scorrere la traccia"
 
 #: src/uiExpandedPlayer.js:1354
 msgid "Audio Output"
-msgstr ""
+msgstr "Uscita audio"
 
 #: src/uiExpandedPlayer.js:1356
 msgid "Audio control unavailable"
-msgstr ""
+msgstr "Controllo audio non disponibile"
 
 #: src/uiExpandedPlayer.js:1359
 msgid "No output devices found"
-msgstr ""
+msgstr "Nessun dispositivo di uscita trovato"
 
 #: src/uiExpandedPlayer.js:1362
 msgid "Unknown Device"
-msgstr ""
+msgstr "Dispositivo sconosciuto"
 
 #: src/uiExpandedPlayer.js:1383 prefs.js:580
 msgid "Sleep Timer"
-msgstr ""
+msgstr "Timer di spegnimento"
 
 #: src/uiExpandedPlayer.js:1383
 msgid "min left"
-msgstr ""
+msgstr "minuti rimanenti"
 
 #: src/uiExpandedPlayer.js:1386
 msgid "Cancel Timer"
-msgstr ""
+msgstr "Annulla timer"
 
 #: src/uiExpandedPlayer.js:1418
 msgid "Runs inside the shell — works on lock screen"
-msgstr ""
+msgstr "Esegue nella shell — funziona anche con lo schermo bloccato"
 
 #: src/uiExpandedPlayer.js:1423 prefs.js:581
 msgid "Playback Speed"
-msgstr ""
+msgstr "Velocità di riproduzione"
 
 #: src/uiExpandedPlayer.js:1430
 msgid "This player does not support playback speed"
-msgstr ""
+msgstr "Questo player non supporta la modifica della velocità di riproduzione"
 
 #: src/uiExpandedPlayer.js:1469
 msgid "Player must support MPRIS Rate"
-msgstr ""
+msgstr "Il player deve supportare la velocità MPRIS"
 
 #: src/uiExpandedPlayer.js:1469
 msgid "Not supported by this player"
-msgstr ""
+msgstr "Non supportato da questo player"
 
 #: src/uiExpandedPlayer.js:1475
 msgid "Recently Played"
-msgstr ""
+msgstr "Riprodotti di recente"
 
 #: src/uiExpandedPlayer.js:1477
 msgid "No history yet"
-msgstr ""
+msgstr "Nessuna cronologia disponibile"
 
 #: src/uiExpandedPlayer.js:1510
 msgid "Unknown"
-msgstr ""
+msgstr "Sconosciuto"
 
 #: src/uiExpandedPlayer.js:1565
 msgid "Clear History"
-msgstr ""
+msgstr "Cancella cronologia"
 
 #: src/uiMusicPill.js:696 src/uiMusicPill.js:990
 msgid "No Media"
-msgstr ""
+msgstr "Nessun media"
 
 #: src/uiMusicPill.js:991
 msgid "Waiting for playback..."
-msgstr ""
+msgstr "In attesa della riproduzione…"
 
 #: src/uiMusicPill.js:1204
 msgid "Loading..."
-msgstr ""
+msgstr "Caricamento..."
 
 #: src/uiPlayerSelector.js:122
 msgid "Select Media Player"
-msgstr ""
+msgstr "Seleziona lettore musicale"
 
 #: src/uiPlayerSelector.js:133
 msgid "Auto (Smart Selection)"
-msgstr ""
+msgstr "Automatico (Selezione intelligente)"
 
 #: src/uiVisualizers.js:303
 msgid "Please install \"cava\" for real-time mode."
-msgstr ""
+msgstr "È necessario installare \"cava\" per la modalità in tempo reale."
 
 #: prefs.js:37
 msgid "Main Pill"
-msgstr ""
+msgstr "Pillola principale"
 
 #: prefs.js:41
 msgid "General Settings"
@@ -164,11 +168,13 @@ msgstr "Impostazioni Generali"
 
 #: prefs.js:44
 msgid "Always ON"
-msgstr ""
+msgstr "Sempre acceso"
 
 #: prefs.js:45
 msgid "Retain last known track and keep pill visible after closing the player"
 msgstr ""
+"Ricorda l’ultima traccia e lascia la pillola visibile anche dopo aver chiuso "
+"il player"
 
 #: prefs.js:57
 msgid "Show Album Art"
@@ -180,15 +186,15 @@ msgstr "Mostra la copertina del brano in riproduzione"
 
 #: prefs.js:69
 msgid "Fallback Album Art"
-msgstr ""
+msgstr "Copertina album predefinita"
 
 #: prefs.js:70 prefs.js:110
 msgid "No image selected"
-msgstr ""
+msgstr "Nessuna immagine selezionata"
 
 #: prefs.js:80
 msgid "Select Fallback Image"
-msgstr ""
+msgstr "Seleziona immagine predefinita"
 
 #: prefs.js:124
 msgid "Enable Scroll Controls"
@@ -197,26 +203,28 @@ msgstr "Abilita Controllo Scorrimento"
 #: prefs.js:125
 msgid "Change Tracks, Volume or Media Player using scroll wheel or touchpad"
 msgstr ""
+"Cambia tracce, volume o player multimediale usando la rotellina del mouse o "
+"il touchpad"
 
 #: prefs.js:136
 msgid "Change Track"
-msgstr ""
+msgstr "Cambia traccia"
 
 #: prefs.js:137
 msgid "Change Volume"
-msgstr ""
+msgstr "Cambia volume"
 
 #: prefs.js:138
 msgid "Switch Player"
-msgstr ""
+msgstr "Cambia player"
 
 #: prefs.js:146
 msgid "Scroll Action"
-msgstr ""
+msgstr "Azione di scorrimento"
 
 #: prefs.js:147
 msgid "Choose what scrolling on the pill should do"
-msgstr ""
+msgstr "Scegli cosa deve fare lo scorrimento sulla pillola"
 
 #: prefs.js:171
 msgid "Invert Scroll Animation"
@@ -228,11 +236,11 @@ msgstr "Direzione dell'effetto salto (Naturale vs Tradizionale)"
 
 #: prefs.js:183
 msgid "Invert Scroll Direction"
-msgstr ""
+msgstr "Inverti la direzione di scorrimento"
 
 #: prefs.js:184
 msgid "Swap up/down scrolling for track and volume actions"
-msgstr ""
+msgstr "Inverti lo scorrimento su/giù per le azioni di traccia e volume"
 
 #: prefs.js:196
 msgid "Scrolling Text"
@@ -512,7 +520,7 @@ msgstr ""
 
 #: prefs.js:516
 msgid "Show Visualizer in Pop-up"
-msgstr "Visualizzatore e Forma"
+msgstr ""
 
 #: prefs.js:523
 msgid "Hide Pill Visualizer"
