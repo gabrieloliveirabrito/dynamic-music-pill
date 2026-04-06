@@ -1460,6 +1460,7 @@ export const ExpandedPlayer = GObject.registerClass(
                             lbl.text = '\u2713';
                             b.set_style('border-radius:12px;padding:8px 12px;min-width:42px;background-color:rgba(255,255,255,0.38);');
                             GLib.timeout_add(GLib.PRIORITY_DEFAULT, 300, () => {
+                                if (this.is_finalized && this.is_finalized()) return GLib.SOURCE_REMOVE;
                                 ctrl.startSleepTimer(m);
                                 this._updateCustomButtons();
                                 this._popPage();
@@ -1512,6 +1513,7 @@ export const ExpandedPlayer = GObject.registerClass(
                             lbl.text = '\u2713';
                             b.set_style('border-radius:12px;padding:8px 14px;min-width:42px;background-color:rgba(255,255,255,0.38);');
                             GLib.timeout_add(GLib.PRIORITY_DEFAULT, 300, () => {
+                                if (this.is_finalized && this.is_finalized()) return GLib.SOURCE_REMOVE;
                                 this._controller.setPlaybackRate(r);
                                 this._popPage();
                                 return GLib.SOURCE_REMOVE;
@@ -1727,6 +1729,7 @@ export const ExpandedPlayer = GObject.registerClass(
             if (this._updateTimer) { GLib.Source.remove(this._updateTimer); this._updateTimer = null; }
             if (this._resizeDebounceId) { GLib.Source.remove(this._resizeDebounceId); this._resizeDebounceId = null; }
             if (this._leaveHideTimeoutId) { GLib.Source.remove(this._leaveHideTimeoutId); this._leaveHideTimeoutId = null; }
+            if (this._artVisibilityTimer) { GLib.Source.remove(this._artVisibilityTimer); this._artVisibilityTimer = null; }
             if (this._currentSubPage) { this._currentSubPage.destroy(); this._currentSubPage = null; }
             if (this._lyricsTimerId) { GLib.Source.remove(this._lyricsTimerId); this._lyricsTimerId = null; }
             if (this._lyricsClient) { this._lyricsClient.destroy(); this._lyricsClient = null; }
