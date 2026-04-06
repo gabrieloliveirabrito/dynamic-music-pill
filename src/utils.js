@@ -31,11 +31,15 @@ export function getAverageColor(pixbuf) {
     return { r: Math.floor(r / count), g: Math.floor(g / count), b: Math.floor(b / count) };
 }
 
-export function formatTime(microSeconds) {
-    if (!microSeconds || microSeconds < 0) return "0:00";
-    let seconds = Math.floor(microSeconds / 1000000);
-    let min = Math.floor(seconds / 60);
-    let sec = seconds % 60;
+export function formatTime(microSeconds, forceHours = false) {
+    if (!microSeconds || microSeconds < 0) return forceHours ? "0:00:00" : "0:00";
+    let totalSeconds = Math.floor(microSeconds / 1000000);
+    let hours = Math.floor(totalSeconds / 3600);
+    let min = Math.floor((totalSeconds % 3600) / 60);
+    let sec = totalSeconds % 60;
+    if (forceHours || hours > 0) {
+        return `${hours}:${min < 10 ? '0' + min : min}:${sec < 10 ? '0' + sec : sec}`;
+    }
     return `${min}:${sec < 10 ? '0' + sec : sec}`;
 }
 
@@ -93,6 +97,7 @@ export function getClosestGnomeAccent(r, g, b) {
 
 let dtdDisableRequests = 0;
 let _dtdDockManager = null;
+let _dtdModule = null;
 let _dtdImportPromise = null;
 
 export function initDTDModule() {
@@ -105,6 +110,7 @@ export function initDTDModule() {
     if (_dtdImportPromise) return _dtdImportPromise;
     
     _dtdImportPromise = import(`file://${ext.path}/extension.js`).then(mod => {
+        _dtdModule = mod;
         _dtdDockManager = mod.dockManager;
         if (dtdDisableRequests > 0) {
             _applyDisable();
@@ -117,25 +123,22 @@ export function initDTDModule() {
     return _dtdImportPromise;
 }
 
-function _applyDisable() {
-    if (!_dtdDockManager) return;
-    for (const dock of _dtdDockManager._allDocks) {
-        dock.dash.requiresVisibility = true;
-        dock._show();
+function _refreshDockManager() {
+    if (_dtdModule && _dtdModule.dockManager) {
+        _dtdDockManager = _dtdModule.dockManager;
     }
 }
 
-function _refreshDockManager() {
-    let ext = Main.extensionManager.lookup('dash-to-dock@micxgx.gmail.com');
-    if (!ext || ext.state !== 1) {
-        ext = Main.extensionManager.lookup('ubuntu-dock@ubuntu.com');
-    }
-    if (ext && ext.state === 1 && ext.stateObj) {
-        if (ext.stateObj.dockManager) {
-            _dtdDockManager = ext.stateObj.dockManager;
-        } else if (ext.stateObj._dockManager) {
-            _dtdDockManager = ext.stateObj._dockManager;
+function _applyDisable() {
+    _refreshDockManager();
+    if (!_dtdDockManager) return;
+    try {
+        for (const dock of _dtdDockManager._allDocks) {
+            dock.dash.requiresVisibility = true;
+            dock._show();
         }
+    } catch (e) {
+        console.debug('[Dynamic Music Pill] DTD _applyDisable error: ' + e.message);
     }
 }
 
@@ -143,7 +146,6 @@ export function disableDashToDockAutohide() {
     try {
         dtdDisableRequests++;
         if (dtdDisableRequests === 1) {
-            _refreshDockManager();
             if (_dtdDockManager) {
                 _applyDisable();
             } else {
@@ -156,10 +158,15 @@ export function disableDashToDockAutohide() {
 }
 
 function _applyRestore() {
+    _refreshDockManager();
     if (!_dtdDockManager) return;
-    for (const dock of _dtdDockManager._allDocks) {
-        dock.dash.requiresVisibility = false;
-        dock._updateDashVisibility();
+    try {
+        for (const dock of _dtdDockManager._allDocks) {
+            dock.dash.requiresVisibility = false;
+            dock._updateDashVisibility();
+        }
+    } catch (e) {
+        console.debug('[Dynamic Music Pill] DTD _applyRestore error: ' + e.message);
     }
 }
 
@@ -168,7 +175,6 @@ export function restoreDashToDockAutohide() {
         if (dtdDisableRequests > 0) {
             dtdDisableRequests--;
             if (dtdDisableRequests === 0) {
-                _refreshDockManager();
                 if (_dtdDockManager) {
                     _applyRestore();
                 }

@@ -220,6 +220,7 @@
     <key name="scroll-on-hover-only" type="b">
       <default>false</default>
       <summary>Scroll Text Only on Hover</summary>
+      <description>When enabled, text only scrolls while hovering over the pill.</description>
     </key>
     <key name="enable-transparency" type="b">
       <default>false</default>
@@ -371,6 +372,16 @@
       <default>false</default>
       <summary>Has seen first-time settings hint</summary>
       <description>Whether the user has dismissed the first-time hint in the popup.</description>
+    </key>
+    <key name="show-hours-format" type="b">
+      <default>true</default>
+      <summary>Show HH:MM:SS for long media</summary>
+      <description>Display time as HH:MM:SS instead of MM:SS when the media file is longer than 60 minutes.</description>
+    </key>
+    <key name="popup-show-album-title" type="b">
+      <default>false</default>
+      <summary>Show Album Title in Pop-up</summary>
+      <description>Display album name next to the artist in the popup (Artist • Album).</description>
     </key>
   </schema>
 </schemalist>

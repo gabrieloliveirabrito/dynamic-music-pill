@@ -154,10 +154,10 @@ export const ExpandedPlayer = GObject.registerClass(
                 y_align: Clutter.ActorAlign.CENTER
             });
             topRow.add_child(this._vinylBin);
-            
-            this._vinylBin.reactive    = true;
+
+            this._vinylBin.reactive = true;
             this._vinylBin.track_hover = true;
-            this._vinyl.reactive       = true;
+            this._vinyl.reactive = true;
 
             this._vinylBin.connectObject('enter-event', () => {
                 this._vinyl.ease({ opacity: 175, duration: 150, mode: Clutter.AnimationMode.EASE_OUT_QUAD });
@@ -193,7 +193,9 @@ export const ExpandedPlayer = GObject.registerClass(
             infoBox.layout_manager.orientation = Clutter.Orientation.VERTICAL;
 
             this._titleLabel = new ScrollLabel('expanded-title', this._settings);
+            this._titleLabel.setForceScroll(true);
             this._artistLabel = new ScrollLabel('expanded-artist', this._settings);
+            this._artistLabel.setForceScroll(true);
 
             this._visualizer = new WaveformVisualizer(80, this._settings, true);
 
@@ -357,6 +359,16 @@ export const ExpandedPlayer = GObject.registerClass(
             controlsRow.add_child(this._customBtn2);
             controlsRow.add_child(this._repeatBtn);
 
+            this._settings.connectObject('changed::popup-show-album-title', () => {
+                if (this.visible && this._player) {
+                    let m = this._player.Metadata;
+                    let title = m ? smartUnpack(m['xesam:title']) : null;
+                    let artist = m ? smartUnpack(m['xesam:artist']) : null;
+                    if (Array.isArray(artist)) artist = artist.join(', ');
+                    let artUrl = this._currentArtUrl;
+                    this.updateContent(title, artist, artUrl, this._lastStatus);
+                }
+            }, this);
             this._settings.connectObject('changed::enable-custom-buttons', () => this._updateCustomButtons(), this);
             this._settings.connectObject('changed::custom-button-1', () => this._updateCustomButtons(), this);
             this._settings.connectObject('changed::custom-button-2', () => this._updateCustomButtons(), this);
@@ -402,8 +414,9 @@ export const ExpandedPlayer = GObject.registerClass(
                 this._firstHintBox.hide();
                 if (openSettings) {
                     this.hide();
-                    GLib.timeout_add_once(GLib.PRIORITY_DEFAULT, 100, () => {
+                    GLib.timeout_add(GLib.PRIORITY_DEFAULT, 100, () => {
                         this._controller.openSettings();
+                        return GLib.SOURCE_REMOVE;
                     });
                 }
             };
@@ -453,9 +466,10 @@ export const ExpandedPlayer = GObject.registerClass(
             this._box.connectObject('leave-event', () => {
                 if (this._settings.get_boolean('popup-hide-on-leave')) {
                     if (this._leaveHideTimeoutId) GLib.Source.remove(this._leaveHideTimeoutId);
-                    this._leaveHideTimeoutId = GLib.timeout_add_once(GLib.PRIORITY_DEFAULT, 300, () => {
+                    this._leaveHideTimeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 300, () => {
                         this._leaveHideTimeoutId = null;
                         this.hide();
+                        return GLib.SOURCE_REMOVE;
                     });
                 }
                 return Clutter.EVENT_PROPAGATE;
@@ -660,8 +674,15 @@ export const ExpandedPlayer = GObject.registerClass(
             if (this._titleLabel && this._titleLabel._text !== title) {
                 this._titleLabel.setText(title || _('Unknown Title'), false);
             }
-            if (this._artistLabel && this._artistLabel._text !== artist) {
-                this._artistLabel.setText(artist || _('Unknown Artist'), false);
+
+            let displayArtist = artist || _('Unknown Artist');
+            if (this._settings.get_boolean('popup-show-album-title') && this._player) {
+                let m = this._player.Metadata;
+                let album = m ? smartUnpack(m['xesam:album']) : null;
+                if (album) displayArtist = `${displayArtist}  •  ${album}`;
+            }
+            if (this._artistLabel && this._artistLabel._text !== displayArtist) {
+                this._artistLabel.setText(displayArtist, false);
             }
 
             this._seekLockTime = 0;
@@ -671,12 +692,29 @@ export const ExpandedPlayer = GObject.registerClass(
             if (trackChanged && this._player) {
                 this._player._lastPosition = 0;
                 this._player._lastPositionTime = Date.now();
+
+                // Reset stale detection and seeker state for new track
+                this._lastTickPosition = undefined;
+                this._lastTickTime = undefined;
+                this._lastPositionSync = 0;
+                this._lastTickLength = 0;
+
+                // Force slider to start and recalculate time label widths
+                if (this._sliderFill) this._sliderFill.width = 6;
+                if (this._currentTimeLabel) {
+                    this._currentTimeLabel.text = '0:00';
+                    this._currentTimeLabel.set_width(-1);
+                }
+                if (this._totalTimeLabel) {
+                    this._totalTimeLabel.text = '0:00';
+                    this._totalTimeLabel.set_width(-1);
+                }
             }
 
             let showVinyl = this._settings.get_boolean('popup-show-vinyl');
             if (!artUrl || !showVinyl) {
                 if (!this._artVisibilityTimer) {
-                    this._artVisibilityTimer = GLib.timeout_add_once(GLib.PRIORITY_DEFAULT, 1000, () => {
+                    this._artVisibilityTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1000, () => {
                         this._artVisibilityTimer = null;
                         this._vinylBin.hide();
                         this._vinyl.hide();
@@ -693,6 +731,7 @@ export const ExpandedPlayer = GObject.registerClass(
                                 topRow.x_align = Clutter.ActorAlign.CENTER;
                             }
                         }
+                        return GLib.SOURCE_REMOVE;
                     });
                 }
             } else {
@@ -978,13 +1017,14 @@ export const ExpandedPlayer = GObject.registerClass(
             buildFn(contentBox, tc, ta, page);
             this._box.add_child(page);
 
-            GLib.idle_add_once(GLib.PRIORITY_DEFAULT_IDLE, () => {
+            GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
                 if (page.get_parent() && page === this._currentSubPage) {
                     page.ease({
                         translation_x: 0, opacity: 255,
                         duration: SUBPAGE_ANIM_IN_DURATION, mode: Clutter.AnimationMode.EASE_OUT_QUAD
                     });
                 }
+                return false;
             });
         }
 
@@ -1005,8 +1045,8 @@ export const ExpandedPlayer = GObject.registerClass(
                 }
             });
         }
-        
-       _showLyricsPage() {
+
+        _showLyricsPage() {
             if (this._currentSubPage) return;
 
             this._savedBoxHeight = this._box.height;
@@ -1017,13 +1057,13 @@ export const ExpandedPlayer = GObject.registerClass(
                 ? this._controller._pill._displayedColor : { r: 40, g: 40, b: 40 };
 
             let brightness = (pillCol.r * 299 + pillCol.g * 587 + pillCol.b * 114) / 1000;
-            let isDark     = brightness <= 160;
-            let btnRgb     = isDark ? '255,255,255' : '0,0,0';
-            let iconClr    = isDark ? 'rgba(255,255,255,0.92)' : 'rgba(30,30,30,0.92)';
+            let isDark = brightness <= 160;
+            let btnRgb = isDark ? '255,255,255' : '0,0,0';
+            let iconClr = isDark ? 'rgba(255,255,255,0.92)' : 'rgba(30,30,30,0.92)';
 
             let followRadius = this._settings.get_boolean('popup-follow-radius');
-            let rawRadius    = followRadius ? this._settings.get_int('border-radius') : 24;
-            let dynRadius    = (typeof rawRadius === 'number' && !isNaN(rawRadius)) ? rawRadius : 24;
+            let rawRadius = followRadius ? this._settings.get_int('border-radius') : 24;
+            let dynRadius = (typeof rawRadius === 'number' && !isNaN(rawRadius)) ? rawRadius : 24;
 
             let page = new St.Widget({
                 layout_manager: new Clutter.BinLayout(),
@@ -1045,7 +1085,7 @@ export const ExpandedPlayer = GObject.registerClass(
                 let tid = smartUnpack(m['mpris:trackid']);
                 if (tid) trackId = tid;
                 let positionMicro = Math.round(timeMs * 1000);
-                this._player._lastPosition     = positionMicro;
+                this._player._lastPosition = positionMicro;
                 this._player._lastPositionTime = Date.now();
                 if (this._controller && this._controller._connection) {
                     this._controller._connection.call(
@@ -1055,7 +1095,7 @@ export const ExpandedPlayer = GObject.registerClass(
                         'SetPosition',
                         new GLib.Variant('(ox)', [trackId, positionMicro]),
                         null, Gio.DBusCallFlags.NONE, -1, null,
-                        (conn, res) => { try { conn.call_finish(res); } catch (e) {} }
+                        (conn, res) => { try { conn.call_finish(res); } catch (e) { } }
                     );
                 }
             };
@@ -1073,10 +1113,10 @@ export const ExpandedPlayer = GObject.registerClass(
             page.add_child(lyricsWidget);
 
             const _backBtnStyle = (hover, disableAnim = false) =>
-                `width: 32px; height: 32px;` + 
-                `margin: 8px;` +               
+                `width: 32px; height: 32px;` +
+                `margin: 8px;` +
                 `padding: 0px;` +
-                `border-radius: 8px;` +       
+                `border-radius: 8px;` +
                 `background-color: rgba(${btnRgb}, ${hover ? 0.30 : 0.15});` +
                 `border: 1px solid rgba(${btnRgb}, ${hover ? 0.20 : 0.10});` +
                 (disableAnim ? `transition-duration: 0ms;` : `transition-duration: 140ms;`);
@@ -1105,10 +1145,10 @@ export const ExpandedPlayer = GObject.registerClass(
                 if (!backBtn.get_parent() || page !== this._currentSubPage) return;
                 backBtn.set_style(_backBtnStyle(backBtn.hover));
             });
-            
+
             _addBtnPressAnim(backBtn);
             backBtn.connectObject('button-press-event', () => Clutter.EVENT_STOP, page);
-            
+
             const _doBack = () => {
                 backBtn.set_style(_backBtnStyle(false, true));
                 this._popPage();
@@ -1119,7 +1159,7 @@ export const ExpandedPlayer = GObject.registerClass(
                 if (e.type() === Clutter.EventType.TOUCH_END) { _doBack(); return Clutter.EVENT_STOP; }
                 return Clutter.EVENT_PROPAGATE;
             }, page);
-            
+
             page.add_child(backBtnWrapper);
 
             this._lyricsWidget = lyricsWidget;
@@ -1141,10 +1181,10 @@ export const ExpandedPlayer = GObject.registerClass(
             if (this._player) {
                 let m = this._player.Metadata;
                 if (m) {
-                    let fetchTitle  = smartUnpack(m['xesam:title'])  || '';
+                    let fetchTitle = smartUnpack(m['xesam:title']) || '';
                     let fetchArtist = smartUnpack(m['xesam:artist']) || '';
                     if (Array.isArray(fetchArtist)) fetchArtist = fetchArtist.join(', ');
-                    let fetchAlbum  = smartUnpack(m['xesam:album'])  || '';
+                    let fetchAlbum = smartUnpack(m['xesam:album']) || '';
                     let lengthMicro = smartUnpack(m['mpris:length']) || 0;
                     let durationSec = Math.round(lengthMicro / 1_000_000);
 
@@ -1188,8 +1228,8 @@ export const ExpandedPlayer = GObject.registerClass(
 
         _getCurrentPositionMs() {
             if (!this._player) return 0;
-            let now        = Date.now();
-            let cachedPos  = this._player._lastPosition  || 0;
+            let now = Date.now();
+            let cachedPos = this._player._lastPosition || 0;
             let lastUpdate = this._player._lastPositionTime || now;
             let posUs = cachedPos;
             if (this._player.PlaybackStatus === 'Playing')
@@ -1257,8 +1297,20 @@ export const ExpandedPlayer = GObject.registerClass(
                 sliderBg.add_child(sliderFill);
                 let volLabel = new St.Label({ text: `${Math.round(frac0 * 100)}%`, style: `color:${ta};min-width:38px;text-align:right;`, y_align: Clutter.ActorAlign.CENTER });
 
-                const upd = (f) => { f = Math.max(0, Math.min(1, f)); let w = sliderBg.get_width(); if (w > 0) sliderFill.width = Math.round(w * f); volLabel.text = `${Math.round(f * 100)}%`; };
+                const upd = (f) => { f = Math.max(0, Math.min(1, f)); if (!sliderBg.has_allocation || !sliderBg.has_allocation()) { volLabel.text = `${Math.round(f * 100)}%`; return; } let w = sliderBg.get_width(); if (w > 0) sliderFill.width = Math.round(w * f); volLabel.text = `${Math.round(f * 100)}%`; };
                 const applyVol = (f) => { f = Math.max(0, Math.min(1, f)); stream.volume = Math.round(f * maxVol); stream.push_volume(); if (stream.is_muted && f > 0) stream.change_is_muted(false); };
+
+                // Throttle volume changes during drag to prevent audio crackling
+                let _lastApplyTime = 0;
+                let _lastDragFrac = 0;
+                const applyVolThrottled = (f) => {
+                    _lastDragFrac = f;
+                    let now = Date.now();
+                    if (now - _lastApplyTime < 30) return;
+                    _lastApplyTime = now;
+                    applyVol(f);
+                };
+
                 const drag = (ev) => {
                     let [ex, ey] = ev.get_coords();
                     let [ok, relX, relY] = sliderBg.transform_stage_point(ex, ey);
@@ -1267,7 +1319,7 @@ export const ExpandedPlayer = GObject.registerClass(
                         if (sw <= 0) return;
                         let f = Math.max(0, Math.min(1, relX / sw));
                         upd(f);
-                        applyVol(f);
+                        applyVolThrottled(f);
                     }
                 };
 
@@ -1280,6 +1332,7 @@ export const ExpandedPlayer = GObject.registerClass(
 
                 const syncFromStream = () => {
                     if (!sliderBg.get_parent()) return;
+                    if (sliderBg._drag) return; // Don't sync from stream while dragging
                     let f = stream.is_muted ? 0 : Math.min(1, stream.volume / maxVol);
                     upd(f);
                     muteBtn.label = stream.is_muted ? _('Unmute') : _('Mute');
@@ -1289,7 +1342,7 @@ export const ExpandedPlayer = GObject.registerClass(
                 stream.connectObject('notify::is-muted', syncFromStream, subpage);
 
                 sliderBg.connectObject('button-press-event', (a, e) => { if (e.get_button() === 8) return Clutter.EVENT_PROPAGATE; sliderBg._drag = true; drag(e); return Clutter.EVENT_STOP; }, subpage);
-                sliderBg.connectObject('button-release-event', (a, e) => { if (e.get_button() === 8) return Clutter.EVENT_PROPAGATE; sliderBg._drag = false; return Clutter.EVENT_STOP; }, subpage);
+                sliderBg.connectObject('button-release-event', (a, e) => { if (e.get_button() === 8) return Clutter.EVENT_PROPAGATE; sliderBg._drag = false; applyVol(_lastDragFrac); return Clutter.EVENT_STOP; }, subpage);
                 sliderBg.connectObject('motion-event', (a, e) => { if (sliderBg._drag) drag(e); return Clutter.EVENT_STOP; }, subpage);
 
                 global.stage.connectObject('captured-event', (stage, ev) => {
@@ -1297,11 +1350,11 @@ export const ExpandedPlayer = GObject.registerClass(
                     if (t === Clutter.EventType.MOTION) {
                         if (sliderBg._drag) drag(ev);
                     } else if (t === Clutter.EventType.BUTTON_RELEASE) {
-                        sliderBg._drag = false;
+                        if (sliderBg._drag) { sliderBg._drag = false; applyVol(_lastDragFrac); }
                     }
                     return Clutter.EVENT_PROPAGATE;
                 }, subpage);
-                sliderBg.connectObject('touch-event', (a, e) => { let t = e.type(); if (t === Clutter.EventType.TOUCH_BEGIN || t === Clutter.EventType.TOUCH_UPDATE) { drag(e); return Clutter.EVENT_STOP; } return Clutter.EVENT_PROPAGATE; }, subpage);
+                sliderBg.connectObject('touch-event', (a, e) => { let t = e.type(); if (t === Clutter.EventType.TOUCH_BEGIN || t === Clutter.EventType.TOUCH_UPDATE) { drag(e); return Clutter.EVENT_STOP; } if (t === Clutter.EventType.TOUCH_END) { applyVol(_lastDragFrac); return Clutter.EVENT_STOP; } return Clutter.EVENT_PROPAGATE; }, subpage);
 
                 sliderRow.add_child(sliderBg);
                 sliderRow.add_child(volLabel);
@@ -1313,7 +1366,15 @@ export const ExpandedPlayer = GObject.registerClass(
                 muteBtn.connectObject('touch-event', (a, e) => { if (e.type() === Clutter.EventType.TOUCH_END) { doMute(); return Clutter.EVENT_STOP; } return Clutter.EVENT_PROPAGATE; }, subpage);
                 contentBox.add_child(muteBtn);
 
-                GLib.timeout_add_once(GLib.PRIORITY_DEFAULT, 80, () => { if (!sliderBg.get_parent()) return; upd(frac0); });
+                // Defer initial fill render to avoid allocation warnings
+                GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+                    if (!sliderBg.get_parent() || !subpage.get_parent()) return GLib.SOURCE_REMOVE;
+                    if (sliderBg.has_allocation && sliderBg.has_allocation() && sliderBg.get_width() > 0) {
+                        upd(frac0);
+                        return GLib.SOURCE_REMOVE;
+                    }
+                    return GLib.SOURCE_CONTINUE;
+                });
             });
         }
 
@@ -1398,10 +1459,11 @@ export const ExpandedPlayer = GObject.registerClass(
                         const doTimer = (m, b, lbl) => {
                             lbl.text = '\u2713';
                             b.set_style('border-radius:12px;padding:8px 12px;min-width:42px;background-color:rgba(255,255,255,0.38);');
-                            GLib.timeout_add_once(GLib.PRIORITY_DEFAULT, 300, () => {
+                            GLib.timeout_add(GLib.PRIORITY_DEFAULT, 300, () => {
                                 ctrl.startSleepTimer(m);
                                 this._updateCustomButtons();
                                 this._popPage();
+                                return GLib.SOURCE_REMOVE;
                             });
                         };
                         btn.connectObject('button-press-event', () => Clutter.EVENT_STOP, subpage);
@@ -1449,9 +1511,10 @@ export const ExpandedPlayer = GObject.registerClass(
                         const doRate = (r, b, lbl) => {
                             lbl.text = '\u2713';
                             b.set_style('border-radius:12px;padding:8px 14px;min-width:42px;background-color:rgba(255,255,255,0.38);');
-                            GLib.timeout_add_once(GLib.PRIORITY_DEFAULT, 300, () => {
+                            GLib.timeout_add(GLib.PRIORITY_DEFAULT, 300, () => {
                                 this._controller.setPlaybackRate(r);
                                 this._popPage();
+                                return GLib.SOURCE_REMOVE;
                             });
                         };
                         btn.connectObject('button-press-event', () => Clutter.EVENT_STOP, subpage);
@@ -1528,15 +1591,16 @@ export const ExpandedPlayer = GObject.registerClass(
                         copyIcon.icon_name = 'object-select-symbolic';
                         copyIcon.opacity = 0;
                         copyIcon.ease({ opacity: 255, duration: COPY_ICON_FADE_IN_DURATION, mode: Clutter.AnimationMode.EASE_OUT_QUAD });
-                        let tid = GLib.timeout_add_once(GLib.PRIORITY_DEFAULT, COPY_ICON_RESET_DELAY, () => {
+                        let tid = GLib.timeout_add(GLib.PRIORITY_DEFAULT, COPY_ICON_RESET_DELAY, () => {
                             const idx = copyTimeouts.indexOf(tid);
                             if (idx >= 0) copyTimeouts.splice(idx, 1);
-                            if (!copyIcon.get_parent()) return;
+                            if (!copyIcon.get_parent()) return GLib.SOURCE_REMOVE;
                             copyIcon.ease({
                                 opacity: 0, duration: COPY_ICON_FADE_OUT_DURATION, mode: Clutter.AnimationMode.EASE_IN_QUAD, onStopped: () => {
                                     if (copyIcon.get_parent()) { copyIcon.icon_name = 'edit-copy-symbolic'; copyIcon.opacity = Math.round(255 * 0.6); }
                                 }
                             });
+                            return GLib.SOURCE_REMOVE;
                         });
                         copyTimeouts.push(tid);
                     };
@@ -1584,8 +1648,8 @@ export const ExpandedPlayer = GObject.registerClass(
 
             let status = player.PlaybackStatus;
             let m = player.Metadata;
-            let title = m ? smartUnpack(m['xesam:title']) : '';
-            let artist = m ? smartUnpack(m['xesam:artist']) : '';
+            let title = m ? smartUnpack(m['xesam:title']) : null;
+            let artist = m ? smartUnpack(m['xesam:artist']) : null;
             if (Array.isArray(artist)) artist = artist.join(', ');
 
             this.updateContent(title, artist, artUrl, status);
@@ -1645,16 +1709,18 @@ export const ExpandedPlayer = GObject.registerClass(
             this._stopTimer();
             this._stopVinyl();
             if (this._controller._pill) this._controller._pill._setPopupOpen(false);
-            this.easeAsync({
+            this.ease({
                 opacity: 0,
                 duration: 200,
                 mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-            }).then(() => {
-                this.visible = false;
-                if (this._controller) {
-                    this._controller.closeMenu();
+                onStopped: (isFinished) => {
+                    if (!isFinished) return;
+                    this.visible = false;
+                    if (this._controller) {
+                        this._controller.closeMenu();
+                    }
                 }
-            }).catch(() => { /* transition cancelled */ });
+            });
         }
 
         _cleanup() {
@@ -1663,12 +1729,17 @@ export const ExpandedPlayer = GObject.registerClass(
             if (this._leaveHideTimeoutId) { GLib.Source.remove(this._leaveHideTimeoutId); this._leaveHideTimeoutId = null; }
             if (this._currentSubPage) { this._currentSubPage.destroy(); this._currentSubPage = null; }
             if (this._lyricsTimerId) { GLib.Source.remove(this._lyricsTimerId); this._lyricsTimerId = null; }
-            if (this._lyricsClient)  { this._lyricsClient.destroy(); this._lyricsClient = null; }
+            if (this._lyricsClient) { this._lyricsClient.destroy(); this._lyricsClient = null; }
             this._lyricsWidget = null;
         }
 
         _startTimer() {
             if (this._updateTimer) GLib.Source.remove(this._updateTimer);
+            // Reset stale detection state for fresh popup session
+            this._lastTickPosition = undefined;
+            this._lastTickTime = undefined;
+            this._lastPositionSync = 0;
+            this._lastTickLength = 0;
             this._updateTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 100, () => {
                 this._tick();
                 return GLib.SOURCE_CONTINUE;
@@ -1681,55 +1752,89 @@ export const ExpandedPlayer = GObject.registerClass(
         }
 
         _tick() {
-          try {
-            if (!this._player || !this.get_parent()) return GLib.SOURCE_REMOVE;
+            try {
+                if (!this._player || !this.get_parent()) return GLib.SOURCE_REMOVE;
 
-            let meta = this._player.Metadata;
-            let length = meta ? smartUnpack(meta['mpris:length']) : 0;
-            if (length <= 0) return;
+                let meta = this._player.Metadata;
+                let length = meta ? smartUnpack(meta['mpris:length']) : 0;
+                if (length <= 0) return;
 
-            let now = Date.now();
-            if (now - this._seekLockTime < 2000) return GLib.SOURCE_CONTINUE;
+                let now = Date.now();
+                if (now - this._seekLockTime < 2000) return GLib.SOURCE_CONTINUE;
 
-            let cachedPos = this._player._lastPosition || 0;
-            let lastUpdate = this._player._lastPositionTime || now;
-
-            let currentPos = cachedPos;
-            if (this._player.PlaybackStatus === 'Playing') {
-                currentPos += (now - lastUpdate) * 1000;
-            }
-            if (currentPos > length) currentPos = length;
-
-             let newCurrentText = formatTime(currentPos);
-            if (this._currentTimeLabel.text !== newCurrentText) {
-                this._currentTimeLabel.text = newCurrentText;
-                this._currentTimeLabel.set_width(-1);
-                let [, natWC] = this._currentTimeLabel.get_preferred_width(-1);
-                this._currentTimeLabel.set_width(Math.ceil(natWC) + 2);
-            }
-            let newTotalText = formatTime(length);
-            if (this._totalTimeLabel.text !== newTotalText) {
-                this._totalTimeLabel.text = newTotalText;
-                this._totalTimeLabel.set_width(-1);
-                let [, natWT] = this._totalTimeLabel.get_preferred_width(-1);
-                this._totalTimeLabel.set_width(Math.ceil(natWT) + 2);
-            }
-
-            let percent = Math.min(1, Math.max(0, currentPos / length));
-            let totalW = Math.round(this._sliderBin.get_width());
-
-            if (totalW > 0) {
-                let targetWidth = Math.max(6, Math.min(totalW, Math.round(totalW * percent)));
-                if (Math.abs(this._sliderFill.width - targetWidth) >= 1) {
-                    this._sliderFill.width = targetWidth;
+                // Periodically sync position from DBus to keep _lastPositionTime fresh
+                // Most MPRIS players don't push Position updates, only send Seeked on seek
+                if (this._player.PlaybackStatus === 'Playing' &&
+                    (!this._lastPositionSync || now - this._lastPositionSync > 5000)) {
+                    this._lastPositionSync = now;
+                    if (this._controller) this._controller._syncPosition(this._player);
                 }
-            }
 
-            return GLib.SOURCE_CONTINUE;
-          } catch (e) {
-            console.debug(`[Dynamic Music Pill] _tick error: ${e.message}`);
-            return GLib.SOURCE_CONTINUE;
-          }
+                let cachedPos = this._player._lastPosition || 0;
+                let lastUpdate = this._player._lastPositionTime || now;
+
+                // Stale position detection for KDE Connect / GS Connect
+                // Only triggers when position hasn't been updated by DBus for >6s
+                // AND the raw cached position hasn't changed (rules out normal interpolation)
+                let isStale = false;
+                if (this._player.PlaybackStatus === 'Playing') {
+                    if (cachedPos === (this._lastTickPosition || 0) && (now - lastUpdate) > 6000
+                        && this._lastTickTime && (now - this._lastTickTime) > 6000) {
+                        isStale = true;
+                    }
+                    if (cachedPos !== (this._lastTickPosition || 0)) this._lastTickTime = now;
+                    this._lastTickPosition = cachedPos;
+                }
+
+                let currentPos = cachedPos;
+                if (this._player.PlaybackStatus === 'Playing' && !isStale) {
+                    currentPos += (now - lastUpdate) * 1000;
+                }
+                if (currentPos > length) currentPos = length;
+
+                let useHours = length >= 3600000000 && this._settings.get_boolean('show-hours-format');
+
+                // Detect track length change (format switch mm:ss <-> hh:mm:ss)
+                // Force label width recalculation when format changes
+                if (this._lastTickLength && this._lastTickLength !== length) {
+                    let prevUseHours = this._lastTickLength >= 3600000000 && this._settings.get_boolean('show-hours-format');
+                    if (prevUseHours !== useHours) {
+                        // Format changed - force width recalc by clearing fixed widths
+                        this._currentTimeLabel.set_width(-1);
+                        this._totalTimeLabel.set_width(-1);
+                    }
+                }
+                this._lastTickLength = length;
+
+                let newCurrentText = isStale ? '--:--' : formatTime(currentPos, useHours);
+                if (this._currentTimeLabel.text !== newCurrentText) {
+                    this._currentTimeLabel.text = newCurrentText;
+                    this._currentTimeLabel.set_width(-1);
+                    let [, natWC] = this._currentTimeLabel.get_preferred_width(-1);
+                    this._currentTimeLabel.set_width(Math.ceil(natWC) + 2);
+                }
+                let newTotalText = isStale ? '--:--' : formatTime(length, useHours);
+                if (this._totalTimeLabel.text !== newTotalText) {
+                    this._totalTimeLabel.text = newTotalText;
+                    this._totalTimeLabel.set_width(-1);
+                    let [, natWT] = this._totalTimeLabel.get_preferred_width(-1);
+                    this._totalTimeLabel.set_width(Math.ceil(natWT) + 2);
+                }
+
+                if (isStale) return;
+
+                let percent = Math.min(1, Math.max(0, currentPos / length));
+                let totalW = Math.round(this._sliderBin.get_width());
+
+                if (totalW > 0) {
+                    let targetWidth = Math.max(6, Math.min(totalW, Math.round(totalW * percent)));
+                    if (Math.abs(this._sliderFill.width - targetWidth) >= 1) {
+                        this._sliderFill.width = targetWidth;
+                    }
+                }
+            } catch (e) {
+                console.debug(`[Dynamic Music Pill] _tick error: ${e.message}`);
+            }
         }
 
         _handleSeek(event) {
@@ -1751,7 +1856,8 @@ export const ExpandedPlayer = GObject.registerClass(
             this._player._lastPosition = targetPos;
             this._player._lastPositionTime = Date.now();
 
-            this._currentTimeLabel.text = formatTime(targetPos);
+            let useHours = length >= 3600000000 && this._settings.get_boolean('show-hours-format');
+            this._currentTimeLabel.text = formatTime(targetPos, useHours);
             let totalW = Math.round(this._sliderBin.get_width());
 
             if (totalW > 0) {
@@ -1795,19 +1901,20 @@ export const ExpandedPlayer = GObject.registerClass(
             this._vinyl.remove_all_transitions();
             let currentAngle = this._vinyl.rotation_angle_z || 0;
 
-            this._vinyl.easeAsync({
+            this._vinyl.ease({
                 rotation_angle_z: currentAngle + 90,
                 duration: initialDuration,
                 mode: Clutter.AnimationMode.EASE_IN_QUAD,
-            }).then(() => {
-                if (!this._isSpinning || !this._vinyl) return;
-                let nextAngle = this._vinyl.rotation_angle_z || 0;
-                this._vinyl.ease({
-                    rotation_angle_z: nextAngle + 36000,
-                    duration: loopDuration,
-                    mode: Clutter.AnimationMode.LINEAR
-                });
-            }).catch(() => { /* cancelled */ });
+                onStopped: (isFinished) => {
+                    if (!isFinished || !this._isSpinning || !this._vinyl) return;
+                    let nextAngle = this._vinyl.rotation_angle_z || 0;
+                    this._vinyl.ease({
+                        rotation_angle_z: nextAngle + 36000,
+                        duration: loopDuration,
+                        mode: Clutter.AnimationMode.LINEAR
+                    });
+                }
+            });
         }
 
         _stopVinyl() {
@@ -1821,15 +1928,16 @@ export const ExpandedPlayer = GObject.registerClass(
             let currentAngle = this._vinyl.rotation_angle_z || 0;
             this._vinyl.remove_all_transitions();
 
-            this._vinyl.easeAsync({
+            this._vinyl.ease({
                 rotation_angle_z: currentAngle + 90,
                 duration: stopDuration,
                 mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-            }).then(() => {
-                if (this._vinyl) {
-                    this._vinyl.rotation_angle_z = this._vinyl.rotation_angle_z % 360;
+                onStopped: (isFinished) => {
+                    if (isFinished && this._vinyl) {
+                        this._vinyl.rotation_angle_z = this._vinyl.rotation_angle_z % 360;
+                    }
                 }
-            }).catch(() => { /* cancelled */ });
+            });
         }
 
 
@@ -1868,9 +1976,9 @@ export const ExpandedPlayer = GObject.registerClass(
                 this._resizeDebounceId = null;
             }
 
-            this._resizeDebounceId = GLib.idle_add_once(GLib.PRIORITY_DEFAULT, () => {
+            this._resizeDebounceId = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
                 this._resizeDebounceId = null;
-                if (!this._box) return;
+                if (!this._box) return GLib.SOURCE_REMOVE;
 
                 let currentW = this._box.width;
                 let currentX = Math.round(this._box.x);
@@ -1926,12 +2034,12 @@ export const ExpandedPlayer = GObject.registerClass(
                 if (currentW > 0) this._box.set_width(currentW);
 
                 let pill = this._controller._pill;
-                if (!pill || !pill.get_parent()) return;
+                if (!pill || !pill.get_parent()) return GLib.SOURCE_REMOVE;
                 let [px, py] = pill.get_transformed_position();
                 let [pw, ph] = pill.get_transformed_size();
                 let monitor = Main.layoutManager.findMonitorForActor(pill);
 
-                if (!monitor) return;
+                if (!monitor) return GLib.SOURCE_REMOVE;
 
                 px = Math.round(px); py = Math.round(py);
                 pw = Math.round(pw); ph = Math.round(ph);
@@ -1974,14 +2082,14 @@ export const ExpandedPlayer = GObject.registerClass(
 
                 if (currentW === menuW && currentX === targetX && currentY === targetY) {
                     this._isOpening = false;
-                    return;
+                    return GLib.SOURCE_REMOVE;
                 }
 
                 if (this._isOpening) {
                     this._box.set_position(targetX, targetY);
                     this._box.set_width(menuW);
                     this._isOpening = false;
-                    return;
+                    return GLib.SOURCE_REMOVE;
                 }
 
                 this._box.remove_all_transitions();
@@ -1993,6 +2101,7 @@ export const ExpandedPlayer = GObject.registerClass(
                     mode: Clutter.AnimationMode.EASE_OUT_QUAD
                 });
 
+                return GLib.SOURCE_REMOVE;
             });
         }
     });

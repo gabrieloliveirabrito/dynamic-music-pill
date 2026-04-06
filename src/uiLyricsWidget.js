@@ -20,48 +20,48 @@ export const LyricsWidget = GObject.registerClass(
             });
 
             this._seekCallback = seekCallback;
-            this._state        = 'loading';
-            this._lyrics       = [];
-            this._activeIndex  = -1;
+            this._state = 'loading';
+            this._lyrics = [];
+            this._activeIndex = -1;
 
-            this._geoms     = [];
-            this._totalH    = 0;
+            this._geoms = [];
+            this._totalH = 0;
             this._geomBuilt = false;
 
-            this._SZ    = 14;
-            this._GAP   = 12;
+            this._SZ = 14;
+            this._GAP = 12;
             this._PAD_X = 16;
 
-            this._lineAlpha   = [];
-            this._lineScale   = [];
+            this._lineAlpha = [];
+            this._lineScale = [];
             this._alphaTickId = null;
 
-            this._hoverIndex      = -1;
-            this._hoverPillY      = -1;
-            this._hoverPillAlpha  = 0;
-            this._hoverExtras     = [];   
-            this._hoverTickId     = null;
+            this._hoverIndex = -1;
+            this._hoverPillY = -1;
+            this._hoverPillAlpha = 0;
+            this._hoverExtras = [];
+            this._hoverTickId = null;
 
-            this._scrollOffset       = 0;
+            this._scrollOffset = 0;
             this._targetScrollOffset = 0;
-            this._scrollTickId       = null;
+            this._scrollTickId = null;
 
             this._manualScroll = false;
-            this._manualTimer  = null;
-            this._MANUAL_MS    = 2500;
+            this._manualTimer = null;
+            this._MANUAL_MS = 2500;
 
-            this._pulseAlpha  = 0.4;
-            this._pulseDir    = 1;
+            this._pulseAlpha = 0.4;
+            this._pulseDir = 1;
             this._pulseTickId = null;
 
             this._fgR = 1; this._fgG = 1; this._fgB = 1;
 
-            this.connect('repaint',              this._onRepaint.bind(this));
+            this.connect('repaint', this._onRepaint.bind(this));
             this.connect('button-release-event', this._onClick.bind(this));
-            this.connect('motion-event',         this._onMotion.bind(this));
-            this.connect('leave-event',          this._onLeave.bind(this));
-            this.connect('scroll-event',         this._onScroll.bind(this));
-            this.connect('destroy',              this._cleanup.bind(this));
+            this.connect('motion-event', this._onMotion.bind(this));
+            this.connect('leave-event', this._onLeave.bind(this));
+            this.connect('scroll-event', this._onScroll.bind(this));
+            this.connect('destroy', this._cleanup.bind(this));
         }
 
 
@@ -86,11 +86,11 @@ export const LyricsWidget = GObject.registerClass(
         setLyrics(lyrics) {
             if (!lyrics || lyrics.length === 0) { this.showEmpty(); return; }
             this._fullReset('lyrics');
-            this._lyrics      = lyrics;
-            this._lineAlpha   = new Array(lyrics.length).fill(0.22);
-            this._lineScale   = new Array(lyrics.length).fill(1.0);
+            this._lyrics = lyrics;
+            this._lineAlpha = new Array(lyrics.length).fill(0.22);
+            this._lineScale = new Array(lyrics.length).fill(1.0);
             this._hoverExtras = new Array(lyrics.length).fill(0.0);
-            this._geomBuilt   = false;
+            this._geomBuilt = false;
             this.queue_repaint();
         }
 
@@ -112,21 +112,21 @@ export const LyricsWidget = GObject.registerClass(
         }
 
         _fullReset(state) {
-            this._state              = state;
-            this._lyrics             = [];
-            this._activeIndex        = -1;
-            this._hoverIndex         = -1;
-            this._hoverExtras        = [];
-            this._hoverPillY         = -1;
-            this._hoverPillAlpha     = 0;
-            this._lineAlpha          = [];
-            this._lineScale          = [];
-            this._geoms              = [];
-            this._totalH             = 0;
-            this._geomBuilt          = false;
-            this._scrollOffset       = 0;
+            this._state = state;
+            this._lyrics = [];
+            this._activeIndex = -1;
+            this._hoverIndex = -1;
+            this._hoverExtras = [];
+            this._hoverPillY = -1;
+            this._hoverPillAlpha = 0;
+            this._lineAlpha = [];
+            this._lineScale = [];
+            this._geoms = [];
+            this._totalH = 0;
+            this._geomBuilt = false;
+            this._scrollOffset = 0;
             this._targetScrollOffset = 0;
-            this._manualScroll       = false;
+            this._manualScroll = false;
             this._stopScrollAnim();
             this._stopAlphaAnim();
             this._stopHoverAnim();
@@ -139,7 +139,7 @@ export const LyricsWidget = GObject.registerClass(
             if (this._geomBuilt || this._lyrics.length === 0) return;
             this._geomBuilt = true;
 
-            const textW  = width - this._PAD_X * 2;
+            const textW = width - this._PAD_X * 2;
             const layout = PangoCairo.create_layout(cr);
             layout.set_width(textW * Pango.SCALE);
             layout.set_wrap(Pango.WrapMode.WORD_CHAR);
@@ -167,7 +167,7 @@ export const LyricsWidget = GObject.registerClass(
             if (this._activeIndex >= 0)
                 this._startAlphaAnim();
 
-            this._scrollOffset       = 0;
+            this._scrollOffset = 0;
             this._targetScrollOffset = 0;
         }
 
@@ -233,10 +233,10 @@ export const LyricsWidget = GObject.registerClass(
             let height = this.get_height();
             if (height <= 0) return;
 
-            let geo        = this._geoms[this._activeIndex];
-            let maxScroll  = Math.max(0, this._totalH - height);
-            let rowTop     = geo.y - this._scrollOffset;
-            let rowBottom  = rowTop + geo.slotH;
+            let geo = this._geoms[this._activeIndex];
+            let maxScroll = Math.max(0, this._totalH - height);
+            let rowTop = geo.y - this._scrollOffset;
+            let rowBottom = rowTop + geo.slotH;
 
             const MARGIN = 30;
             if (rowTop >= MARGIN && rowBottom <= height - MARGIN) return;
@@ -274,8 +274,8 @@ export const LyricsWidget = GObject.registerClass(
             if (this._state !== 'lyrics') return Clutter.EVENT_PROPAGATE;
             let dy = 0;
             let dir = event.get_scroll_direction();
-            if      (dir === Clutter.ScrollDirection.UP)     dy = -48;
-            else if (dir === Clutter.ScrollDirection.DOWN)   dy = 48;
+            if (dir === Clutter.ScrollDirection.UP) dy = -48;
+            else if (dir === Clutter.ScrollDirection.DOWN) dy = 48;
             else if (dir === Clutter.ScrollDirection.SMOOTH) {
                 let [, deltaY] = event.get_scroll_delta();
                 dy = deltaY * 38;
@@ -290,7 +290,7 @@ export const LyricsWidget = GObject.registerClass(
             this._startScrollAnim();
 
             this._manualTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, this._MANUAL_MS, () => {
-                this._manualTimer  = null;
+                this._manualTimer = null;
                 this._manualScroll = false;
                 this._updateScrollTarget();
                 this._startScrollAnim();
@@ -314,7 +314,7 @@ export const LyricsWidget = GObject.registerClass(
             let [sx, sy] = event.get_coords();
             let [ok, , ly] = this.transform_stage_point(sx, sy);
             if (!ok) return Clutter.EVENT_PROPAGATE;
-            let hitY     = ly + this._scrollOffset;
+            let hitY = ly + this._scrollOffset;
             let newHover = -1;
             for (let i = 0; i < this._geoms.length; i++) {
                 let g = this._geoms[i];
@@ -343,7 +343,7 @@ export const LyricsWidget = GObject.registerClass(
                 let done = true;
 
                 let pillTargetAlpha = 0.0;
-                let pillTargetY     = -1;
+                let pillTargetY = -1;
                 if (this._hoverIndex >= 0 && this._hoverIndex < this._geoms.length) {
                     let g = this._geoms[this._hoverIndex];
                     pillTargetY = g.y - this._scrollOffset;
@@ -373,7 +373,7 @@ export const LyricsWidget = GObject.registerClass(
 
                 for (let i = 0; i < this._hoverExtras.length; i++) {
                     let target = (i === this._hoverIndex) ? 0.14 : 0.0;
-                    let diff   = target - this._hoverExtras[i];
+                    let diff = target - this._hoverExtras[i];
                     if (Math.abs(diff) < 0.003) {
                         this._hoverExtras[i] = target;
                     } else {
@@ -476,19 +476,19 @@ export const LyricsWidget = GObject.registerClass(
 
             if (this._hoverPillAlpha > 0.005 && this._hoverPillY >= -20
                 && this._hoverIndex >= 0 && this._hoverIndex < this._geoms.length) {
-                let g      = this._geoms[this._hoverIndex];
-                let pillH  = g.slotH + 8;
-                let pillW  = width - 8;
-                let pillX  = 4;
-                let pillY  = this._hoverPillY;
-                let r      = 10;
+                let g = this._geoms[this._hoverIndex];
+                let pillH = g.slotH + 8;
+                let pillW = width - 8;
+                let pillX = 4;
+                let pillY = this._hoverPillY;
+                let r = 10;
 
                 cr.setSourceRGBA(R, G, B, this._hoverPillAlpha);
                 cr.newSubPath();
-                cr.arc(pillX + r,         pillY + r,          r, Math.PI,       1.5 * Math.PI);
-                cr.arc(pillX + pillW - r, pillY + r,          r, 1.5 * Math.PI, 0);
-                cr.arc(pillX + pillW - r, pillY + pillH - r,  r, 0,             0.5 * Math.PI);
-                cr.arc(pillX + r,         pillY + pillH - r,  r, 0.5 * Math.PI, Math.PI);
+                cr.arc(pillX + r, pillY + r, r, Math.PI, 1.5 * Math.PI);
+                cr.arc(pillX + pillW - r, pillY + r, r, 1.5 * Math.PI, 0);
+                cr.arc(pillX + pillW - r, pillY + pillH - r, r, 0, 0.5 * Math.PI);
+                cr.arc(pillX + r, pillY + pillH - r, r, 0.5 * Math.PI, Math.PI);
                 cr.closePath();
                 cr.fill();
             }
@@ -502,7 +502,7 @@ export const LyricsWidget = GObject.registerClass(
             );
 
             for (let i = 0; i < this._geoms.length; i++) {
-                let geo   = this._geoms[i];
+                let geo = this._geoms[i];
                 let slotY = geo.y - this._scrollOffset;
 
                 if (slotY + geo.slotH < -4 || slotY > height + 4) continue;
@@ -512,7 +512,7 @@ export const LyricsWidget = GObject.registerClass(
                 if (this._manualScroll) alpha = Math.max(alpha, 0.65);
 
                 let lineBottom = slotY + geo.slotH;
-                let lineTop    = slotY;
+                let lineTop = slotY;
                 if (lineBottom < FADE_H) {
                     let t = Math.max(0, Math.min(1, lineBottom / FADE_H));
                     alpha *= t * t * (3 - 2 * t);

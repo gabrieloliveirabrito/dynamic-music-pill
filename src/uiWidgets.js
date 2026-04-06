@@ -111,7 +111,10 @@ export const ScrollLabel = GObject.registerClass(
             this._text = "";
             this._gameMode = false;
             this._isScrolling = false;
-            this._hoverMode = false;
+            this._hoverOnly = settings.get_boolean('scroll-on-hover-only');
+            this._hovered = false;
+            this._forceScroll = false;
+            this._pendingScrollStop = false;
             this._container = new PixelSnappedBox({ x_expand: true, y_expand: true, x_align: Clutter.ActorAlign.CENTER, y_align: Clutter.ActorAlign.CENTER });
             this._container.layout_manager.orientation = Clutter.Orientation.HORIZONTAL;
             this.add_child(this._container);
@@ -129,13 +132,18 @@ export const ScrollLabel = GObject.registerClass(
             this._container.add_child(this._label2);
 
             this._settings.connectObject('changed::scroll-text', () => this.setText(this._text, true), this);
-            this._settings.connectObject('changed::scroll-on-hover-only', () => this._checkResize(), this);
+            this._settings.connectObject('changed::scroll-on-hover-only', () => {
+                this._hoverOnly = this._settings.get_boolean('scroll-on-hover-only');
+                if (this._hoverOnly && !this._hovered) this._stopAnimation();
+                else this.setText(this._text, true);
+            }, this);
 
             this.connectObject('notify::allocation', () => {
                 if (this._resizeTimer) { GLib.Source.remove(this._resizeTimer); this._resizeTimer = null; }
-                this._resizeTimer = GLib.timeout_add_once(GLib.PRIORITY_DEFAULT, 100, () => {
+                this._resizeTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 100, () => {
                     this._resizeTimer = null;
                     if (this.has_allocation()) this._checkResize();
+                    return GLib.SOURCE_REMOVE;
                 });
             }, this);
 
@@ -199,11 +207,35 @@ export const ScrollLabel = GObject.registerClass(
             else this._checkResize();
         }
 
-        setHoverMode(active) {
-            this._hoverMode = active;
-            if (this._settings && this._settings.get_boolean('scroll-on-hover-only')) {
+        setHoverMode(hovered) {
+            this._hovered = hovered;
+            if (!this._hoverOnly) return;
+            if (hovered) {
                 this._checkResize();
+            } else {
+                // Don't stop lyrics scroll when un-hovering
+                if (this._lyricTime > 0) return;
+                // Don't stop if forceScroll is set (popup labels)
+                if (this._forceScroll) return;
+                // Let current scroll cycle finish, then stop
+                if (this._isScrolling) {
+                    this._pendingScrollStop = true;
+                } else {
+                    this._stopAnimation(true);
+                    this._container.x_align = Clutter.ActorAlign.CENTER;
+                    this._label2.hide();
+                    this._separator.hide();
+                }
             }
+        }
+
+        setForceScroll(force) {
+            this._forceScroll = force;
+            if (force) this._checkResize();
+        }
+
+        setPendingScrollStop(stop) {
+            this._pendingScrollStop = stop;
         }
 
         _checkResize() {
@@ -213,30 +245,26 @@ export const ScrollLabel = GObject.registerClass(
 
             if (this._idleResizeId) { GLib.Source.remove(this._idleResizeId); this._idleResizeId = null; }
 
-            this._idleResizeId = GLib.idle_add_once(GLib.PRIORITY_DEFAULT, () => {
+            this._idleResizeId = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
                 this._idleResizeId = null;
                 if (!this || (this.is_finalized && this.is_finalized()) || !this.get_parent())
-                    return;
+                    return GLib.SOURCE_REMOVE;
 
-                if (this._lyricFinished) return;
+                if (this._lyricFinished) return GLib.SOURCE_REMOVE;
 
                 let boxWidth = this.get_allocation_box().get_width();
-                if (boxWidth <= 1) return;
+                if (boxWidth <= 1) return GLib.SOURCE_REMOVE;
 
                 this._label1.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
                 let textWidth = this._label1.get_preferred_width(-1)[1];
 
                 let needsScroll = (textWidth > boxWidth + 5) && (this._settings.get_boolean('scroll-text') || this._lyricTime > 0);
-                if (needsScroll && this._settings.get_boolean('scroll-on-hover-only') && !this._hoverMode && this._lyricTime <= 0) {
-                    needsScroll = false;
-                }
-                
                 let isScrolling = (this._scrollTimer != null) || this._isScrolling;
 
                 if (needsScroll && !isScrolling) {
                     this._container.x_align = Clutter.ActorAlign.START;
                     if (this._lyricTime > 0) this._startLyricScroll(textWidth);
-                    else this._startInfiniteScroll(textWidth);
+                    else if (!this._hoverOnly || this._hovered || this._forceScroll) this._startInfiniteScroll(textWidth);
                 } else if (!needsScroll && isScrolling) {
                     this._stopAnimation(true);
                     this._container.x_align = Clutter.ActorAlign.CENTER;
@@ -246,6 +274,8 @@ export const ScrollLabel = GObject.registerClass(
                     this._stopAnimation(true);
                     this._container.x_align = Clutter.ActorAlign.CENTER;
                 }
+
+                return GLib.SOURCE_REMOVE;
             });
         }
 
@@ -283,9 +313,6 @@ export const ScrollLabel = GObject.registerClass(
             if (!this._settings.get_boolean('scroll-text') && !this._lyricTime) {
                 return;
             }
-            if (this._settings.get_boolean('scroll-on-hover-only') && !this._hoverMode && !this._lyricTime) {
-                return;
-            }
 
             let isDynamic = this._settings && this._settings.get_boolean('pill-dynamic-width');
             if (isDynamic) {
@@ -295,9 +322,10 @@ export const ScrollLabel = GObject.registerClass(
             let delay = isDynamic ? 450 : 100;
 
             if (this._measureTimeout) { GLib.Source.remove(this._measureTimeout); this._measureTimeout = null; }
-            this._measureTimeout = GLib.timeout_add_once(GLib.PRIORITY_DEFAULT, delay, () => {
+            this._measureTimeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, delay, () => {
                 this._measureTimeout = null;
                 if (this.has_allocation()) this._checkOverflow();
+                return GLib.SOURCE_REMOVE;
             });
         }
 
@@ -322,7 +350,9 @@ export const ScrollLabel = GObject.registerClass(
                 if (this._lyricTime > 0) {
                     this._startLyricScroll(textWidth);
                 } else if (this._settings.get_boolean('scroll-text')) {
-                    this._startInfiniteScroll(textWidth);
+                    if (!this._hoverOnly || this._hovered || this._forceScroll) {
+                        this._startInfiniteScroll(textWidth);
+                    }
                 }
             } else {
                 this._stopAnimation(true);
@@ -348,13 +378,25 @@ export const ScrollLabel = GObject.registerClass(
                     this._scrollTimer = null;
                     if (this._gameMode || !this.get_parent()) return GLib.SOURCE_REMOVE;
 
+                    // Check pending stop during the pause before scrolling starts
+                    if (this._pendingScrollStop) {
+                        this._pendingScrollStop = false;
+                        this._isScrolling = false;
+                        this._stopAnimation(true);
+                        this._container.x_align = Clutter.ActorAlign.CENTER;
+                        this._label2.hide();
+                        this._separator.hide();
+                        return GLib.SOURCE_REMOVE;
+                    }
+
                     this._setFadeOutEffect(true, true, true);
 
                     this._container.ease({
                         translation_x: -distance, duration: duration, mode: Clutter.AnimationMode.LINEAR,
                         onStopped: (isFinished) => {
-                            if (!isFinished || this._gameMode) {
+                            if (!isFinished || this._gameMode || this._pendingScrollStop) {
                                 this._isScrolling = false;
+                                this._pendingScrollStop = false;
                                 return;
                             }
 

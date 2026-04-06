@@ -198,27 +198,26 @@ export const MusicPill = GObject.registerClass(
             }, this);
 
             this.connectObject('enter-event', () => {
-                this._hoverMode = true;
+                this._isHovered = true;
                 if (this._titleScroll) this._titleScroll.setHoverMode(true);
                 if (this._artistScroll) this._artistScroll.setHoverMode(true);
-
                 let delay = this._settings.get_int('hover-delay');
                 if (this._hoverTimeout) { GLib.Source.remove(this._hoverTimeout); }
-                this._hoverTimeout = GLib.timeout_add_once(GLib.PRIORITY_DEFAULT, delay, () => {
+                this._hoverTimeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, delay, () => {
                     this._hoverTimeout = null;
                     let action = this._settings.get_string('action-hover');
                     if (action && action !== 'none') {
                         this._controller.performAction(action);
                     }
+                    return GLib.SOURCE_REMOVE;
                 });
                 return Clutter.EVENT_PROPAGATE;
             }, this);
 
             this.connectObject('leave-event', () => {
-                this._hoverMode = false;
+                this._isHovered = false;
                 if (this._titleScroll) this._titleScroll.setHoverMode(false);
                 if (this._artistScroll) this._artistScroll.setHoverMode(false);
-
                 if (this._hoverTimeout) {
                     GLib.Source.remove(this._hoverTimeout);
                     this._hoverTimeout = null;
@@ -351,7 +350,7 @@ export const MusicPill = GObject.registerClass(
             this._settings.connectObject('changed::visualizer-height', () => this._updateDimensions(), this);
             this.connect('notify::allocation', () => {
                 if (this._allocTimer) return;
-                this._allocTimer = GLib.timeout_add_once(GLib.PRIORITY_DEFAULT, 100, () => {
+                this._allocTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 100, () => {
                     this._allocTimer = null;
                     let parent = this.get_parent();
                     if (parent && !this._inPanel) {
@@ -361,6 +360,7 @@ export const MusicPill = GObject.registerClass(
                             this._updateDimensions();
                         }
                     }
+                    return GLib.SOURCE_REMOVE;
                 });
             });
 
@@ -437,12 +437,13 @@ export const MusicPill = GObject.registerClass(
                 if (this._singleClickTimerId) {
                     GLib.Source.remove(this._singleClickTimerId);
                 }
-                this._singleClickTimerId = GLib.timeout_add_once(GLib.PRIORITY_DEFAULT, doubleClickTime, () => {
+                this._singleClickTimerId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, doubleClickTime, () => {
                     this._singleClickTimerId = null;
                     this._lastLeftClickTime = 0;
                     if (singleAction && singleAction !== 'none') {
                         this._controller.performAction(singleAction);
                     }
+                    return GLib.SOURCE_REMOVE;
                 });
             }
         }
@@ -530,6 +531,11 @@ export const MusicPill = GObject.registerClass(
 
         _setPopupOpen(isOpen) {
             this._isPopupOpen = isOpen;
+            if (isOpen) {
+                // Signal pill scroll labels to finish current cycle then stop
+                if (this._titleScroll) this._titleScroll.setPendingScrollStop(true);
+                if (this._artistScroll) this._artistScroll.setPendingScrollStop(true);
+            }
             this._updateDimensions();
         }
 
@@ -555,10 +561,11 @@ export const MusicPill = GObject.registerClass(
                 this._artBin.opacity = 255;
             } else {
                 if (!this._artDebounceTimer) {
-                    this._artDebounceTimer = GLib.timeout_add_once(GLib.PRIORITY_DEFAULT, 1000, () => {
+                    this._artDebounceTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1000, () => {
                         this._artBin.visible = false;
                         this._artWidget.setArt(null);
                         this._artDebounceTimer = null;
+                        return GLib.SOURCE_REMOVE;
                     });
                 }
             }
@@ -603,8 +610,8 @@ export const MusicPill = GObject.registerClass(
             let shadowBlur = this._settings.get_int('shadow-blur');
             let shadowOpacity = this._settings.get_int('shadow-opacity') / 100.0;
 
-            let titlePx = Math.max(10, Math.floor(height * 0.33)); 
-            let artistPx = Math.max(9, Math.floor(height * 0.26)); 
+            let titlePx = Math.max(10, Math.floor(height * 0.33));
+            let artistPx = Math.max(9, Math.floor(height * 0.26));
 
             let fontSizeTitle = '15px';
             let fontSizeArtist = '12px';
@@ -823,7 +830,7 @@ export const MusicPill = GObject.registerClass(
 
             if (this._idleDimId) { GLib.Source.remove(this._idleDimId); this._idleDimId = null; }
 
-            this._idleDimId = GLib.idle_add_once(GLib.PRIORITY_DEFAULT, () => {
+            this._idleDimId = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
                 this._idleDimId = null;
                 if (this._titleScroll) this._titleScroll._checkResize();
                 if (this._artistScroll) this._artistScroll._checkResize();
@@ -875,6 +882,7 @@ export const MusicPill = GObject.registerClass(
                     }
                 }
 
+                return GLib.SOURCE_REMOVE;
             });
 
             if (!this._isActiveState) {
@@ -899,9 +907,16 @@ export const MusicPill = GObject.registerClass(
         }
 
         setLyric(lyricObj) {
-            let wasActive = !!(this._lyricObj && this._lyricObj.content);
+            let oldContent = this._lyricObj ? this._lyricObj.content : null;
+            let newContent = lyricObj ? lyricObj.content : null;
+            let oldTime = this._lyricObj ? this._lyricObj.time : null;
+            let newTime = lyricObj ? lyricObj.time : null;
+
+            if (oldContent === newContent && oldTime === newTime) return;
+
+            let wasActive = !!oldContent;
             this._lyricObj = lyricObj;
-            let isActive = !!(this._lyricObj && this._lyricObj.content);
+            let isActive = !!newContent;
 
             if (!this._isActiveState) return;
             this._updateTextDisplay(true);
@@ -1160,8 +1175,17 @@ export const MusicPill = GObject.registerClass(
                 } else {
                     this._updateArtVisibility();
                 }
-            } else if (statusChanged) {
-                this._startColorTransition();
+            } else {
+                if (statusChanged) {
+                    this._startColorTransition();
+                }
+                if (this._controller && this._controller._trackHistory && this._controller._trackHistory.length > 0) {
+                    let entry = this._controller._trackHistory[0];
+                    if (!entry.avgColor && this._targetColor) {
+                        entry.avgColor = { r: Math.round(this._targetColor.r), g: Math.round(this._targetColor.g), b: Math.round(this._targetColor.b) };
+                        try { this._controller._settings.set_string('playback-history', JSON.stringify(this._controller._trackHistory)); } catch (e) { }
+                    }
+                }
             }
 
             if (this._controller._expandedPlayer && this._controller._expandedPlayer.visible) {
@@ -1340,4 +1364,3 @@ export const MusicPill = GObject.registerClass(
             }
         }
     });
-

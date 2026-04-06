@@ -9,25 +9,26 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
     fillPreferencesWindow(window) {
         const settings = this.getSettings();
         const PREFS_KEYS = [
-            'scroll-text', 'show-album-art', 'enable-shadow', 'hide-default-player',
+            'scroll-text', 'scroll-on-hover-only', 'show-album-art', 'enable-shadow', 'hide-default-player',
             'shadow-blur', 'shadow-opacity', 'pill-width', 'panel-pill-width',
-            'pill-height', 'panel-pill-height', 'vertical-offset', 'horizontal-offset', 
-            'position-mode', 'dock-position', 'target-container', 'enable-gamemode', 
-            'visualizer-style', 'border-radius', 'enable-transparency', 'transparency-strength', 
-            'transparency-art', 'transparency-text', 'transparency-vis', 'invert-scroll-animation', 
-            'enable-scroll-controls', 'action-left-click', 'action-middle-click', 
-            'action-right-click', 'action-double-click', 'dock-art-size', 'panel-art-size',          
-            'popup-enable-shadow', 'popup-follow-transparency', 'popup-follow-radius', 
-            'popup-vinyl-rotate', 'visualizer-padding', 'scroll-action', 'popup-vinyl-square', 
-            'popup-show-vinyl', 'show-shuffle-loop', 'use-custom-colors', 'custom-bg-color', 
-            'custom-text-color', 'tablet-mode', 'inline-artist', 'pill-dynamic-width', 
-            'popup-use-custom-width', 'popup-custom-width', 'player-filter-mode', 'player-filter-list','hide-text',
-            'fallback-art-path','popup-show-visualizer', 'popup-hide-pill-visualizer','compatibility-delay',
-            'popup-follow-custom-bg', 'popup-follow-custom-text','action-hover', 'hover-delay', 'selected-player-bus',
-            'popup-show-player-selector','show-pill-border','invert-scroll-direction','always-show-pill','popup-hide-on-leave',
-            'visualizer-bars','enable-lyrics','app-name-mapping', 'lyric-fade-enable', 'lyric-fade-duration','visualizer-bar-width', 'visualizer-height',
-            'popup-visualizer-bars', 'popup-visualizer-bar-width', 'popup-visualizer-height','edge-margin','popup-vinyl-speed','sync-accent-color',
-            'enable-custom-buttons', 'custom-button-1', 'custom-button-2', 'playback-history'
+            'pill-height', 'panel-pill-height', 'vertical-offset', 'horizontal-offset',
+            'position-mode', 'dock-position', 'target-container', 'enable-gamemode',
+            'visualizer-style', 'border-radius', 'enable-transparency', 'transparency-strength',
+            'transparency-art', 'transparency-text', 'transparency-vis', 'invert-scroll-animation',
+            'enable-scroll-controls', 'action-left-click', 'action-middle-click',
+            'action-right-click', 'action-double-click', 'dock-art-size', 'panel-art-size',
+            'popup-enable-shadow', 'popup-follow-transparency', 'popup-follow-radius',
+            'popup-vinyl-rotate', 'visualizer-padding', 'scroll-action', 'popup-vinyl-square',
+            'popup-show-vinyl', 'show-shuffle-loop', 'use-custom-colors', 'custom-bg-color',
+            'custom-text-color', 'tablet-mode', 'inline-artist', 'pill-dynamic-width',
+            'popup-use-custom-width', 'popup-custom-width', 'player-filter-mode', 'player-filter-list', 'hide-text',
+            'fallback-art-path', 'popup-show-visualizer', 'popup-hide-pill-visualizer', 'compatibility-delay',
+            'popup-follow-custom-bg', 'popup-follow-custom-text', 'action-hover', 'hover-delay', 'selected-player-bus',
+            'popup-show-player-selector', 'show-pill-border', 'invert-scroll-direction', 'always-show-pill', 'popup-hide-on-leave',
+            'visualizer-bars', 'enable-lyrics', 'app-name-mapping', 'lyric-fade-enable', 'lyric-fade-duration', 'visualizer-bar-width', 'visualizer-height',
+            'popup-visualizer-bars', 'popup-visualizer-bar-width', 'popup-visualizer-height', 'edge-margin', 'popup-vinyl-speed', 'sync-accent-color',
+            'enable-custom-buttons', 'custom-button-1', 'custom-button-2', 'playback-history',
+            'show-hours-format', 'popup-show-album-title'
         ];
 
         // =========================================
@@ -38,8 +39,10 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
             icon_name: 'preferences-system-symbolic'
         });
 
+        // GNOME 50: GLib.*_once() APIs auto-remove, no manual source tracking needed
+
         const genGroup = new Adw.PreferencesGroup({ title: _('General Settings') });
-        
+
         const alwaysShowRow = new Adw.ActionRow({
             title: _('Always ON'),
             subtitle: _('Retain last known track and keep pill visible after closing the player')
@@ -51,7 +54,7 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
         settings.bind('always-show-pill', alwaysShowToggle, 'active', Gio.SettingsBindFlags.DEFAULT);
         alwaysShowRow.add_suffix(alwaysShowToggle);
         genGroup.add(alwaysShowRow);
-        
+
         // Album Art
         const artRow = new Adw.ActionRow({
             title: _('Show Album Art'),
@@ -64,7 +67,7 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
         settings.bind('show-album-art', artToggle, 'active', Gio.SettingsBindFlags.DEFAULT);
         artRow.add_suffix(artToggle);
         genGroup.add(artRow);
-        
+
         const fallbackRow = new Adw.ActionRow({
             title: _('Fallback Album Art'),
             subtitle: settings.get_string('fallback-art-path') || _('No image selected')
@@ -78,7 +81,7 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
 
         fallbackBtn.connect('clicked', () => {
             let dialog = new Gtk.FileDialog({ title: _('Select Fallback Image') });
-            
+
             let filter = new Gtk.FileFilter();
             filter.set_name("Images");
             filter.add_mime_type("image/png");
@@ -104,7 +107,7 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
             valign: Gtk.Align.CENTER,
             css_classes: ['flat', 'error']
         });
-        
+
         clearFallbackBtn.connect('clicked', () => {
             settings.set_string('fallback-art-path', '');
             fallbackRow.subtitle = _('No image selected');
@@ -114,7 +117,7 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
         btnBox.append(fallbackBtn);
         btnBox.append(clearFallbackBtn);
         fallbackRow.add_suffix(btnBox);
-        
+
         settings.bind('show-album-art', fallbackRow, 'sensitive', Gio.SettingsBindFlags.DEFAULT);
 
         genGroup.add(fallbackRow);
@@ -135,7 +138,7 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
         const scrollActionModel = new Gtk.StringList();
         scrollActionModel.append(_("Change Track"));
         scrollActionModel.append(_("Change Volume"));
-        scrollActionModel.append(_("Switch Player")); 
+        scrollActionModel.append(_("Switch Player"));
 
         let currentAction = settings.get_string('scroll-action');
         let selectedIdx = 0;
@@ -178,7 +181,7 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
         settings.bind('invert-scroll-animation', invertToggle, 'active', Gio.SettingsBindFlags.DEFAULT);
         invertRow.add_suffix(invertToggle);
         genGroup.add(invertRow);
-        
+
         const invertDirRow = new Adw.ActionRow({
             title: _('Invert Scroll Direction'),
             subtitle: _('Swap up/down scrolling for track and volume actions')
@@ -206,7 +209,7 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
 
         const scrollHoverRow = new Adw.ActionRow({
             title: _('Scroll Only on Hover'),
-            subtitle: _('Pause scrolling text until the mouse hovers over it')
+            subtitle: _('Text stays still until you hover the pill')
         });
         const scrollHoverToggle = new Gtk.Switch({
             active: settings.get_boolean('scroll-on-hover-only'),
@@ -217,7 +220,7 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
         scrollHoverRow.add_suffix(scrollHoverToggle);
         genGroup.add(scrollHoverRow);
 
-		// Lyrics Display
+        // Lyrics Display
         const lyricsRow = new Adw.ActionRow({
             title: _('Lyrics Display'),
             subtitle: _('Show real-time synchronized lyrics for current track.')
@@ -229,21 +232,21 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
         settings.bind('enable-lyrics', lyricsToggle, 'active', Gio.SettingsBindFlags.DEFAULT);
         lyricsRow.add_suffix(lyricsToggle);
         genGroup.add(lyricsRow);
-        
+
         const langPrefRow = new Adw.ComboRow({
-	    title: _('Lyrics language preference'),
-	    subtitle: _('When multiple versions exist'),
-	    model: Gtk.StringList.new([
-		_('Auto'),
-		_('Prefer original script'),
-		_('Prefer Latin'),
-	    ]),
-	});
-	langPrefRow.set_selected(settings.get_int('lyrics-language-preference'));
-	langPrefRow.connect('notify::selected', () =>
-	    settings.set_int('lyrics-language-preference', langPrefRow.get_selected()));
-	genGroup.add(langPrefRow);
-        
+            title: _('Lyrics language preference'),
+            subtitle: _('When multiple versions exist'),
+            model: Gtk.StringList.new([
+                _('Auto'),
+                _('Prefer original script'),
+                _('Prefer Latin'),
+            ]),
+        });
+        langPrefRow.set_selected(settings.get_int('lyrics-language-preference'));
+        langPrefRow.connect('notify::selected', () =>
+            settings.set_int('lyrics-language-preference', langPrefRow.get_selected()));
+        genGroup.add(langPrefRow);
+
         const lyricFadeRow = new Adw.ActionRow({
             title: _('Lyrics Fade-in Effect'),
             subtitle: _('Smoothly fade in new lyric lines')
@@ -262,35 +265,35 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
             adjustment: new Gtk.Adjustment({ lower: 50, upper: 2000, step_increment: 50 })
         });
         settings.bind('lyric-fade-duration', lyricFadeDurationRow, 'value', Gio.SettingsBindFlags.DEFAULT);
-        
+
         settings.bind('lyric-fade-enable', lyricFadeDurationRow, 'sensitive', Gio.SettingsBindFlags.DEFAULT);
         genGroup.add(lyricFadeDurationRow);
-        
+
         const tabletModeRow = new Adw.ComboRow({
-	    title: _('Tablet Mode Controls'),
-	    subtitle: _('Show media buttons directly on the pill'),
-	    model: new Gtk.StringList({
-		strings: [_('Off'), _('Skip Only'), _('Play/Pause Only'), _('All Controls')]
-	    }),
-	    selected: settings.get_int('tablet-mode'),
-	});
-
-	settings.bind('tablet-mode', tabletModeRow, 'selected', Gio.SettingsBindFlags.DEFAULT);
-	genGroup.add(tabletModeRow);
-
-	const inlineArtistRow = new Adw.ActionRow({ title: _('Inline Artist'), subtitle: _('Show "Title • Artist" when the widget is squeezed') });
-	const inlineArtistToggle = new Gtk.Switch({ active: settings.get_boolean('inline-artist'), valign: Gtk.Align.CENTER });
-	settings.bind('inline-artist', inlineArtistToggle, 'active', Gio.SettingsBindFlags.DEFAULT);
-	inlineArtistRow.add_suffix(inlineArtistToggle);
-	genGroup.add(inlineArtistRow);
-	
-	const hideTextRow = new Adw.ActionRow({ 
-            title: _('Compact Mode (Hide Text)'), 
-            subtitle: _('Hide title and artist') 
+            title: _('Tablet Mode Controls'),
+            subtitle: _('Show media buttons directly on the pill'),
+            model: new Gtk.StringList({
+                strings: [_('Off'), _('Skip Only'), _('Play/Pause Only'), _('All Controls')]
+            }),
+            selected: settings.get_int('tablet-mode'),
         });
-        const hideTextToggle = new Gtk.Switch({ 
-            active: settings.get_boolean('hide-text'), 
-            valign: Gtk.Align.CENTER 
+
+        settings.bind('tablet-mode', tabletModeRow, 'selected', Gio.SettingsBindFlags.DEFAULT);
+        genGroup.add(tabletModeRow);
+
+        const inlineArtistRow = new Adw.ActionRow({ title: _('Inline Artist'), subtitle: _('Show "Title • Artist" when the widget is squeezed') });
+        const inlineArtistToggle = new Gtk.Switch({ active: settings.get_boolean('inline-artist'), valign: Gtk.Align.CENTER });
+        settings.bind('inline-artist', inlineArtistToggle, 'active', Gio.SettingsBindFlags.DEFAULT);
+        inlineArtistRow.add_suffix(inlineArtistToggle);
+        genGroup.add(inlineArtistRow);
+
+        const hideTextRow = new Adw.ActionRow({
+            title: _('Compact Mode (Hide Text)'),
+            subtitle: _('Hide title and artist')
+        });
+        const hideTextToggle = new Gtk.Switch({
+            active: settings.get_boolean('hide-text'),
+            valign: Gtk.Align.CENTER
         });
         settings.bind('hide-text', hideTextToggle, 'active', Gio.SettingsBindFlags.DEFAULT);
         hideTextRow.add_suffix(hideTextToggle);
@@ -302,11 +305,11 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
         const actionGroup = new Adw.PreferencesGroup({ title: _('Mouse Actions') });
         const actionModel = new Gtk.StringList();
         const actionNames = [
-	    _("None"), _("Play / Pause"), _("Next Track"), _("Previous Track"), 
-	    _("Open Player App"), _("Open Menu"), _("Select Player"), _("Open Settings"), _("Close Player App")
-	];
+            _("None"), _("Play / Pause"), _("Next Track"), _("Previous Track"),
+            _("Open Player App"), _("Open Menu"), _("Select Player"), _("Open Settings"), _("Close Player App")
+        ];
         const actionValues = ['none', 'play_pause', 'next', 'previous', 'open_app', 'toggle_menu', 'open_player_menu', 'open_settings', 'close_app'];
-        
+
         actionNames.forEach(name => actionModel.append(name));
 
         const leftRow = new Adw.ComboRow({
@@ -316,7 +319,7 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
         });
         leftRow.connect('notify::selected', () => { settings.set_string('action-left-click', actionValues[leftRow.selected]); });
         actionGroup.add(leftRow);
-        
+
         const doubleRow = new Adw.ComboRow({
             title: _('Double Click'),
             model: actionModel,
@@ -340,7 +343,7 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
         });
         rightRow.connect('notify::selected', () => { settings.set_string('action-right-click', actionValues[rightRow.selected]); });
         actionGroup.add(rightRow);
-        
+
         const hoverRow = new Adw.ComboRow({
             title: _('Hover Action'),
             model: actionModel,
@@ -383,7 +386,7 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
         settings.bind('popup-vinyl-rotate', popRotateToggle, 'active', Gio.SettingsBindFlags.DEFAULT);
         popRotateRow.add_suffix(popRotateToggle);
         popupGroup.add(popRotateRow);
-        
+
         const popRotateSpeedRow = new Adw.SpinRow({
             title: _('Rotation Speed'),
             subtitle: _('Adjust the vinyl spin speed (Lower is slower, Default: 10)'),
@@ -404,7 +407,7 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
         settings.bind('popup-enable-shadow', popShadowToggle, 'active', Gio.SettingsBindFlags.DEFAULT);
         popShadowRow.add_suffix(popShadowToggle);
         popupGroup.add(popShadowRow);
-        
+
         const hideOnLeaveRow = new Adw.ActionRow({
             title: _('Close on Mouse Leave'),
             subtitle: _('Automatically hide the pop-up when you move the cursor away')
@@ -416,7 +419,7 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
         settings.bind('popup-hide-on-leave', hideOnLeaveToggle, 'active', Gio.SettingsBindFlags.DEFAULT);
         hideOnLeaveRow.add_suffix(hideOnLeaveToggle);
         popupGroup.add(hideOnLeaveRow);
-        
+
         const popCustomBgRow = new Adw.ActionRow({
             title: _('Follow Custom Background Color'),
             subtitle: _('Use the custom background color for the pop-up (if active)')
@@ -461,29 +464,29 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
         popRadRow.add_suffix(popRadToggle);
         popupGroup.add(popRadRow);
         const popShowRow = new Adw.ActionRow({ title: _('Show Vinyl'), subtitle: _('Display the album art in the pop-up') });
-	const popShowToggle = new Gtk.Switch({ active: settings.get_boolean('popup-show-vinyl'), valign: Gtk.Align.CENTER });
-	settings.bind('popup-show-vinyl', popShowToggle, 'active', Gio.SettingsBindFlags.DEFAULT);
-	popShowRow.add_suffix(popShowToggle);
-	popupGroup.add(popShowRow);
+        const popShowToggle = new Gtk.Switch({ active: settings.get_boolean('popup-show-vinyl'), valign: Gtk.Align.CENTER });
+        settings.bind('popup-show-vinyl', popShowToggle, 'active', Gio.SettingsBindFlags.DEFAULT);
+        popShowRow.add_suffix(popShowToggle);
+        popupGroup.add(popShowRow);
 
-	const popSquareRow = new Adw.ActionRow({ title: _('Square Vinyl Image'), subtitle: _('Use a square album art (disables rotation)') });
-	const popSquareToggle = new Gtk.Switch({ active: settings.get_boolean('popup-vinyl-square'), valign: Gtk.Align.CENTER });
-	settings.bind('popup-vinyl-square', popSquareToggle, 'active', Gio.SettingsBindFlags.DEFAULT);
-	popSquareRow.add_suffix(popSquareToggle);
-	popupGroup.add(popSquareRow);
+        const popSquareRow = new Adw.ActionRow({ title: _('Square Vinyl Image'), subtitle: _('Use a square album art (disables rotation)') });
+        const popSquareToggle = new Gtk.Switch({ active: settings.get_boolean('popup-vinyl-square'), valign: Gtk.Align.CENTER });
+        settings.bind('popup-vinyl-square', popSquareToggle, 'active', Gio.SettingsBindFlags.DEFAULT);
+        popSquareRow.add_suffix(popSquareToggle);
+        popupGroup.add(popSquareRow);
 
-	const showShuffleRow = new Adw.ActionRow({ title: _('Show Shuffle and Loop'), subtitle: _('Display extra controls in the pop-up') });
-	const showShuffleToggle = new Gtk.Switch({ active: settings.get_boolean('show-shuffle-loop'), valign: Gtk.Align.CENTER });
-	settings.bind('show-shuffle-loop', showShuffleToggle, 'active', Gio.SettingsBindFlags.DEFAULT);
-	showShuffleRow.add_suffix(showShuffleToggle);
-	popupGroup.add(showShuffleRow);
-	
-	const popUseCustomRow = new Adw.ActionRow({ title: _('Use Custom Width'), subtitle: _('Disable dynamic sizing for the pop-up') });
+        const showShuffleRow = new Adw.ActionRow({ title: _('Show Shuffle and Loop'), subtitle: _('Display extra controls in the pop-up') });
+        const showShuffleToggle = new Gtk.Switch({ active: settings.get_boolean('show-shuffle-loop'), valign: Gtk.Align.CENTER });
+        settings.bind('show-shuffle-loop', showShuffleToggle, 'active', Gio.SettingsBindFlags.DEFAULT);
+        showShuffleRow.add_suffix(showShuffleToggle);
+        popupGroup.add(showShuffleRow);
+
+        const popUseCustomRow = new Adw.ActionRow({ title: _('Use Custom Width'), subtitle: _('Disable dynamic sizing for the pop-up') });
         const popUseCustomToggle = new Gtk.Switch({ active: settings.get_boolean('popup-use-custom-width'), valign: Gtk.Align.CENTER });
         settings.bind('popup-use-custom-width', popUseCustomToggle, 'active', Gio.SettingsBindFlags.DEFAULT);
         popUseCustomRow.add_suffix(popUseCustomToggle);
         popupGroup.add(popUseCustomRow);
-        
+
         const popCustomWidthRow = new Adw.SpinRow({
             title: _('Custom Width Value'),
             adjustment: new Gtk.Adjustment({ lower: 260, upper: 800, step_increment: 10 })
@@ -492,44 +495,62 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
         const updateWidthBound = () => {
             let limit = settings.get_boolean('show-shuffle-loop') ? 360 : 260;
             popCustomWidthRow.adjustment.lower = limit;
-            
+
             if (settings.get_int('popup-custom-width') < limit) {
                 settings.set_int('popup-custom-width', limit);
             }
         };
         settings.connect('changed::show-shuffle-loop', updateWidthBound);
         updateWidthBound();
-        
-        const popSelectorRow = new Adw.ActionRow({ 
-            title: _('Show Player Selector'), 
-            subtitle: _('Display active player icons at the top of the pop-up') 
+
+        const popSelectorRow = new Adw.ActionRow({
+            title: _('Show Player Selector'),
+            subtitle: _('Display active player icons at the top of the pop-up')
         });
         const popSelectorToggle = new Gtk.Switch({ active: settings.get_boolean('popup-show-player-selector'), valign: Gtk.Align.CENTER });
         settings.bind('popup-show-player-selector', popSelectorToggle, 'active', Gio.SettingsBindFlags.DEFAULT);
         popSelectorRow.add_suffix(popSelectorToggle);
         popupGroup.add(popSelectorRow);
 
+        const popAlbumRow = new Adw.ActionRow({
+            title: _('Show Album Title'),
+            subtitle: _('Display album name next to the artist (Artist \u2022 Album)')
+        });
+        const popAlbumToggle = new Gtk.Switch({ active: settings.get_boolean('popup-show-album-title'), valign: Gtk.Align.CENTER });
+        settings.bind('popup-show-album-title', popAlbumToggle, 'active', Gio.SettingsBindFlags.DEFAULT);
+        popAlbumRow.add_suffix(popAlbumToggle);
+        popupGroup.add(popAlbumRow);
+
+        const hoursRow = new Adw.ActionRow({
+            title: _('Show HH:MM:SS'),
+            subtitle: _('Display hours in the time labels when media is longer than 60 minutes')
+        });
+        const hoursToggle = new Gtk.Switch({ active: settings.get_boolean('show-hours-format'), valign: Gtk.Align.CENTER });
+        settings.bind('show-hours-format', hoursToggle, 'active', Gio.SettingsBindFlags.DEFAULT);
+        hoursRow.add_suffix(hoursToggle);
+        popupGroup.add(hoursRow);
+
         settings.bind('popup-custom-width', popCustomWidthRow, 'value', Gio.SettingsBindFlags.DEFAULT);
         settings.bind('popup-use-custom-width', popCustomWidthRow, 'sensitive', Gio.SettingsBindFlags.DEFAULT);
         popupGroup.add(popCustomWidthRow);
-        
+
         const popVisRow = new Adw.ActionRow({ title: _('Show Visualizer in Pop-up') });
         const popVisToggle = new Gtk.Switch({ active: settings.get_boolean('popup-show-visualizer'), valign: Gtk.Align.CENTER });
         settings.bind('popup-show-visualizer', popVisToggle, 'active', Gio.SettingsBindFlags.DEFAULT);
         popVisRow.add_suffix(popVisToggle);
         popupGroup.add(popVisRow);
 
-        const hidePillVisRow = new Adw.ActionRow({ 
-            title: _('Hide Pill Visualizer'), 
-            subtitle: _('Creates a "moving" effect by hiding the main pill visualizer') 
+        const hidePillVisRow = new Adw.ActionRow({
+            title: _('Hide Pill Visualizer'),
+            subtitle: _('Creates a "moving" effect by hiding the main pill visualizer')
         });
         const hidePillVisToggle = new Gtk.Switch({ active: settings.get_boolean('popup-hide-pill-visualizer'), valign: Gtk.Align.CENTER });
         settings.bind('popup-hide-pill-visualizer', hidePillVisToggle, 'active', Gio.SettingsBindFlags.DEFAULT);
         hidePillVisRow.add_suffix(hidePillVisToggle);
         settings.bind('popup-show-visualizer', hidePillVisRow, 'sensitive', Gio.SettingsBindFlags.DEFAULT);
         popupGroup.add(hidePillVisRow);
-	
-	const popVisBarsRow = new Adw.SpinRow({
+
+        const popVisBarsRow = new Adw.SpinRow({
             title: _('Popup Visualizer Bar Count'),
             adjustment: new Gtk.Adjustment({ lower: 2, upper: 64, step_increment: 1 })
         });
@@ -552,7 +573,7 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
         settings.bind('popup-visualizer-height', popVisHeightRow, 'value', Gio.SettingsBindFlags.DEFAULT);
         settings.bind('popup-show-visualizer', popVisHeightRow, 'sensitive', Gio.SettingsBindFlags.DEFAULT);
         popupGroup.add(popVisHeightRow);
-        
+
         popupPage.add(popupGroup);
 
         const customBtnGroup = new Adw.PreferencesGroup({
@@ -612,12 +633,12 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
 
         customBtnGroup.set_description(_('If both buttons are set to Seek, they act directly (Button 1 = −10s, Button 2 = +10s). Otherwise Seek opens a sub-page.'));
 
-	customBtnGroup.add(makeButtonActionRow(
-	    _('Custom Button 1'), _('Placed left of Shuffle.'), 'custom-button-1'
-	));
-	customBtnGroup.add(makeButtonActionRow(
-	    _('Custom Button 2'), _('Placed right of Loop.'), 'custom-button-2'
-	));
+        customBtnGroup.add(makeButtonActionRow(
+            _('Custom Button 1'), _('Placed left of Shuffle.'), 'custom-button-1'
+        ));
+        customBtnGroup.add(makeButtonActionRow(
+            _('Custom Button 2'), _('Placed right of Loop.'), 'custom-button-2'
+        ));
 
         popupPage.add(customBtnGroup);
         window.add(popupPage);
@@ -632,7 +653,7 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
         });
 
         const lookGroup = new Adw.PreferencesGroup({ title: _('Visualizer and Shape') });
-        
+
         const visModel = new Gtk.StringList();
         visModel.append(_("Off (Disabled)"));
         visModel.append(_("Wave (Smooth)"));
@@ -656,7 +677,7 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
             margin_top: 6, margin_bottom: 6, margin_start: 12, margin_end: 12
         });
         lookGroup.add(cavaNote);
-        
+
         const visBarsRow = new Adw.SpinRow({
             title: _('Visualizer Bar Count'),
             subtitle: _('Number of bars displayed in the animation'),
@@ -664,7 +685,7 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
         });
         settings.bind('visualizer-bars', visBarsRow, 'value', Gio.SettingsBindFlags.DEFAULT);
         lookGroup.add(visBarsRow);
-        
+
         const visWidthRow = new Adw.SpinRow({
             title: _('Visualizer Bar Width'),
             subtitle: _('Thickness of individual bars (pixels)'),
@@ -688,7 +709,7 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
         });
         settings.bind('visualizer-padding', visPaddingRow, 'value', Gio.SettingsBindFlags.DEFAULT);
         lookGroup.add(visPaddingRow);
-        
+
         const edgeMarginRow = new Adw.SpinRow({
             title: _('Outer Edge Margin'),
             subtitle: _('Spacing before the album art and after the visualizer'),
@@ -696,7 +717,7 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
         });
         settings.bind('edge-margin', edgeMarginRow, 'value', Gio.SettingsBindFlags.DEFAULT);
         lookGroup.add(edgeMarginRow);
-        
+
         const radiusRow = new Adw.SpinRow({
             title: _('Corner Radius'),
             subtitle: _('Roundness of the widget edges (0 = Square, 25 = Pill)'),
@@ -704,7 +725,7 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
         });
         settings.bind('border-radius', radiusRow, 'value', Gio.SettingsBindFlags.DEFAULT);
         lookGroup.add(radiusRow);
-        
+
         const borderRow = new Adw.ActionRow({
             title: _('Show Pill Outline'),
             subtitle: _('Display a subtle border around the main pill')
@@ -715,10 +736,10 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
         });
         settings.bind('show-pill-border', borderSwitch, 'active', Gio.SettingsBindFlags.DEFAULT);
         borderRow.add_suffix(borderSwitch);
-        
+
         lookGroup.add(borderRow);
         stylePage.add(lookGroup);
-        
+
 
         const transGroup = new Adw.PreferencesGroup({ title: _('Background and Transparency') });
         const transRow = new Adw.ActionRow({
@@ -805,13 +826,13 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
             updateGroupVisibility(val);
         });
         posGroup.add(targetRow);
-        
+
         const dynWidthRow = new Adw.ActionRow({ title: _('Dynamic Width'), subtitle: _('Auto-adjust pill width (slider acts as max width)') });
         const dynWidthToggle = new Gtk.Switch({ active: settings.get_boolean('pill-dynamic-width'), valign: Gtk.Align.CENTER });
         settings.bind('pill-dynamic-width', dynWidthToggle, 'active', Gio.SettingsBindFlags.DEFAULT);
         dynWidthRow.add_suffix(dynWidthToggle);
         posGroup.add(dynWidthRow);
-        
+
         settings.connect('changed::target-container', () => {
             let val = settings.get_int('target-container');
             if (targetRow.selected !== val) {
@@ -903,7 +924,7 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
         panelDimGroup.add(panelHeightRow);
         posGroup.add(panelDimGroup);
         const colorGroup = new Adw.PreferencesGroup({ title: _('Custom Colors') });
-        
+
         const syncAccentRow = new Adw.ActionRow({
             title: _('Sync GNOME Accent Color'),
             subtitle: _('Dynamically change the GNOME Shell accent color to match the album art')
@@ -915,7 +936,7 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
         settings.bind('sync-accent-color', syncAccentToggle, 'active', Gio.SettingsBindFlags.DEFAULT);
         syncAccentRow.add_suffix(syncAccentToggle);
         colorGroup.add(syncAccentRow);
-        
+
         const customColorRow = new Adw.ActionRow({ title: _('Use Custom Colors'), subtitle: _('Override dynamic colors') });
         const customColorToggle = new Gtk.Switch({ active: settings.get_boolean('use-custom-colors'), valign: Gtk.Align.CENTER });
         settings.bind('use-custom-colors', customColorToggle, 'active', Gio.SettingsBindFlags.DEFAULT);
@@ -927,7 +948,7 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
             let cStr = settings.get_string(settingKey).split(',');
             let c = new Gdk.RGBA();
             c.parse(`rgb(${cStr[0] || 40},${cStr[1] || 40},${cStr[2] || 40})`);
-            
+
             const btn = new Gtk.ColorButton({ rgba: c, use_alpha: false, valign: Gtk.Align.CENTER });
             btn.connect('color-set', () => {
                 let rgba = btn.get_rgba();
@@ -939,7 +960,7 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
                 newC.parse(`rgb(${parts[0]},${parts[1]},${parts[2]})`);
                 btn.set_rgba(newC);
             });
-            
+
             settings.bind('use-custom-colors', btn, 'sensitive', Gio.SettingsBindFlags.DEFAULT);
             row.add_suffix(btn);
             return row;
@@ -960,9 +981,9 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
             title: _('System & Reset'),
             icon_name: 'utilities-terminal-symbolic'
         });
-        
+
         const compatGroup = new Adw.PreferencesGroup({ title: _('System') });
-        
+
         const hidePlayerRow = new Adw.ActionRow({
             title: _('Hide Default GNOME Player'),
             subtitle: _('Remove the duplicate built-in media controls')
@@ -980,16 +1001,16 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
         settings.bind('enable-gamemode', gameToggle, 'active', Gio.SettingsBindFlags.DEFAULT);
         gameRow.add_suffix(gameToggle);
         compatGroup.add(gameRow);
-        
-        const compatDelayRow = new Adw.ActionRow({ 
-            title: _('Slow Player Workaround'), 
-            subtitle: _('Adds a slight delay to track changes (fixes sync issues)') 
+
+        const compatDelayRow = new Adw.ActionRow({
+            title: _('Slow Player Workaround'),
+            subtitle: _('Adds a slight delay to track changes (fixes sync issues)')
         });
         const compatDelayToggle = new Gtk.Switch({ active: settings.get_boolean('compatibility-delay'), valign: Gtk.Align.CENTER });
         settings.bind('compatibility-delay', compatDelayToggle, 'active', Gio.SettingsBindFlags.DEFAULT);
         compatDelayRow.add_suffix(compatDelayToggle);
         compatGroup.add(compatDelayRow);
-        
+
         const filterModel = new Gtk.StringList();
         filterModel.append(_("Off (Allow All)"));
         filterModel.append(_("Blacklist (Exclude listed)"));
@@ -1001,7 +1022,7 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
             model: filterModel,
             selected: settings.get_int('player-filter-mode')
         });
-        
+
         filterModeRow.connect('notify::selected', () => {
             settings.set_int('player-filter-mode', filterModeRow.selected);
         });
@@ -1011,7 +1032,7 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
             title: _('Filtered Players (comma separated)'),
             text: settings.get_string('player-filter-list')
         });
-        
+
         settings.bind('player-filter-list', filterListRow, 'text', Gio.SettingsBindFlags.DEFAULT);
 
         const updateFilterState = () => {
@@ -1026,9 +1047,9 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
             subtitle: _('Click an active player to add it to the filter list')
         });
 
-        const refreshBtn = new Gtk.Button({ 
-            icon_name: 'view-refresh-symbolic', 
-            valign: Gtk.Align.CENTER, 
+        const refreshBtn = new Gtk.Button({
+            icon_name: 'view-refresh-symbolic',
+            valign: Gtk.Align.CENTER,
             margin_end: 10,
             css_classes: ['flat']
         });
@@ -1054,9 +1075,9 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
                         let r = c.call_finish(res);
                         let names = r.deep_unpack()[0];
                         let mpris = names.filter(n => n.startsWith('org.mpris.MediaPlayer2.'));
-                        
+
                         let apps = [...new Set(mpris.map(n => n.replace('org.mpris.MediaPlayer2.', '').split('.')[0]))];
-                        
+
                         if (apps.length === 0) {
                             playerBox.append(new Gtk.Label({ label: _('No players found') }));
                         } else {
@@ -1073,7 +1094,7 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
                                 playerBox.append(btn);
                             });
                         }
-                    } catch(e) {}
+                    } catch (e) { }
                 }
             );
         };
@@ -1089,7 +1110,7 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
 
         compatGroup.add(detectedPlayersRow);
         otherPage.add(compatGroup);
-        
+
         const mappingHelpGroup = new Adw.PreferencesGroup();
         const helpExpander = new Adw.ExpanderRow({
             title: _('💡 How to find the correct App ID?'),
@@ -1098,25 +1119,25 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
 
         const helpLabel = new Gtk.Label({
             label: _("To allow the extension to open/close your player, you need to provide its exact window name (App ID).\n\n" +
-		   "<b>Common Examples:</b>\n" +
-		   "• Spotify (Flatpak): <b>com.spotify.Client</b>\n" +
-		   "• VLC: <b>vlc</b>\n" +
-		   "• YouTube Music (Web App): <b>youtube-music</b>\n" +
-		   "• High Tide: <b>io.github.nokse22.high-tide</b>\n" +
-		   "• Browsers: <b>chromium</b>, <b>firefox</b>, <b>brave-browser</b>\n\n" +
-		   "<b>How to find it manually:</b>\n" +
-		   "1. Press <b>Alt + F2</b>, type <b>lg</b>, and press Enter.\n" +
-		   "2. Click on the <b>Windows</b> tab in the top right corner.\n" +
-		   "3. Find your music player in the list.\n" +
-		   "4. Look at the <b>wmclass:</b> or <b>app:</b> field. That is your App ID! <i>(Remove the .desktop part)</i>\n" +
-		   "5. Press Esc to close the debugger."),
+                "<b>Common Examples:</b>\n" +
+                "• Spotify (Flatpak): <b>com.spotify.Client</b>\n" +
+                "• VLC: <b>vlc</b>\n" +
+                "• YouTube Music (Web App): <b>youtube-music</b>\n" +
+                "• High Tide: <b>io.github.nokse22.high-tide</b>\n" +
+                "• Browsers: <b>chromium</b>, <b>firefox</b>, <b>brave-browser</b>\n\n" +
+                "<b>How to find it manually:</b>\n" +
+                "1. Press <b>Alt + F2</b>, type <b>lg</b>, and press Enter.\n" +
+                "2. Click on the <b>Windows</b> tab in the top right corner.\n" +
+                "3. Find your music player in the list.\n" +
+                "4. Look at the <b>wmclass:</b> or <b>app:</b> field. That is your App ID! <i>(Remove the .desktop part)</i>\n" +
+                "5. Press Esc to close the debugger."),
             use_markup: true,
             justify: Gtk.Justification.LEFT,
             xalign: 0,
             wrap: true,
-            margin_top: 15, 
-            margin_bottom: 15, 
-            margin_start: 15, 
+            margin_top: 15,
+            margin_bottom: 15,
+            margin_start: 15,
             margin_end: 15
         });
 
@@ -1130,7 +1151,7 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
         });
         otherPage.add(appMappingGroup);
 
-        let _isRefreshing = false; 
+        let _isRefreshing = false;
 
         const refreshAppMappings = () => {
             if (_isRefreshing) return;
@@ -1180,18 +1201,18 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
 
                         let currentStr = settings.get_string('app-name-mapping') || '';
                         let currentPairs = currentStr.split(',').filter(p => p.trim() !== '');
-                        
+
                         let newPairs = currentPairs.map(p => {
                             if (p.startsWith(mprisName + ':')) {
                                 return `${mprisName}:${newId}`;
                             }
                             return p;
                         });
-                        
+
                         settings.set_string('app-name-mapping', newPairs.join(','));
-                        
+
                         saveBtn.set_icon_name('object-select-symbolic');
-                        GLib.timeout_add_once(GLib.PRIORITY_DEFAULT, 1500, () => {
+                        GLib.timeout_add_once(1500, () => {
                             if (saveBtn) saveBtn.set_icon_name('document-save-symbolic');
                         });
                     };
@@ -1209,12 +1230,12 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
                     deleteBtn.connect('clicked', () => {
                         let currentStr = settings.get_string('app-name-mapping') || '';
                         let currentPairs = currentStr.split(',').filter(p => p.trim() !== '');
-                        
+
                         let newPairs = currentPairs.filter(p => !p.startsWith(mprisName + ':'));
                         settings.set_string('app-name-mapping', newPairs.join(','));
-                        
-                        GLib.idle_add_once(GLib.PRIORITY_DEFAULT, () => {
-                            refreshAppMappings(); 
+
+                        GLib.idle_add_once(() => {
+                            refreshAppMappings();
                             if (typeof updateDetectedPlayers === 'function') updateDetectedPlayers();
                         });
                     });
@@ -1222,7 +1243,7 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
                     btnBox.append(saveBtn);
                     btnBox.append(deleteBtn);
                     row.add_suffix(btnBox);
-                    
+
                     appMappingGroup.add(row);
                 }
             });
@@ -1232,8 +1253,8 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
         refreshAppMappings();
 
         const activePlayersGroup = new Adw.PreferencesGroup({
-            	title: _('Running Players Detection'),
-    		description: _('Click on a detected player to automatically fill the mapping.')
+            title: _('Running Players Detection'),
+            description: _('Click on a detected player to automatically fill the mapping.')
         });
         otherPage.add(activePlayersGroup);
 
@@ -1244,7 +1265,7 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
                 activePlayersGroup.remove(child);
                 child = next;
             }
-            
+
             let connection = Gio.bus_get_sync(Gio.BusType.SESSION, null);
             connection.call(
                 'org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus', 'ListNames',
@@ -1256,22 +1277,22 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
                         let mprisNames = names.filter(n => n.startsWith('org.mpris.MediaPlayer2.'));
 
                         if (mprisNames.length === 0) {
-			    activePlayersGroup.set_description(_('No active players detected. Open a music app first!'));
-			} else {
-			    activePlayersGroup.set_description(_('Select a player to help the extension identify it:'));
-                            
+                            activePlayersGroup.set_description(_('No active players detected. Open a music app first!'));
+                        } else {
+                            activePlayersGroup.set_description(_('Select a player to help the extension identify it:'));
+
                             mprisNames.forEach(fullBusName => {
                                 let shortName = fullBusName.replace('org.mpris.MediaPlayer2.', '');
-                                
+
                                 if (shortName.includes('.instance')) {
                                     shortName = shortName.split('.instance')[0];
                                 }
-                                
+
                                 let currentMapStr = settings.get_string('app-name-mapping') || '';
                                 if (currentMapStr.includes(shortName + ':')) {
-                                    return; 
+                                    return;
                                 }
-                                
+
                                 let row = new Adw.ActionRow({
                                     title: shortName,
                                     subtitle: `Bus: ${fullBusName}`
@@ -1289,8 +1310,8 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
 
                                     let newVal = currentVal ? `${currentVal},${shortName}:ENTER_APP_ID_HERE` : `${shortName}:ENTER_APP_ID_HERE`;
                                     settings.set_string('app-name-mapping', newVal);
-                                    
-                                    GLib.idle_add_once(GLib.PRIORITY_DEFAULT, () => {
+
+                                    GLib.idle_add_once(() => {
                                         refreshAppMappings();
                                         updateDetectedPlayers();
                                     });
@@ -1312,8 +1333,8 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
             subtitle: _('Click to scan for active players again')
         });
 
-        const refreshMappingBtn = new Gtk.Button({ 
-            icon_name: 'view-refresh-symbolic', 
+        const refreshMappingBtn = new Gtk.Button({
+            icon_name: 'view-refresh-symbolic',
             valign: Gtk.Align.CENTER,
             css_classes: ['flat']
         });
@@ -1325,7 +1346,7 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
         updateDetectedPlayers();
 
         const backupGroup = new Adw.PreferencesGroup({ title: _('Backup & Restore') });
-        
+
         // EXPORT
         const exportRow = new Adw.ActionRow({ title: _('Export Settings') });
         const exportBtn = new Gtk.Button({ label: _('Export'), valign: Gtk.Align.CENTER });
@@ -1421,7 +1442,7 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
                     while ((fi = en.next_file(null)) !== null) dir.get_child(fi.get_name()).delete(null);
                     en.close(null);
                 }
-            } catch (e) {}
+            } catch (e) { }
             cacheRow.subtitle = buildSubtitle(getCacheInfo());
         });
 
@@ -1446,95 +1467,95 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
             title: _('About'),
             icon_name: 'help-about-symbolic'
         });
-        
-        const whatsNewGroup = new Adw.PreferencesGroup({ 
-            title: _("What's New") 
+
+        const whatsNewGroup = new Adw.PreferencesGroup({
+            title: _("What's New")
         });
 
         const changelog = [
-        	{
+            {
                 version: "1.0.0 - Latest Update",
                 subtitle: "Custom Buttons & Bug Fixes",
                 expanded: true,
                 notes: "✨ New Features:\n" +
-                       "• Custom Control Buttons: Add up to two extra buttons to the pop-up controls row. Each can be assigned to Volume, Seek Step, Audio Output, Sleep Timer, Playback Speed, or Recently Played history.\n" +
-                       "• First-Time Hint: A one-time tip in the pop-up suggests checking settings for more options (custom buttons, scroll actions, etc.). Dismissible with a click or via the settings button.\n" +
-					   "• Scroll on Hover Only: A new setting to scroll long text only when hovering over the pill.\n\n" +
-                       "🐛 Bug Fixes:\n" +
-					   "• Fixed GNOME Shell freezes (metadata crash) when player state unexpectedly becomes undefined.\n" +
-                       "• Fixed History showing incorrect album art for slow players (Zen Browser/Web apps) and prevents rapid-skip duplicates.\n" +
-                       "• Fixed Dash to Dock autohide breaking after locking and unlocking the screen.\n" +
-                       "• Fixed two pills appearing in the dock (could occur unreliably after Lock and Unlock).\n" +
-                       "• Fixed duplicate title and artist display.\n" +
-                       "• Fixed visualizer failing to update when transitioning between pill and pop-up with Dash to Dock.\n" +
-                       "• Fixed history scroll area being covered and unclickable (switched to non-overlay scrollbars).\n" +
-                       "• Fixed first-time hint buttons (Settings, X) not responding to clicks."
+                    "• Custom Control Buttons: Add up to two extra buttons to the pop-up controls row. Each can be assigned to Volume, Seek Step, Audio Output, Sleep Timer, Playback Speed, or Recently Played history.\n" +
+                    "• First-Time Hint: A one-time tip in the pop-up suggests checking settings for more options (custom buttons, scroll actions, etc.). Dismissible with a click or via the settings button.\n" +
+                    "• Scroll on Hover Only: A new setting to scroll long text only when hovering over the pill.\n\n" +
+                    "🐛 Bug Fixes:\n" +
+                    "• Fixed GNOME Shell freezes (metadata crash) when player state unexpectedly becomes undefined.\n" +
+                    "• Fixed History showing incorrect album art for slow players (Zen Browser/Web apps) and prevents rapid-skip duplicates.\n" +
+                    "• Fixed Dash to Dock autohide breaking after locking and unlocking the screen.\n" +
+                    "• Fixed two pills appearing in the dock (could occur unreliably after Lock and Unlock).\n" +
+                    "• Fixed duplicate title and artist display.\n" +
+                    "• Fixed visualizer failing to update when transitioning between pill and pop-up with Dash to Dock.\n" +
+                    "• Fixed history scroll area being covered and unclickable (switched to non-overlay scrollbars).\n" +
+                    "• Fixed first-time hint buttons (Settings, X) not responding to clicks."
             },
             {
                 version: "V29",
                 subtitle: "Real-Time Visualizer, App Mapping & Major Fixes",
                 expanded: false,
                 notes: "✨ New Features:\n" +
-                       "• Real-Time Visualizer: Added CAVA-powered real-time audio visualizer!\n" +
-                       "• Accent Color Sync: Dynamically change the GNOME accent color to match the current album art.\n" +
-                       "• Manual App Mapping: Added a new settings page to manually map unrecognized App IDs (fixes Open/Close app actions).\n" +
-                       "• Translations: Implemented multi-language support! Contributions to complete missing languages are welcome on GitHub.\n" +
-                       "• Shared Engine: Implemented a shared visualizer engine for better performance (paving the way for simultaneous Dash & Top Panel placement).\n" +
-                       "• Implemented cache system for better performance.\n\n" +
-                       "🎨 Customization & Enhancements:\n" +
-                       "• Advanced Visualizer:Deep customization options added (bar count, width, height, margin, and border radius).\n" +
-                       "• Smooth Fading: Added adjustable fade-in/out transitions for Lyrics and edge-fading for scrolling text.\n" +
-                       "• Touch & Tablet: Added a dedicated Play/Pause button in Tablet Mode and implemented proper touchscreen target controls.\n" +
-                       "• Pop-up Tweaks: Adjustable Vinyl rotation speed and a new option to auto-hide the pop-up on mouse leave/hover.\n" +
-                       "• Added dynamic width with crossfade and a new 'Outer Edge Margin' setting.\n\n" +
-                       "🐛 Bug Fixes:\n" +
-                       "• Fixed blurry album art, text, and numbers inside the pop-up menu.\n" +
-                       "• Fixed background color not updating properly to reflect the album artwork.\n" +
-                       "• Fixed an issue where selecting a non-playing player caused the pill to hide and break the player selector.\n" +
-                       "• Fixed Spotify window failing to close properly.\n" +
-                       "• Fixed a bug where the microphone would activate when the CAVA visualizer was enabled.\n" +
-                       "• Fixed floating menu alignment issues when using Dash to Dock.\n" +
-                       "• Fixed Dash to Dock aligment when tried to change an icon position.\n" +
-                       "• Fixed and issue with Strawberry player where the art image didn't loaded."
+                    "• Real-Time Visualizer: Added CAVA-powered real-time audio visualizer!\n" +
+                    "• Accent Color Sync: Dynamically change the GNOME accent color to match the current album art.\n" +
+                    "• Manual App Mapping: Added a new settings page to manually map unrecognized App IDs (fixes Open/Close app actions).\n" +
+                    "• Translations: Implemented multi-language support! Contributions to complete missing languages are welcome on GitHub.\n" +
+                    "• Shared Engine: Implemented a shared visualizer engine for better performance (paving the way for simultaneous Dash & Top Panel placement).\n" +
+                    "• Implemented cache system for better performance.\n\n" +
+                    "🎨 Customization & Enhancements:\n" +
+                    "• Advanced Visualizer:Deep customization options added (bar count, width, height, margin, and border radius).\n" +
+                    "• Smooth Fading: Added adjustable fade-in/out transitions for Lyrics and edge-fading for scrolling text.\n" +
+                    "• Touch & Tablet: Added a dedicated Play/Pause button in Tablet Mode and implemented proper touchscreen target controls.\n" +
+                    "• Pop-up Tweaks: Adjustable Vinyl rotation speed and a new option to auto-hide the pop-up on mouse leave/hover.\n" +
+                    "• Added dynamic width with crossfade and a new 'Outer Edge Margin' setting.\n\n" +
+                    "🐛 Bug Fixes:\n" +
+                    "• Fixed blurry album art, text, and numbers inside the pop-up menu.\n" +
+                    "• Fixed background color not updating properly to reflect the album artwork.\n" +
+                    "• Fixed an issue where selecting a non-playing player caused the pill to hide and break the player selector.\n" +
+                    "• Fixed Spotify window failing to close properly.\n" +
+                    "• Fixed a bug where the microphone would activate when the CAVA visualizer was enabled.\n" +
+                    "• Fixed floating menu alignment issues when using Dash to Dock.\n" +
+                    "• Fixed Dash to Dock aligment when tried to change an icon position.\n" +
+                    "• Fixed and issue with Strawberry player where the art image didn't loaded."
             },
-        	{
+            {
                 version: "V27",
                 subtitle: "Small Features and Fixes",
                 expanded: false,
                 notes: "• Added Double Click Mouse Actin\n" +
-                       "• Added Always ON mode\n" +
-                       "• Fixed an issue where the seek bar become glitchy\n" +
-                       "• Fixed a huge CPU drain with dash to dock autohide mode"
-            },     
-        	{
+                    "• Added Always ON mode\n" +
+                    "• Fixed an issue where the seek bar become glitchy\n" +
+                    "• Fixed a huge CPU drain with dash to dock autohide mode"
+            },
+            {
                 version: "V26",
                 subtitle: "Dynamic Contrast & Readability Improvements",
                 expanded: false,
                 notes: "• Added dynamic contrast: Popup text and buttons now automatically turn dark on light album arts for perfect readability\n" +
-                       "• The Player Selector menu now correctly follows your Custom Color settings\n" +
-                       "• Dynamic contrast is also applied to the Player Selector menu\n" +
-                       "• Improved Player Selector: Added smart DBus logic to accurately detect and display media player names and icons\n" +
-                       "• Fixed an issue where the popup menu would jump or resize incorrectly when Custom Width was enabled"
+                    "• The Player Selector menu now correctly follows your Custom Color settings\n" +
+                    "• Dynamic contrast is also applied to the Player Selector menu\n" +
+                    "• Improved Player Selector: Added smart DBus logic to accurately detect and display media player names and icons\n" +
+                    "• Fixed an issue where the popup menu would jump or resize incorrectly when Custom Width was enabled"
             },
             {
                 version: "V25",
                 subtitle: "Ubuntu Dock Support, UI Fixes & Stability",
                 expanded: false,
                 notes: "• Added automatic vertical mode for side panels (e.g., Ubuntu Dock)\n" +
-                       "• Fixed an issue where the pill disappeared when moving the dock\n" +
-                       "• Improved seeker sync when changing tracks\n" +
-                       "• New toggle for Outline Border for the Main Pill, now you can disable it\n" +
-                       "• Fixed the pill hitbox"                   
+                    "• Fixed an issue where the pill disappeared when moving the dock\n" +
+                    "• Improved seeker sync when changing tracks\n" +
+                    "• New toggle for Outline Border for the Main Pill, now you can disable it\n" +
+                    "• Fixed the pill hitbox"
             },
             {
                 version: "V21-V23",
                 subtitle: "Custom Colors & Player Selector",
                 expanded: false,
                 notes: "• Added custom text and background color options\n" +
-                       "• New Player Selector\n" +
-                       "• New Invert Scrolling Toggle\n" +
-                       "• New Mouse Action (Hover)\n" +
-                       "• Bugfixes and performance improvements"
+                    "• New Player Selector\n" +
+                    "• New Invert Scrolling Toggle\n" +
+                    "• New Mouse Action (Hover)\n" +
+                    "• Bugfixes and performance improvements"
             }
         ];
 
@@ -1547,9 +1568,9 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
 
             let label = new Gtk.Label({
                 label: release.notes,
-                justify: Gtk.Justification.LEFT, 
-                xalign: 0,                       
-                wrap: true,                      
+                justify: Gtk.Justification.LEFT,
+                xalign: 0,
+                wrap: true,
                 margin_top: 10,
                 margin_bottom: 10,
                 margin_start: 15,

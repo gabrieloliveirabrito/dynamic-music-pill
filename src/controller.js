@@ -115,7 +115,6 @@ export class MusicController {
 
         this._createPill();
 
-        // Asynchronously cleanup unbounded art caches from disk
         GLib.idle_add(GLib.PRIORITY_LOW, () => {
             this._cleanupDiskCache();
             return GLib.SOURCE_REMOVE;
@@ -206,6 +205,7 @@ export class MusicController {
             this._fetchedTrackKey = null;
             this._fetchedLyricsData = null;
             this._lastLyricIndex = -1;
+
             if (this._settings.get_boolean('enable-lyrics') && !this._dbusLyricActive) {
                 let player = this._getActivePlayer();
                 if (player) this._fetchNetworkLyrics(player);
@@ -215,6 +215,18 @@ export class MusicController {
 
     disable() {
         this._isShuttingDown = true;
+        if (this._artMonitor) {
+            this._artMonitor.cancel();
+            this._artMonitor = null;
+        }
+        if (this._artMonitorDebounce) {
+            GLib.Source.remove(this._artMonitorDebounce);
+            this._artMonitorDebounce = null;
+        }
+        if (this._retryArtTimer) {
+            GLib.Source.remove(this._retryArtTimer);
+            this._retryArtTimer = null;
+        }
         if (this._startupCompleteId) {
             Main.layoutManager.disconnect(this._startupCompleteId);
             this._startupCompleteId = null;
@@ -364,8 +376,8 @@ export class MusicController {
         if (killTarget) {
             killTarget = killTarget.toLowerCase();
 
-            GLib.timeout_add_once(GLib.PRIORITY_DEFAULT, 800, () => {
-                if (!this._proxies.has(busName)) return;
+            GLib.timeout_add(GLib.PRIORITY_DEFAULT, 800, () => {
+                if (!this._proxies.has(busName)) return GLib.SOURCE_REMOVE;
 
                 try {
                     if (killTarget.includes('.')) {
@@ -375,6 +387,7 @@ export class MusicController {
                 } catch (e) {
                     console.debug("[Dynamic Music Pill] Failed to hard kill: " + killTarget);
                 }
+                return GLib.SOURCE_REMOVE;
             });
         }
     }
@@ -546,9 +559,10 @@ export class MusicController {
 
     _queueInject() {
         if (this._injectTimeout) GLib.Source.remove(this._injectTimeout);
-        this._injectTimeout = GLib.timeout_add_once(GLib.PRIORITY_DEFAULT, 100, () => {
-            this._injectTimeout = null;
+        this._injectTimeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 100, () => {
             this._inject();
+            this._injectTimeout = null;
+            return GLib.SOURCE_REMOVE;
         });
     }
 
@@ -869,10 +883,6 @@ export class MusicController {
                                                     if (typeof val === 'number' && val >= 0) {
                                                         p._lastPosition = val;
                                                         p._lastPositionTime = Date.now();
-                                                    } else {
-                                                        GLib.timeout_add_once(GLib.PRIORITY_DEFAULT, 500, () => {
-                                                            if (this._proxies.has(p._busName)) this._syncPosition(p);
-                                                        });
                                                     }
                                                     this._triggerUpdate();
                                                 }
@@ -1224,6 +1234,21 @@ export class MusicController {
             this._syncPosition(active);
         }
 
+        // Stale position detection for KDE Connect / GS Connect
+        let cachedPos = active._lastPosition || 0;
+        if (cachedPos === (this._lastLyricPosition || 0)) {
+            this._stalePositionCount = (this._stalePositionCount || 0) + 1;
+        } else {
+            this._stalePositionCount = 0;
+            this._lastLyricPosition = cachedPos;
+        }
+
+        // If position hasn't changed for ~3 seconds (15 ticks × 200ms), hide lyrics
+        if (this._stalePositionCount > 15) {
+            if (this._pill) this._pill.setLyric(null);
+            return;
+        }
+
         let positionUs = active._lastPosition + (now - active._lastPositionTime) * 1000;
         let positionMs = positionUs / 1000;
 
@@ -1261,9 +1286,10 @@ export class MusicController {
         let useDelay = this._settings ? this._settings.get_boolean('compatibility-delay') : false;
         let delay = useDelay ? 800 : 150;
 
-        this._updateTimeoutId = GLib.timeout_add_once(GLib.PRIORITY_DEFAULT, delay, () => {
+        this._updateTimeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, delay, () => {
             this._updateTimeoutId = null;
             this._updateUI();
+            return GLib.SOURCE_REMOVE;
         });
     }
 
@@ -1293,9 +1319,10 @@ export class MusicController {
                     if (this._artMonitorDebounce) {
                         GLib.Source.remove(this._artMonitorDebounce);
                     }
-                    this._artMonitorDebounce = GLib.timeout_add_once(GLib.PRIORITY_DEFAULT, 200, () => {
+                    this._artMonitorDebounce = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 200, () => {
                         this._artMonitorDebounce = null;
                         this._updateUI();
+                        return GLib.SOURCE_REMOVE;
                     });
                 }
             });
@@ -1419,20 +1446,22 @@ export class MusicController {
                                             let newUri = cachedFile.get_uri();
                                             this._artCacheSet(cacheKey, newUri);
                                             if (this._pill && this._pill._lastArtUrl !== newUri && this._getActivePlayer()) {
-                                                GLib.idle_add_once(GLib.PRIORITY_DEFAULT, () => {
+                                                GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
                                                     this._updateUI();
+                                                    return GLib.SOURCE_REMOVE;
                                                 });
                                             }
-                                         } else {
+                                        } else {
                                             this._artCacheSet(cacheKey, currentArt);
                                             if (this._pill && this._pill._lastArtUrl !== currentArt && this._getActivePlayer()) {
-                                                GLib.idle_add_once(GLib.PRIORITY_DEFAULT, () => {
+                                                GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
                                                     this._pill.showFor(title, artist, currentArt, active.PlaybackStatus, active._busName, false, active);
+                                                    return GLib.SOURCE_REMOVE;
                                                 });
                                             }
 
                                             if (this._getActivePlayer()) {
-                                                GLib.idle_add_once(GLib.PRIORITY_DEFAULT, () => {
+                                                GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
                                                     if (!this._retryArtTimer) {
                                                         this._retryArtTimerCount = 0;
                                                         this._retryArtTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 500, () => {
@@ -1445,6 +1474,7 @@ export class MusicController {
                                                             return GLib.SOURCE_CONTINUE;
                                                         });
                                                     }
+                                                    return GLib.SOURCE_REMOVE;
                                                 });
                                             }
                                         }
@@ -1479,8 +1509,9 @@ export class MusicController {
                                             let newUri = httpCachedFile.get_uri();
                                             this._artCacheSet(cacheKey, newUri);
                                             if (this._pill && this._pill._lastArtUrl !== newUri && this._getActivePlayer()) {
-                                                GLib.idle_add_once(GLib.PRIORITY_DEFAULT, () => {
+                                                GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
                                                     this._updateUI();
+                                                    return GLib.SOURCE_REMOVE;
                                                 });
                                             }
                                         }
@@ -1488,8 +1519,9 @@ export class MusicController {
                                         console.debug('[Dynamic Music Pill] Soup art download failed: ' + e.message);
                                         this._artCacheSet(cacheKey, currentArt);
                                         if (this._pill && this._pill._lastArtUrl !== currentArt && this._getActivePlayer()) {
-                                            GLib.idle_add_once(GLib.PRIORITY_DEFAULT, () => {
+                                            GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
                                                 this._updateUI();
+                                                return GLib.SOURCE_REMOVE;
                                             });
                                         }
                                     }
@@ -1552,13 +1584,36 @@ export class MusicController {
                     this._recordHistory(title, artist, artUrl);
                 }
 
-                if (!artUrl && active.PlaybackStatus === 'Playing' && !this._retryArtTimer) {
-                    this._retryArtTimer = GLib.timeout_add_once(GLib.PRIORITY_DEFAULT, 500, () => {
-                        this._retryArtTimer = null;
+                let needsRetry = false;
+                if (currentArt && currentArt.startsWith('file://')) {
+                    let srcFile = Gio.File.new_for_uri(currentArt);
+                    if (!srcFile.query_exists(null)) {
+                        needsRetry = true;
+                    } else {
+                        let info = null;
+                        try {
+                            info = srcFile.query_info(Gio.FILE_ATTRIBUTE_STANDARD_SIZE, Gio.FileQueryInfoFlags.NONE, null);
+                        } catch (e) { }
+                        if (info && info.get_size() === 0) needsRetry = true;
+                    }
+                }
+
+                if (needsRetry && active.PlaybackStatus === 'Playing' && !this._retryArtTimer) {
+                    this._retryArtTimerCount = 0;
+                    this._retryArtTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 500, () => {
+                        this._retryArtTimerCount++;
+                        if (this._retryArtTimerCount > 10 || !this._pill || (this._pill.is_finalized && this._pill.is_finalized())) {
+                            this._retryArtTimer = null;
+                            return GLib.SOURCE_REMOVE;
+                        }
                         if (this._proxies.has(active._busName)) {
                             this._updateUI();
                         }
+                        return GLib.SOURCE_CONTINUE;
                     });
+                } else if (!needsRetry && this._retryArtTimer) {
+                    GLib.Source.remove(this._retryArtTimer);
+                    this._retryArtTimer = null;
                 }
 
                 let now = Date.now();
@@ -1585,7 +1640,14 @@ export class MusicController {
                     }
                 }
 
-                this._pill.updateDisplay(title, artist, artUrl, active.PlaybackStatus, active._busName, isSkipActive, active);
+                let finalDisplayArt = artUrl;
+                if (this._pill && !finalDisplayArt && active.PlaybackStatus === 'Playing' && (needsRetry || this._retryArtTimer)) {
+                    if (this._pill._lastArtUrl) {
+                        finalDisplayArt = this._pill._lastArtUrl;
+                    }
+                }
+
+                this._pill.updateDisplay(title, artist, finalDisplayArt, active.PlaybackStatus, active._busName, isSkipActive, active);
             } else {
                 this._stopLyricsTimer();
                 this._fetchedTrackKey = null;
@@ -1596,7 +1658,7 @@ export class MusicController {
                 this._pill.updateDisplay(null, null, null, 'Stopped', null, false);
             }
         } catch (e) {
-            console.debug('[Dynamic Music Pill] _updateUI crash trapped: ' + e);
+            console.debug(`[Dynamic Music Pill] _updateUI error: ${e.message}`);
         }
     }
 
@@ -1618,59 +1680,80 @@ export class MusicController {
     }
 
     _getActivePlayer() {
-        let proxiesArr = Array.from(this._proxies.values());
-        if (proxiesArr.length === 0) return null;
-        let manualBus = this._settings.get_string('selected-player-bus');
-        if (manualBus && manualBus !== '' && this._proxies.has(manualBus)) {
-            return this._proxies.get(manualBus);
-        }
-        let now = Date.now();
+        try {
+            let proxiesArr = Array.from(this._proxies.values());
+            if (proxiesArr.length === 0) return null;
+            let manualBus = this._settings.get_string('selected-player-bus');
+            if (manualBus && manualBus !== '' && this._proxies.has(manualBus)) {
+                return this._proxies.get(manualBus);
+            }
+            let now = Date.now();
 
-        let filterMode = this._settings.get_int('player-filter-mode');
-        let filterListStr = this._settings.get_string('player-filter-list').toLowerCase();
-        let filterList = filterListStr.split(',').map(s => s.trim()).filter(s => s.length > 0);
+            let filterMode = this._settings.get_int('player-filter-mode');
+            let filterListStr = this._settings.get_string('player-filter-list').toLowerCase();
+            let filterList = filterListStr.split(',').map(s => s.trim()).filter(s => s.length > 0);
 
-        if (now - this._lastActionTime < 3000 && this._lastWinnerName) {
-            let lockedPlayer = proxiesArr.find(p => p._busName === this._lastWinnerName);
-            if (lockedPlayer) return lockedPlayer;
-        }
-
-        let scoredPlayers = proxiesArr.map(p => {
-            let score = 0;
-            let status = p.PlaybackStatus;
-            let m = p.Metadata;
-
-            if (m) {
-                let metaObj = (m instanceof GLib.Variant) ? m.deep_unpack() : m;
-                let url = metaObj['xesam:url'] ? smartUnpack(metaObj['xesam:url']).toLowerCase() : "";
-
-                let isWebContent = url.startsWith('http://') || url.startsWith('https://');
-
-                if (isWebContent && filterMode === 2) {
-                    let urlMatch = filterList.some(item => url.includes(item));
-                    if (!urlMatch) return { player: p, score: -1 };
-                }
+            if (now - this._lastActionTime < 3000 && this._lastWinnerName) {
+                let lockedPlayer = proxiesArr.find(p => p._busName === this._lastWinnerName);
+                if (lockedPlayer) return lockedPlayer;
             }
 
-            let hasTitle = m && smartUnpack(m['xesam:title']);
-            if (status === 'Playing' && hasTitle) score = 500;
-            else if (status === 'Paused' && hasTitle) score = 100;
-            return { player: p, score: score };
-        });
+            let scoredPlayers = proxiesArr.map(p => {
+                let score = 0;
+                let status = p.PlaybackStatus;
+                let m = p.Metadata;
 
-        scoredPlayers.sort((a, b) => {
-            if (b.score !== a.score) return b.score - a.score;
-            return b.player._lastPlayingTime - a.player._lastPlayingTime;
-        });
+                if (m) {
+                    try {
+                        let metaObj = (m instanceof GLib.Variant) ? m.deep_unpack() : m;
+                        let url = metaObj['xesam:url'] ? smartUnpack(metaObj['xesam:url']).toLowerCase() : "";
 
-        if (scoredPlayers[0].score < 0) return null;
+                        let isWebContent = url.startsWith('http://') || url.startsWith('https://');
 
-        let winner = scoredPlayers[0].player;
-        if (winner.PlaybackStatus !== 'Playing') {
-            let anyPlaying = scoredPlayers.find(s => s.score > 0 && s.player.PlaybackStatus === 'Playing' && smartUnpack(s.player.Metadata['xesam:title']));
-            if (anyPlaying) winner = anyPlaying.player;
+                        if (isWebContent && filterMode === 2) {
+                            let urlMatch = filterList.some(item => url.includes(item));
+                            if (!urlMatch) return { player: p, score: -1 };
+                        }
+                    } catch (e) { /* metadata access failed, treat as no metadata */ }
+                }
+
+                let hasTitle = false;
+                if (m) {
+                    try {
+                        let mu = (m instanceof GLib.Variant) ? m.deep_unpack() : m;
+                        hasTitle = !!smartUnpack(mu['xesam:title']);
+                    } catch (e) { hasTitle = false; }
+                }
+                if (status === 'Playing' && hasTitle) score = 500;
+                else if (status === 'Paused' && hasTitle) score = 100;
+                return { player: p, score: score };
+            });
+
+            scoredPlayers.sort((a, b) => {
+                if (b.score !== a.score) return b.score - a.score;
+                return b.player._lastPlayingTime - a.player._lastPlayingTime;
+            });
+
+            if (scoredPlayers[0].score < 0) return null;
+
+            let winner = scoredPlayers[0].player;
+            if (winner.PlaybackStatus !== 'Playing') {
+                let anyPlaying = scoredPlayers.find(s => {
+                    if (s.score <= 0 || s.player.PlaybackStatus !== 'Playing') return false;
+                    try {
+                        let md = s.player.Metadata;
+                        if (!md) return false;
+                        let mdu = (md instanceof GLib.Variant) ? md.deep_unpack() : md;
+                        return !!smartUnpack(mdu['xesam:title']);
+                    } catch (e) { return false; }
+                });
+                if (anyPlaying) winner = anyPlaying.player;
+            }
+            return winner;
+        } catch (e) {
+            console.debug(`[Dynamic Music Pill] _getActivePlayer error: ${e.message}`);
+            return null;
         }
-        return winner;
     }
 
     togglePlayback() { let p = this._getActivePlayer(); if (p) p.PlayPauseRemote(); }
@@ -1757,7 +1840,7 @@ export class MusicController {
         this._pill._feedbackBox.show();
         this._pill._feedbackBox.ease({ opacity: 255, duration: 150, mode: Clutter.AnimationMode.EASE_OUT_QUAD });
 
-        this._feedbackTimer = GLib.timeout_add_once(GLib.PRIORITY_DEFAULT, 1500, () => {
+        this._feedbackTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1500, () => {
             this._feedbackTimer = null;
             if (this._pill && this._pill._feedbackBox) {
                 this._pill._feedbackBox.ease({
@@ -1766,6 +1849,7 @@ export class MusicController {
                 });
                 this._pill._textBox.ease({ opacity: 255, duration: 150, mode: Clutter.AnimationMode.EASE_OUT_QUAD });
             }
+            return GLib.SOURCE_REMOVE;
         });
     }
 
@@ -1997,7 +2081,7 @@ export class MusicController {
         this._sleepTimerEndTime = Date.now() + totalSeconds * 1000;
         this._sleepTimerActive = true;
 
-        this._sleepTimerId = GLib.timeout_add_seconds_once(GLib.PRIORITY_DEFAULT, totalSeconds, () => {
+        this._sleepTimerId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, totalSeconds, () => {
             this._sleepTimerId = null;
             this._sleepTimerActive = false;
             this._sleepTimerEndTime = null;
@@ -2005,6 +2089,7 @@ export class MusicController {
             if (p && p.PlaybackStatus === 'Playing') {
                 p.PlayPauseRemote();
             }
+            return GLib.SOURCE_REMOVE;
         });
     }
 
@@ -2025,7 +2110,6 @@ export class MusicController {
 
     _recordHistory(title, artist, artUrl) {
         if (!title) return;
-
         let now = Date.now();
         let foundIdx = -1;
         let safeArtist = artist || '';
@@ -2051,9 +2135,10 @@ export class MusicController {
                             let destPath = GLib.build_filenamev([cacheDir, 'hist_' + hashKey + '.jpg']);
                             let srcFile = Gio.File.new_for_uri(artUrl);
                             let destFile = Gio.File.new_for_path(destPath);
-                            if (!destFile.query_exists(null)) {
-                                srcFile.copy(destFile, Gio.FileCopyFlags.NONE, null, null);
-                            }
+                            srcFile.copy_async(destFile, Gio.FileCopyFlags.OVERWRITE,
+                                GLib.PRIORITY_DEFAULT, null, null, (src, res) => {
+                                    try { src.copy_finish(res); } catch (e) { }
+                                });
                             localArtUrl = destFile.get_uri();
                         } catch (e) { }
                     }
@@ -2079,9 +2164,10 @@ export class MusicController {
                 let destPath = GLib.build_filenamev([cacheDir, 'hist_' + hashKey + '.jpg']);
                 let srcFile = Gio.File.new_for_uri(artUrl);
                 let destFile = Gio.File.new_for_path(destPath);
-                if (!destFile.query_exists(null)) {
-                    srcFile.copy(destFile, Gio.FileCopyFlags.NONE, null, null);
-                }
+                srcFile.copy_async(destFile, Gio.FileCopyFlags.OVERWRITE,
+                    GLib.PRIORITY_DEFAULT, null, null, (src, res) => {
+                        try { src.copy_finish(res); } catch (e) { /* ignore */ }
+                    });
                 localArtUrl = destFile.get_uri();
             } catch (e) { }
         }
