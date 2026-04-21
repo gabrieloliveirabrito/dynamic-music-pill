@@ -1477,6 +1477,18 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
         });
 
         const changelog = [
+                    {
+                        version: "1.1.0 - Latest Update",
+                        subtitle: "Custom Buttons & Bug Fixes",
+                        expanded: true,
+                        notes: "✨ New Features:\n" +
+                               "• Add a 'Scroll Action' mode to fast-forward.\n" +
+                               "• Per-App Volume Control.\n" +
+        					   "• Resotre original GNOME accent color after player is closed.\n\n" +
+                               "• Bug Fixes:\n" +
+        					   "• Lyrics view crash fix.\n" +
+                               "• Telegram crash fix."
+                    },
             {
                 version: "1.0.0 - Latest Update",
                 subtitle: "Custom Buttons & Bug Fixes",
