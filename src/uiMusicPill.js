@@ -265,7 +265,7 @@ export const MusicPill = GObject.registerClass(
                     if (shouldNext || shouldPrev) {
                         let now = Date.now();
                         let action = this._settings.get_string('scroll-action');
-                        et delayLimit = (action === 'volume') ? 50 : (action === 'seek') ? 200 : 500;
+                        let delayLimit = (action === 'volume') ? 50 : (action === 'seek') ? 200 : 500;
 
                         if (now - this._lastScrollTime < delayLimit) return Clutter.EVENT_STOP;
                         this._lastScrollTime = now;
