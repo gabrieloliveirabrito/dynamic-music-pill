@@ -48,6 +48,11 @@
       <default>false</default>
       <summary>Show player selector in pop-up</summary>
     </key>
+    <key name="hide-auto-smart-selection" type="b">
+      <default>false</default>
+      <summary>Hide Auto (Smart Selection)</summary>
+      <description>Remove the automatic player selection entry from the player selector menu.</description>
+    </key>
     <key name="popup-follow-custom-bg" type="b">
       <default>false</default>
       <summary>Popup Follows Custom Background Color</summary>
