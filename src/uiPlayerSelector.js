@@ -145,31 +145,26 @@ export const PlayerSelectorMenu = GObject.registerClass(
                 });
                 _addBtnPressAnim(autoBtn);
 
-                autoBtn.connectObject('button-release-event', (a, e) => {
-                    if (e.get_button() === 8) return Clutter.EVENT_PROPAGATE;
-                    return Clutter.EVENT_PROPAGATE;
-                }, this);
-                autoBtn.connectObject('clicked', () => {
+                const selectAuto = () => {
                     this._settings.set_string('selected-player-bus', '');
                     this._controller._updateUI();
                     this.hide();
-                }, this);
+                };
 
+                autoBtn.connectObject('clicked', selectAuto, this);
                 autoBtn.connectObject('touch-event', (actor, event) => {
                     let type = event.type();
                     if (type === Clutter.EventType.TOUCH_END) {
-                        this._settings.set_string('selected-player-bus', '');
-                        this._controller._updateUI();
-                        this.hide();
+                        selectAuto();
                         return Clutter.EVENT_STOP;
                     }
                     return Clutter.EVENT_PROPAGATE;
                 }, this);
 
-                autoBtn.connect('notify::hover', () => {
+                autoBtn.connectObject('notify::hover', () => {
                     if (this._settings.get_string('selected-player-bus') === '') return;
                     autoBtn.set_style(`margin-bottom: 8px; border-radius: 12px; padding: 10px; background-color: ${autoBtn.hover ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.05)'}; transition-duration: 150ms;`);
-                });
+                }, this);
 
                 this._box.add_child(autoBtn);
             }

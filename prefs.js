@@ -525,6 +525,7 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
             valign: Gtk.Align.CENTER
         });
         settings.bind('hide-auto-smart-selection', hideAutoToggle, 'active', Gio.SettingsBindFlags.DEFAULT);
+        settings.bind('popup-show-player-selector', hideAutoRow, 'sensitive', Gio.SettingsBindFlags.DEFAULT);
         hideAutoRow.add_suffix(hideAutoToggle);
         popupGroup.add(hideAutoRow);
 
