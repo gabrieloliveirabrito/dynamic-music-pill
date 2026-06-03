@@ -847,7 +847,6 @@ export class MusicController {
                                 p._lastPositionTime = now;
                             }
                             this._triggerUpdate();
-                            return;
                         }
 
                         if (keys.Metadata !== undefined || keys.PlaybackStatus !== undefined) {
@@ -1365,7 +1364,10 @@ export class MusicController {
             else if (target === 3) container = Main.panel._rightBox;
 
             if (container) {
-                this._ensurePosition(container);
+                let moved = this._ensurePosition(container);
+                if (moved) {
+                    this._pill._updateDimensions();
+                }
             }
 
             let active = this._getActivePlayer();

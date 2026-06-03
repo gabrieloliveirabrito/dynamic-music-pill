@@ -1245,6 +1245,9 @@ export const MusicPill = GObject.registerClass(
             let a = this._origArtist;
             let lyricTime = 0;
 
+            let target = this._settings.get_int('target-container');
+            this._inPanel = (target > 0);
+
             let isSqueezed = (this._inPanel && this._settings.get_int('panel-pill-height') < 30) || (!this._inPanel && this._settings.get_int('pill-height') < 46);
             if (this._settings.get_boolean('inline-artist') && isSqueezed && a && t) {
                 t = `${t} • ${a}`;
