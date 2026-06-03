@@ -20,7 +20,7 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
             'popup-enable-shadow', 'popup-follow-transparency', 'popup-follow-radius',
             'popup-vinyl-rotate', 'visualizer-padding', 'scroll-action', 'popup-vinyl-square',
             'popup-show-vinyl', 'show-shuffle-loop', 'use-custom-colors', 'custom-bg-color',
-            'custom-text-color', 'tablet-mode', 'inline-artist', 'pill-dynamic-width',
+            'custom-text-color', 'tablet-mode', 'pill-controls-position', 'inline-artist', 'pill-dynamic-width',
             'popup-use-custom-width', 'popup-custom-width', 'player-filter-mode', 'player-filter-list', 'hide-text',
             'fallback-art-path', 'popup-show-visualizer', 'popup-hide-pill-visualizer', 'compatibility-delay',
             'popup-follow-custom-bg', 'popup-follow-custom-text', 'action-hover', 'hover-delay', 'selected-player-bus',
@@ -297,6 +297,24 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
 
         settings.bind('tablet-mode', tabletModeRow, 'selected', Gio.SettingsBindFlags.DEFAULT);
         genGroup.add(tabletModeRow);
+
+        const controlsPosRow = new Adw.ComboRow({
+            title: _('Controls Position'),
+            subtitle: _('Where to place the tablet controls on the pill'),
+            model: new Gtk.StringList({
+                strings: [_('Before Text'), _('After Text'), _('After Visualizer')]
+            }),
+            selected: settings.get_int('pill-controls-position'),
+        });
+        controlsPosRow.connect('notify::selected', () =>
+            settings.set_int('pill-controls-position', controlsPosRow.get_selected()));
+        settings.connect('changed::pill-controls-position', () =>
+            controlsPosRow.set_selected(settings.get_int('pill-controls-position')));
+        controlsPosRow.sensitive = settings.get_int('tablet-mode') > 0;
+        settings.connect('changed::tablet-mode', () => {
+            controlsPosRow.sensitive = settings.get_int('tablet-mode') > 0;
+        });
+        genGroup.add(controlsPosRow);
 
         const inlineArtistRow = new Adw.ActionRow({ title: _('Inline Artist'), subtitle: _('Show "Title • Artist" when the widget is squeezed') });
         const inlineArtistToggle = new Gtk.Switch({ active: settings.get_boolean('inline-artist'), valign: Gtk.Align.CENTER });

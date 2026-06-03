@@ -117,7 +117,8 @@ export const MusicPill = GObject.registerClass(
             this._tabletControls.add_child(this._prevBtn);
             this._tabletControls.add_child(this._playPauseBtnTablet);
             this._tabletControls.add_child(this._nextBtn);
-            this._body.add_child(this._tabletControls);
+            // Position 0 (before text) is the default — insert after _artBin
+            this._body.insert_child_at_index(this._tabletControls, 1);
 
             this._textWrapper = new St.Widget({
                 layout_manager: new Clutter.BinLayout(),
@@ -307,6 +308,7 @@ export const MusicPill = GObject.registerClass(
             this._settings.connectObject('changed::custom-bg-color', () => this._applyStyle(this._displayedColor.r, this._displayedColor.g, this._displayedColor.b), this);
             this._settings.connectObject('changed::custom-text-color', () => this._updateDimensions(), this);
             this._settings.connectObject('changed::tablet-mode', () => this._updateDimensions(), this);
+            this._settings.connectObject('changed::pill-controls-position', () => this._updateDimensions(), this);
             this._settings.connectObject('changed::scroll-action', () => { this._scrollDelta = 0; }, this);
             this._settings.connectObject('changed::enable-transparency', () => this._updateTransparencyConfig(), this);
             this._settings.connectObject('changed::transparency-strength', () => this._updateTransparencyConfig(), this);
@@ -575,6 +577,26 @@ export const MusicPill = GObject.registerClass(
             }
         }
 
+        _repositionTabletControls() {
+            let pos = this._settings.get_int('pill-controls-position');
+            // Remove from current position
+            if (this._tabletControls.get_parent() === this._body) {
+                this._body.remove_child(this._tabletControls);
+            }
+            // _body children without _tabletControls: _artBin(0), _textWrapper(1), _visBin(2)
+            switch (pos) {
+                case 1: // After text, before visualizer → insert at index 2
+                    this._body.insert_child_at_index(this._tabletControls, 2);
+                    break;
+                case 2: // After visualizer → append at end
+                    this._body.add_child(this._tabletControls);
+                    break;
+                default: // 0 = Before text → insert at index 1 (after art)
+                    this._body.insert_child_at_index(this._tabletControls, 1);
+                    break;
+            }
+        }
+
         _updateDimensions() {
             if (!this.get_parent()) return;
             let target = this._settings.get_int('target-container');
@@ -688,6 +710,7 @@ export const MusicPill = GObject.registerClass(
                 this._nextBtn.visible = (tabletSetting === 1 || tabletSetting === 3);
                 if (this._playPauseBtnTablet)
                     this._playPauseBtnTablet.visible = (tabletSetting === 2 || tabletSetting === 3);
+                this._repositionTabletControls();
             } else {
                 this._tabletControls.hide();
             }
@@ -697,7 +720,12 @@ export const MusicPill = GObject.registerClass(
                 this._tabletControls.set_style('margin: 0px;');
             } else {
                 this._tabletControls.layout_manager.orientation = Clutter.Orientation.HORIZONTAL;
-                this._tabletControls.set_style('margin-left: 6px; margin-top: 0px;');
+                let controlsPos = this._settings.get_int('pill-controls-position');
+                if (controlsPos === 0) {
+                    this._tabletControls.set_style('margin-left: 6px; margin-top: 0px;');
+                } else {
+                    this._tabletControls.set_style('margin-left: 6px; margin-right: 4px; margin-top: 0px;');
+                }
             }
 
             let forceHideVis = this._isPopupOpen && this._settings.get_boolean('popup-hide-pill-visualizer') && this._settings.get_boolean('popup-show-visualizer');

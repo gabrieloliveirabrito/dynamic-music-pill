@@ -200,6 +200,12 @@
       <summary>Tablet Controls Mode</summary>
       <description>0: Off, 1: Skip Only, 2: Play/Pause Only, 3: All Controls</description>
     </key>
+    <key name="pill-controls-position" type="i">
+      <default>0</default>
+      <range min="0" max="2"/>
+      <summary>Pill Controls Position</summary>
+      <description>Position of tablet controls in the pill: 0=Before Text, 1=After Text (before visualizer), 2=After Visualizer</description>
+    </key>
     <key name="popup-hide-on-leave" type="b">
       <default>false</default>
       <summary>Hide popup when mouse leaves</summary>
