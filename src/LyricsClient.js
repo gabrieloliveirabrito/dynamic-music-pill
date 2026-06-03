@@ -51,18 +51,13 @@ export class LyricsClient {
     const pref = settings ? settings.get_int('lyrics-language-preference') : 0;
 
     try {
+      // Fire both requests in parallel
       const url = `https://lrclib.net/api/get?track_name=${encodeURIComponent(title || '')}&artist_name=${encodeURIComponent(artist || '')}&album_name=${encodeURIComponent(album || '')}&duration=${duration}`;
-      let msg;
-      try { msg = Soup.Message.new("GET", url); } catch (_e) { throw new Error('Failed to create request'); }
-      if (!msg) throw new Error('Failed to create request');
-      const bytes = await this._session.send_and_read_async(msg, GLib.PRIORITY_DEFAULT, null);
 
-      let exactItem = null;
-      if (msg.status_code === Soup.Status.OK) {
-        try { exactItem = JSON.parse(decode(bytes.get_data())); } catch (_) {}
-      }
-
-      const candidates = await this._fetchCandidates(title, artist, duration);
+      const [exactItem, candidates] = await Promise.all([
+        this._fetchExact(url),
+        this._fetchCandidates(title, artist, duration),
+      ]);
 
       if (exactItem && exactItem.syncedLyrics) {
         const alreadyIn = candidates.some(c => c.id === exactItem.id);
@@ -90,6 +85,23 @@ export class LyricsClient {
     } catch (e) {
       console.debug(`[Dynamic Music Pill] Lyrics fetch error: ${e.message}`);
       throw e; // re-throw so caller can distinguish error from "no lyrics found"
+    }
+  }
+
+  async _fetchExact(url) {
+    if (!this._session) return null;
+    try {
+      let msg;
+      try { msg = Soup.Message.new("GET", url); } catch (_e) { throw new Error('Failed to create request'); }
+      if (!msg) throw new Error('Failed to create request');
+      const bytes = await this._session.send_and_read_async(msg, GLib.PRIORITY_DEFAULT, null);
+      if (msg.status_code === Soup.Status.OK) {
+        try { return JSON.parse(decode(bytes.get_data())); } catch (_) {}
+      }
+      return null;
+    } catch (e) {
+      console.debug(`[Dynamic Music Pill] Exact lyrics fetch error: ${e.message}`);
+      return null; // don't throw — search results may still be useful
     }
   }
 
