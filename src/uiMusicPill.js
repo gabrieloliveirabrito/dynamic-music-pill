@@ -770,16 +770,19 @@ export const MusicPill = GObject.registerClass(
             let customTextStr = this._settings.get_boolean('use-custom-colors') ? `rgb(${this._settings.get_string('custom-text-color')})` : 'white';
             let customTextAlpha = this._settings.get_boolean('use-custom-colors') ? `rgba(${this._settings.get_string('custom-text-color')}, 0.7)` : 'rgba(255,255,255,0.7)';
 
-            if (height < 46 && !this._inPanel) {
+            let borderOffset = this._settings.get_boolean('show-pill-border') ? 2 : 0;
+            let effectiveHeight = height - borderOffset;
+
+            if (effectiveHeight < 46 && !this._inPanel) {
                 this._artistScroll.hide();
-            } else if (this._inPanel && height < 30) {
+            } else if (this._inPanel && effectiveHeight < 30) {
                 this._artistScroll.hide();
             } else {
                 this._artistScroll.show();
             }
 
-            this._titleScroll.setLabelStyle(`font-size: ${fontSizeTitle}; font-weight: 800; color: ${customTextStr};`);
-            this._artistScroll.setLabelStyle(`font-size: ${fontSizeArtist}; font-weight: 500; color: ${customTextAlpha};`);
+            this._titleScroll.setLabelStyle(`font-size: ${fontSizeTitle}; font-weight: 800; color: ${customTextStr}; margin: 0px; padding: 0px;`);
+            this._artistScroll.setLabelStyle(`font-size: ${fontSizeArtist}; font-weight: 500; color: ${customTextAlpha}; margin: 0px; padding: 0px;`);
 
             this._updateTextDisplay();
 
@@ -1248,7 +1251,11 @@ export const MusicPill = GObject.registerClass(
             let target = this._settings.get_int('target-container');
             this._inPanel = (target > 0);
 
-            let isSqueezed = (this._inPanel && this._settings.get_int('panel-pill-height') < 30) || (!this._inPanel && this._settings.get_int('pill-height') < 46);
+            let borderOffset = this._settings.get_boolean('show-pill-border') ? 2 : 0;
+            let currentHeight = this._inPanel ? this._settings.get_int('panel-pill-height') : this._settings.get_int('pill-height');
+            let effectiveHeight = currentHeight - borderOffset;
+
+            let isSqueezed = (this._inPanel && effectiveHeight < 30) || (!this._inPanel && effectiveHeight < 46);
             if (this._settings.get_boolean('inline-artist') && isSqueezed && a && t) {
                 t = `${t} • ${a}`;
                 a = null;
