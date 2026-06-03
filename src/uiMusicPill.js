@@ -343,6 +343,7 @@ export const MusicPill = GObject.registerClass(
             this._settings.connectObject('changed::shadow-blur', () => { this._updateDimensions(); this._applyStyle(this._displayedColor.r, this._displayedColor.g, this._displayedColor.b); }, this);
             this._settings.connectObject('changed::show-album-art', () => this._updateArtVisibility(), this);
             this._settings.connectObject('changed::show-pill-border', () => { this._applyStyle(this._displayedColor.r, this._displayedColor.g, this._displayedColor.b); }, this);
+            this._settings.connectObject('changed::show-artist', () => { this._updateDimensions(); this._updateTextDisplay(true); }, this);
             this._settings.connectObject('changed::always-show-pill', () => {
                 if (!this._settings.get_boolean('always-show-pill') && this._currentStatus === 'Stopped' && this._isActiveState) {
                     this.updateDisplay(null, null, null, 'Stopped', null, false);
@@ -773,7 +774,11 @@ export const MusicPill = GObject.registerClass(
             let borderOffset = this._settings.get_boolean('show-pill-border') ? 2 : 0;
             let effectiveHeight = height - borderOffset;
 
-            if (effectiveHeight < 46 && !this._inPanel) {
+            let showArtist = this._settings.get_boolean('show-artist');
+
+            if (!showArtist) {
+                this._artistScroll.hide();
+            } else if (effectiveHeight < 46 && !this._inPanel) {
                 this._artistScroll.hide();
             } else if (this._inPanel && effectiveHeight < 30) {
                 this._artistScroll.hide();
@@ -1256,7 +1261,13 @@ export const MusicPill = GObject.registerClass(
             let effectiveHeight = currentHeight - borderOffset;
 
             let isSqueezed = (this._inPanel && effectiveHeight < 30) || (!this._inPanel && effectiveHeight < 46);
-            if (this._settings.get_boolean('inline-artist') && isSqueezed && a && t) {
+            
+            let showArtist = this._settings.get_boolean('show-artist');
+            if (!showArtist) {
+                a = null;
+            }
+
+            if (showArtist && this._settings.get_boolean('inline-artist') && isSqueezed && a && t) {
                 t = `${t} • ${a}`;
                 a = null;
             }

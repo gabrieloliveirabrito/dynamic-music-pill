@@ -20,7 +20,7 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
             'popup-enable-shadow', 'popup-follow-transparency', 'popup-follow-radius',
             'popup-vinyl-rotate', 'visualizer-padding', 'scroll-action', 'popup-vinyl-square',
             'popup-show-vinyl', 'show-shuffle-loop', 'use-custom-colors', 'custom-bg-color',
-            'custom-text-color', 'tablet-mode', 'pill-controls-position', 'inline-artist', 'pill-dynamic-width',
+            'custom-text-color', 'tablet-mode', 'pill-controls-position', 'inline-artist', 'show-artist', 'pill-dynamic-width',
             'popup-use-custom-width', 'popup-custom-width', 'player-filter-mode', 'player-filter-list', 'hide-text',
             'fallback-art-path', 'popup-show-visualizer', 'popup-hide-pill-visualizer', 'compatibility-delay',
             'popup-follow-custom-bg', 'popup-follow-custom-text', 'action-hover', 'hover-delay', 'selected-player-bus',
@@ -321,6 +321,17 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
         settings.bind('inline-artist', inlineArtistToggle, 'active', Gio.SettingsBindFlags.DEFAULT);
         inlineArtistRow.add_suffix(inlineArtistToggle);
         genGroup.add(inlineArtistRow);
+
+        const showArtistRow = new Adw.ActionRow({ title: _('Show Artist'), subtitle: _('Show the artist name in the main music pill') });
+        const showArtistToggle = new Gtk.Switch({ active: settings.get_boolean('show-artist'), valign: Gtk.Align.CENTER });
+        settings.bind('show-artist', showArtistToggle, 'active', Gio.SettingsBindFlags.DEFAULT);
+        showArtistRow.add_suffix(showArtistToggle);
+        genGroup.add(showArtistRow);
+
+        inlineArtistRow.sensitive = settings.get_boolean('show-artist');
+        settings.connect('changed::show-artist', () => {
+            inlineArtistRow.sensitive = settings.get_boolean('show-artist');
+        });
 
         const hideTextRow = new Adw.ActionRow({
             title: _('Compact Mode (Hide Text)'),
