@@ -1544,10 +1544,26 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
         });
 
         const changelog = [
+            {
+                version: "1.2.0 - Latest Update",
+                subtitle: "New features & Bug Fixes",
+                expanded: true,
+                notes: "✨ New Features:\n" +
+                    "• Added a new toggle 'Show artist'.\n" +
+                    "• Tablet mode buttons, new positions.\n" +
+                    "• Option to move the \"media source\" buttons to other placement.\n" +
+                    "• Add toggle to hide Auto (Smart Selection).\n" +
+                    "• Parallelize lyric fetching requests.\n" +
+                    "• Translations update.\n" +
+                    "• Add option to pause text scrolling when player is paused.\n\n" +
+                    "• Bug Fixes:\n" +
+                    "• Artist name is cropped away in panel mode.\n" +
+                    "• The artist name and song title do not display correctly in the widget every time it starts up."
+            },
                     {
-                        version: "1.1.0 - Latest Update",
+                        version: "1.1.0",
                         subtitle: "Custom Buttons & Bug Fixes",
-                        expanded: true,
+                        expanded: false,
                         notes: "✨ New Features:\n" +
                                "• Add a 'Scroll Action' mode to fast-forward.\n" +
                                "• Per-App Volume Control.\n" +
@@ -1557,7 +1573,7 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
                                "• Telegram crash fix."
                     },
             {
-                version: "1.0.0 - Latest Update",
+                version: "1.0.0",
                 subtitle: "Custom Buttons & Bug Fixes",
                 expanded: false,
                 notes: "✨ New Features:\n" +
