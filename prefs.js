@@ -24,7 +24,7 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
             'popup-use-custom-width', 'popup-custom-width', 'player-filter-mode', 'player-filter-list', 'hide-text',
             'fallback-art-path', 'popup-show-visualizer', 'popup-hide-pill-visualizer', 'compatibility-delay',
             'popup-follow-custom-bg', 'popup-follow-custom-text', 'action-hover', 'hover-delay', 'selected-player-bus',
-            'popup-show-player-selector', 'show-pill-border', 'invert-scroll-direction', 'always-show-pill', 'popup-hide-on-leave',
+            'popup-show-player-selector', 'hide-auto-smart-selection', 'show-pill-border', 'invert-scroll-direction', 'always-show-pill', 'popup-hide-on-leave',
             'visualizer-bars', 'enable-lyrics', 'app-name-mapping', 'lyric-fade-enable', 'lyric-fade-duration', 'visualizer-bar-width', 'visualizer-height',
             'popup-visualizer-bars', 'popup-visualizer-bar-width', 'popup-visualizer-height', 'edge-margin', 'popup-vinyl-speed', 'sync-accent-color',
             'enable-custom-buttons', 'custom-button-1', 'custom-button-2', 'playback-history',
@@ -515,6 +515,19 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
         settings.bind('popup-show-player-selector', popSelectorToggle, 'active', Gio.SettingsBindFlags.DEFAULT);
         popSelectorRow.add_suffix(popSelectorToggle);
         popupGroup.add(popSelectorRow);
+
+        const hideAutoRow = new Adw.ActionRow({
+            title: _('Hide Auto (Smart Selection)'),
+            subtitle: _('Remove the automatic player selection entry from the player selector menu')
+        });
+        const hideAutoToggle = new Gtk.Switch({
+            active: settings.get_boolean('hide-auto-smart-selection'),
+            valign: Gtk.Align.CENTER
+        });
+        settings.bind('hide-auto-smart-selection', hideAutoToggle, 'active', Gio.SettingsBindFlags.DEFAULT);
+        settings.bind('popup-show-player-selector', hideAutoRow, 'sensitive', Gio.SettingsBindFlags.DEFAULT);
+        hideAutoRow.add_suffix(hideAutoToggle);
+        popupGroup.add(hideAutoRow);
 
         const popAlbumRow = new Adw.ActionRow({
             title: _('Show Album Title'),

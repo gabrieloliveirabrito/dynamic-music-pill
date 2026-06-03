@@ -127,50 +127,47 @@ export const PlayerSelectorMenu = GObject.registerClass(
 
             let currentSelected = this._settings.get_string('selected-player-bus');
 
-            // ==== Auto (Smart Selection) Button ====
-            let autoContent = new St.BoxLayout({ vertical: false, style: 'spacing: 12px;' });
-            let autoIcon = new St.Icon({ icon_name: 'emblem-system-symbolic', icon_size: 24, style: textColorStyle });
-            let autoLabel = new St.Label({ text: _('Auto (Smart Selection)'), y_align: Clutter.ActorAlign.CENTER, style: textColorStyle });
-            autoContent.add_child(autoIcon);
-            autoContent.add_child(autoLabel);
+            if (!this._settings.get_boolean('hide-auto-smart-selection')) {
+                // ==== Auto (Smart Selection) Button ====
+                let autoContent = new St.BoxLayout({ vertical: false, style: 'spacing: 12px;' });
+                let autoIcon = new St.Icon({ icon_name: 'emblem-system-symbolic', icon_size: 24, style: textColorStyle });
+                let autoLabel = new St.Label({ text: _('Auto (Smart Selection)'), y_align: Clutter.ActorAlign.CENTER, style: textColorStyle });
+                autoContent.add_child(autoIcon);
+                autoContent.add_child(autoLabel);
 
-            let autoBtn = new St.Button({
-                child: autoContent,
-                reactive: true,
-                can_focus: true,
-                track_hover: true,
-                x_expand: true,
-                style: `margin-bottom: 8px; border-radius: 12px; padding: 10px; background-color: ${currentSelected === '' ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.05)'}; transition-duration: 150ms;`
-            });
-            _addBtnPressAnim(autoBtn);
+                let autoBtn = new St.Button({
+                    child: autoContent,
+                    reactive: true,
+                    can_focus: true,
+                    track_hover: true,
+                    x_expand: true,
+                    style: `margin-bottom: 8px; border-radius: 12px; padding: 10px; background-color: ${currentSelected === '' ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.05)'}; transition-duration: 150ms;`
+                });
+                _addBtnPressAnim(autoBtn);
 
-            autoBtn.connectObject('button-release-event', (a, e) => {
-                if (e.get_button() === 8) return Clutter.EVENT_PROPAGATE;
-                return Clutter.EVENT_PROPAGATE;
-            }, this);
-            autoBtn.connectObject('clicked', () => {
-                this._settings.set_string('selected-player-bus', '');
-                this._controller._updateUI();
-                this.hide();
-            }, this);
-
-            autoBtn.connectObject('touch-event', (actor, event) => {
-                let type = event.type();
-                if (type === Clutter.EventType.TOUCH_END) {
+                const selectAuto = () => {
                     this._settings.set_string('selected-player-bus', '');
                     this._controller._updateUI();
                     this.hide();
-                    return Clutter.EVENT_STOP;
-                }
-                return Clutter.EVENT_PROPAGATE;
-            }, this);
+                };
 
-            autoBtn.connect('notify::hover', () => {
-                if (this._settings.get_string('selected-player-bus') === '') return;
-                autoBtn.set_style(`margin-bottom: 8px; border-radius: 12px; padding: 10px; background-color: ${autoBtn.hover ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.05)'}; transition-duration: 150ms;`);
-            });
+                autoBtn.connectObject('clicked', selectAuto, this);
+                autoBtn.connectObject('touch-event', (actor, event) => {
+                    let type = event.type();
+                    if (type === Clutter.EventType.TOUCH_END) {
+                        selectAuto();
+                        return Clutter.EVENT_STOP;
+                    }
+                    return Clutter.EVENT_PROPAGATE;
+                }, this);
 
-            this._box.add_child(autoBtn);
+                autoBtn.connectObject('notify::hover', () => {
+                    if (this._settings.get_string('selected-player-bus') === '') return;
+                    autoBtn.set_style(`margin-bottom: 8px; border-radius: 12px; padding: 10px; background-color: ${autoBtn.hover ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.05)'}; transition-duration: 150ms;`);
+                }, this);
+
+                this._box.add_child(autoBtn);
+            }
 
             // ==== Aktive Players Button ====
             for (let [busName, proxy] of this._controller._proxies) {
