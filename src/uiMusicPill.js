@@ -477,17 +477,19 @@ export const MusicPill = GObject.registerClass(
 
         _updatePlayingStates() {
             let isVisibleAndActive = this._isActuallyVisible && !this._gameModeActive;
+            let isPlaying = this._currentStatus === 'Playing';
 
             if (this._visualizer) {
-                let isPlaying = this._currentStatus === 'Playing';
                 let popupOpen = this._controller?._expandedPlayer?.visible;
                 this._visualizer.setPlaying(isPlaying && (isVisibleAndActive || popupOpen));
             }
             if (this._titleScroll) {
                 this._titleScroll.setGameMode(!isVisibleAndActive);
+                this._titleScroll.setPlayerPaused(!isPlaying);
             }
             if (this._artistScroll) {
                 this._artistScroll.setGameMode(!isVisibleAndActive);
+                this._artistScroll.setPlayerPaused(!isPlaying);
             }
         }
 

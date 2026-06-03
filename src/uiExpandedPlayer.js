@@ -127,9 +127,20 @@ export const ExpandedPlayer = GObject.registerClass(
                 x_align: Clutter.ActorAlign.CENTER,
                 style: 'margin-bottom: 12px; spacing: 10px;'
             });
-            this._mainPage.add_child(this._playerSelectorBox);
+            // _playerSelectorBox placement is handled by _updatePlayerSelector() at the end of init
+
+            // _centerContent holds the main popup content; _middleRow wraps it horizontally
+            // so the selector can be placed to the left or right
+            this._centerContent = new St.BoxLayout({ vertical: true, x_expand: true });
+            this._middleRow = new St.BoxLayout({ vertical: false, x_expand: true });
+            this._middleRow.add_child(this._centerContent);
+            this._mainPage.add_child(this._middleRow);
 
             this._settings.connectObject('changed::popup-show-player-selector', () => {
+                this._updatePlayerSelector();
+                if (this.visible) this.animateResize();
+            }, this);
+            this._settings.connectObject('changed::popup-player-selector-position', () => {
                 this._updatePlayerSelector();
                 if (this.visible) this.animateResize();
             }, this);
@@ -212,7 +223,7 @@ export const ExpandedPlayer = GObject.registerClass(
             topRow.add_child(infoBox);
             topRow.add_child(this._visBin);
 
-            this._mainPage.add_child(topRow);
+            this._centerContent.add_child(topRow);
 
             let progressBox = new PixelSnappedBox({ style_class: 'progress-container', vertical: false, y_align: Clutter.ActorAlign.CENTER });
 
@@ -261,7 +272,7 @@ export const ExpandedPlayer = GObject.registerClass(
             progressBox.add_child(this._currentTimeLabel);
             progressBox.add_child(this._sliderBin);
             progressBox.add_child(this._totalTimeLabel);
-            this._mainPage.add_child(progressBox);
+            this._centerContent.add_child(progressBox);
 
             let controlsRow = new PixelSnappedBox({ style_class: 'controls-row', vertical: false, x_align: Clutter.ActorAlign.CENTER, reactive: true });
 
@@ -373,7 +384,10 @@ export const ExpandedPlayer = GObject.registerClass(
             this._settings.connectObject('changed::custom-button-1', () => this._updateCustomButtons(), this);
             this._settings.connectObject('changed::custom-button-2', () => this._updateCustomButtons(), this);
 
-            this._mainPage.add_child(controlsRow);
+            this._centerContent.add_child(controlsRow);
+
+            // Now place the player selector in its initial position
+            this._updatePlayerSelector();
 
             this._firstHintBox = new St.BoxLayout({
                 vertical: false,
@@ -453,7 +467,7 @@ export const ExpandedPlayer = GObject.registerClass(
                 if (e.type() === Clutter.EventType.TOUCH_END) { _dismissHint(false); return Clutter.EVENT_STOP; }
                 return Clutter.EVENT_PROPAGATE;
             }, this);
-            this._mainPage.add_child(this._firstHintBox);
+            this._centerContent.add_child(this._firstHintBox);
 
             this._box.connectObject('enter-event', () => {
                 if (this._leaveHideTimeoutId) {
@@ -479,50 +493,86 @@ export const ExpandedPlayer = GObject.registerClass(
         }
 
         _updatePlayerSelector() {
+            // Remove the selector box from wherever it currently lives
+            let selectorParent = this._playerSelectorBox.get_parent();
+            if (selectorParent) selectorParent.remove_child(this._playerSelectorBox);
+
+            // Rebuild button contents
+            this._playerSelectorBox.destroy_all_children();
+
             if (!this._settings.get_boolean('popup-show-player-selector')) {
                 this._playerSelectorBox.hide();
                 return;
             }
             this._playerSelectorBox.show();
-            this._playerSelectorBox.destroy_all_children();
+
+            // Position: 0=Top, 1=Bottom, 2=Left, 3=Right
+            let pos = this._settings.get_int('popup-player-selector-position');
+            let isVertical = (pos === 2 || pos === 3);
+
+            this._playerSelectorBox.vertical = isVertical;
+            if (isVertical) {
+                this._playerSelectorBox.y_align = Clutter.ActorAlign.CENTER;
+                this._playerSelectorBox.x_align = Clutter.ActorAlign.CENTER;
+                let margin = pos === 2 ? 'margin-right: 12px;' : 'margin-left: 12px;';
+                this._playerSelectorBox.set_style(`${margin} spacing: 10px;`);
+            } else {
+                this._playerSelectorBox.x_align = Clutter.ActorAlign.CENTER;
+                let margin = pos === 1 ? 'margin-top: 12px;' : 'margin-bottom: 12px;';
+                this._playerSelectorBox.set_style(`${margin} spacing: 10px;`);
+            }
+
+            // Insert into the correct slot
+            switch (pos) {
+                case 1: // Bottom — after _middleRow in _mainPage
+                    this._mainPage.add_child(this._playerSelectorBox);
+                    break;
+                case 2: // Left — before _centerContent in _middleRow
+                    this._middleRow.insert_child_at_index(this._playerSelectorBox, 0);
+                    break;
+                case 3: // Right — after _centerContent in _middleRow
+                    this._middleRow.add_child(this._playerSelectorBox);
+                    break;
+                default: // Top (0) — before _middleRow in _mainPage
+                    this._mainPage.insert_child_at_index(this._playerSelectorBox, 0);
+                    break;
+            }
 
             let currentSelected = this._settings.get_string('selected-player-bus');
 
-            let autoIcon = new St.Icon({ icon_name: 'emblem-system-symbolic', icon_size: 20 });
-            let autoBtn = new St.Button({
-                child: autoIcon,
-                reactive: true,
-                can_focus: true,
-                track_hover: true,
-                style: `border-radius: 12px; padding: 8px; background-color: ${currentSelected === '' ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.05)'}; transition-duration: 150ms;`
-            });
+            if (!this._settings.get_boolean('hide-auto-smart-selection')) {
+                let autoIcon = new St.Icon({ icon_name: 'emblem-system-symbolic', icon_size: 20 });
+                let autoBtn = new St.Button({
+                    child: autoIcon,
+                    reactive: true,
+                    can_focus: true,
+                    track_hover: true,
+                    style: `border-radius: 12px; padding: 8px; background-color: ${currentSelected === '' ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.05)'}; transition-duration: 150ms;`
+                });
 
-            autoBtn.connectObject('button-release-event', (a, e) => {
-                if (e.get_button() === 8) return Clutter.EVENT_PROPAGATE;
-                this._settings.set_string('selected-player-bus', '');
-                this._controller._updateUI();
-                this._updatePlayerSelector();
-                return Clutter.EVENT_STOP;
-            }, this);
-            autoBtn.connectObject('touch-event', (actor, event) => {
-                let type = event.type();
-                if (type === Clutter.EventType.TOUCH_BEGIN) {
-                    return Clutter.EVENT_PROPAGATE;
-                }
-                if (type === Clutter.EventType.TOUCH_END) {
+                const selectAuto = () => {
                     this._settings.set_string('selected-player-bus', '');
                     this._controller._updateUI();
                     this._updatePlayerSelector();
-                    return Clutter.EVENT_STOP;
-                }
-                return Clutter.EVENT_PROPAGATE;
-            }, this);
+                };
 
-            autoBtn.connect('notify::hover', () => {
-                if (this._settings.get_string('selected-player-bus') === '') return;
-                autoBtn.set_style(`border-radius: 12px; padding: 8px; background-color: ${autoBtn.hover ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.05)'}; transition-duration: 150ms;`);
-            });
-            this._playerSelectorBox.add_child(autoBtn);
+                autoBtn.connectObject('button-release-event', (a, e) => {
+                    if (e.get_button() === 8) return Clutter.EVENT_PROPAGATE;
+                    selectAuto();
+                    return Clutter.EVENT_STOP;
+                }, this);
+                autoBtn.connectObject('touch-event', (actor, event) => {
+                    let type = event.type();
+                    if (type === Clutter.EventType.TOUCH_BEGIN) return Clutter.EVENT_PROPAGATE;
+                    if (type === Clutter.EventType.TOUCH_END) { selectAuto(); return Clutter.EVENT_STOP; }
+                    return Clutter.EVENT_PROPAGATE;
+                }, this);
+                autoBtn.connect('notify::hover', () => {
+                    if (this._settings.get_string('selected-player-bus') === '') return;
+                    autoBtn.set_style(`border-radius: 12px; padding: 8px; background-color: ${autoBtn.hover ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.05)'}; transition-duration: 150ms;`);
+                });
+                this._playerSelectorBox.add_child(autoBtn);
+            }
 
             for (let [busName, proxy] of this._controller._proxies) {
                 let isSelected = (currentSelected === busName);
@@ -541,27 +591,23 @@ export const ExpandedPlayer = GObject.registerClass(
                     style: `border-radius: 12px; padding: 8px; background-color: ${isSelected ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.05)'}; transition-duration: 150ms;`
                 });
 
-                btn.connectObject('button-release-event', (a, e) => {
-                    if (e.get_button() === 8) return Clutter.EVENT_PROPAGATE;
-                    this._settings.set_string('selected-player-bus', busName);
+                const selectPlayer = (bus) => {
+                    this._settings.set_string('selected-player-bus', bus);
                     this._controller._updateUI();
                     this._updatePlayerSelector();
+                };
+
+                btn.connectObject('button-release-event', (a, e) => {
+                    if (e.get_button() === 8) return Clutter.EVENT_PROPAGATE;
+                    selectPlayer(busName);
                     return Clutter.EVENT_STOP;
                 }, this);
                 btn.connectObject('touch-event', (actor, event) => {
                     let type = event.type();
-                    if (type === Clutter.EventType.TOUCH_BEGIN) {
-                        return Clutter.EVENT_PROPAGATE;
-                    }
-                    if (type === Clutter.EventType.TOUCH_END) {
-                        this._settings.set_string('selected-player-bus', busName);
-                        this._controller._updateUI();
-                        this._updatePlayerSelector();
-                        return Clutter.EVENT_STOP;
-                    }
+                    if (type === Clutter.EventType.TOUCH_BEGIN) return Clutter.EVENT_PROPAGATE;
+                    if (type === Clutter.EventType.TOUCH_END) { selectPlayer(busName); return Clutter.EVENT_STOP; }
                     return Clutter.EVENT_PROPAGATE;
                 }, this);
-
                 btn.connect('notify::hover', () => {
                     if (this._settings.get_string('selected-player-bus') === busName) return;
                     btn.set_style(`border-radius: 12px; padding: 8px; background-color: ${btn.hover ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.05)'}; transition-duration: 150ms;`);
@@ -671,6 +717,10 @@ export const ExpandedPlayer = GObject.registerClass(
         }
 
         updateContent(title, artist, artUrl, status) {
+            let isPaused = status !== 'Playing';
+            if (this._titleLabel) this._titleLabel.setPlayerPaused(isPaused);
+            if (this._artistLabel) this._artistLabel.setPlayerPaused(isPaused);
+
             if (this._titleLabel && this._titleLabel._text !== title) {
                 this._titleLabel.setText(title || _('Unknown Title'), false);
             }

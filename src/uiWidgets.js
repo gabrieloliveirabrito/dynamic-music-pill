@@ -110,6 +110,8 @@ export const ScrollLabel = GObject.registerClass(
             this._settings = settings;
             this._text = "";
             this._gameMode = false;
+            this._playerPaused = false;
+            this._paused = false;
             this._isScrolling = false;
             this._hoverOnly = settings.get_boolean('scroll-on-hover-only');
             this._hovered = false;
@@ -136,6 +138,9 @@ export const ScrollLabel = GObject.registerClass(
                 this._hoverOnly = this._settings.get_boolean('scroll-on-hover-only');
                 if (this._hoverOnly && !this._hovered) this._stopAnimation();
                 else this.setText(this._text, true);
+            }, this);
+            this._settings.connectObject('changed::freeze-scroll-on-pause', () => {
+                this._updatePausedState();
             }, this);
 
             this.connectObject('notify::allocation', () => {
@@ -207,6 +212,30 @@ export const ScrollLabel = GObject.registerClass(
             else this._checkResize();
         }
 
+        setPlayerPaused(isPaused) {
+            this._playerPaused = isPaused;
+            this._updatePausedState();
+        }
+
+        _updatePausedState() {
+            let shouldPause = this._playerPaused && this._settings.get_boolean('freeze-scroll-on-pause');
+            if (shouldPause) {
+                if (!this._paused) {
+                    this._paused = true;
+                    // Cancel all pending timers so none of them can restart the scroll
+                    if (this._idleResizeId) { GLib.Source.remove(this._idleResizeId); this._idleResizeId = null; }
+                    if (this._measureTimeout) { GLib.Source.remove(this._measureTimeout); this._measureTimeout = null; }
+                    if (this._resizeTimer) { GLib.Source.remove(this._resizeTimer); this._resizeTimer = null; }
+                    this._stopAnimation(true);
+                }
+            } else {
+                if (this._paused) {
+                    this._paused = false;
+                    this._checkResize();
+                }
+            }
+        }
+
         setHoverMode(hovered) {
             this._hovered = hovered;
             if (!this._hoverOnly) return;
@@ -239,7 +268,7 @@ export const ScrollLabel = GObject.registerClass(
         }
 
         _checkResize() {
-            if (!this._text || this._gameMode) return;
+            if (!this._text || this._gameMode || this._paused) return;
 
             if (this._ignoreResizeUntil && Date.now() < this._ignoreResizeUntil) return;
 
@@ -251,6 +280,8 @@ export const ScrollLabel = GObject.registerClass(
                     return GLib.SOURCE_REMOVE;
 
                 if (this._lyricFinished) return GLib.SOURCE_REMOVE;
+                // Re-check paused/gameMode state — may have changed since idle was scheduled
+                if (this._gameMode || this._paused) return GLib.SOURCE_REMOVE;
 
                 let boxWidth = this.get_allocation_box().get_width();
                 if (boxWidth <= 1) return GLib.SOURCE_REMOVE;
@@ -314,6 +345,9 @@ export const ScrollLabel = GObject.registerClass(
                 return;
             }
 
+            // Don't schedule scroll measurement while paused
+            if (this._paused) return;
+
             let isDynamic = this._settings && this._settings.get_boolean('pill-dynamic-width');
             if (isDynamic) {
                 this._ignoreResizeUntil = Date.now() + 450;
@@ -338,7 +372,7 @@ export const ScrollLabel = GObject.registerClass(
         }
 
         _checkOverflow() {
-            if (this._gameMode || !this.get_parent()) return;
+            if (this._gameMode || this._paused || !this.get_parent()) return;
             let boxWidth = this.get_allocation_box().get_width();
             if (boxWidth <= 1) return;
 

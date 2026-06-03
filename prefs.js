@@ -9,7 +9,7 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
     fillPreferencesWindow(window) {
         const settings = this.getSettings();
         const PREFS_KEYS = [
-            'scroll-text', 'scroll-on-hover-only', 'show-album-art', 'enable-shadow', 'hide-default-player',
+            'scroll-text', 'scroll-on-hover-only', 'freeze-scroll-on-pause', 'show-album-art', 'enable-shadow', 'hide-default-player',
             'shadow-blur', 'shadow-opacity', 'pill-width', 'panel-pill-width',
             'pill-height', 'panel-pill-height', 'vertical-offset', 'horizontal-offset',
             'position-mode', 'dock-position', 'target-container', 'enable-gamemode',
@@ -24,7 +24,7 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
             'popup-use-custom-width', 'popup-custom-width', 'player-filter-mode', 'player-filter-list', 'hide-text',
             'fallback-art-path', 'popup-show-visualizer', 'popup-hide-pill-visualizer', 'compatibility-delay',
             'popup-follow-custom-bg', 'popup-follow-custom-text', 'action-hover', 'hover-delay', 'selected-player-bus',
-            'popup-show-player-selector', 'hide-auto-smart-selection', 'show-pill-border', 'invert-scroll-direction', 'always-show-pill', 'popup-hide-on-leave',
+            'popup-show-player-selector', 'hide-auto-smart-selection', 'popup-player-selector-position', 'show-pill-border', 'invert-scroll-direction', 'always-show-pill', 'popup-hide-on-leave',
             'visualizer-bars', 'enable-lyrics', 'app-name-mapping', 'lyric-fade-enable', 'lyric-fade-duration', 'visualizer-bar-width', 'visualizer-height',
             'popup-visualizer-bars', 'popup-visualizer-bar-width', 'popup-visualizer-height', 'edge-margin', 'popup-vinyl-speed', 'sync-accent-color',
             'enable-custom-buttons', 'custom-button-1', 'custom-button-2', 'playback-history',
@@ -223,6 +223,19 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
         settings.bind('scroll-text', scrollHoverRow, 'sensitive', Gio.SettingsBindFlags.DEFAULT);
         scrollHoverRow.add_suffix(scrollHoverToggle);
         genGroup.add(scrollHoverRow);
+
+        const scrollPauseRow = new Adw.ActionRow({
+            title: _('Freeze Scroll on Pause'),
+            subtitle: _('Stop the text scrolling animation when the media player is paused')
+        });
+        const scrollPauseToggle = new Gtk.Switch({
+            active: settings.get_boolean('freeze-scroll-on-pause'),
+            valign: Gtk.Align.CENTER
+        });
+        settings.bind('freeze-scroll-on-pause', scrollPauseToggle, 'active', Gio.SettingsBindFlags.DEFAULT);
+        settings.bind('scroll-text', scrollPauseRow, 'sensitive', Gio.SettingsBindFlags.DEFAULT);
+        scrollPauseRow.add_suffix(scrollPauseToggle);
+        genGroup.add(scrollPauseRow);
 
         // Lyrics Display
         const lyricsRow = new Adw.ActionRow({
@@ -509,7 +522,7 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
 
         const popSelectorRow = new Adw.ActionRow({
             title: _('Show Player Selector'),
-            subtitle: _('Display active player icons at the top of the pop-up')
+            subtitle: _('Display active player icons in the pop-up')
         });
         const popSelectorToggle = new Gtk.Switch({ active: settings.get_boolean('popup-show-player-selector'), valign: Gtk.Align.CENTER });
         settings.bind('popup-show-player-selector', popSelectorToggle, 'active', Gio.SettingsBindFlags.DEFAULT);
@@ -525,9 +538,21 @@ export default class DynamicMusicPrefs extends ExtensionPreferences {
             valign: Gtk.Align.CENTER
         });
         settings.bind('hide-auto-smart-selection', hideAutoToggle, 'active', Gio.SettingsBindFlags.DEFAULT);
-        settings.bind('popup-show-player-selector', hideAutoRow, 'sensitive', Gio.SettingsBindFlags.DEFAULT);
         hideAutoRow.add_suffix(hideAutoToggle);
         popupGroup.add(hideAutoRow);
+
+        const selectorPosRow = new Adw.ComboRow({
+            title: _('Player Selector Position'),
+            subtitle: _('Where to place the player icons inside the pop-up'),
+            model: new Gtk.StringList({ strings: [_('Top'), _('Bottom'), _('Left'), _('Right')] }),
+            selected: settings.get_int('popup-player-selector-position'),
+        });
+        selectorPosRow.connect('notify::selected', () =>
+            settings.set_int('popup-player-selector-position', selectorPosRow.get_selected()));
+        settings.connect('changed::popup-player-selector-position', () =>
+            selectorPosRow.set_selected(settings.get_int('popup-player-selector-position')));
+        settings.bind('popup-show-player-selector', selectorPosRow, 'sensitive', Gio.SettingsBindFlags.DEFAULT);
+        popupGroup.add(selectorPosRow);
 
         const popAlbumRow = new Adw.ActionRow({
             title: _('Show Album Title'),
