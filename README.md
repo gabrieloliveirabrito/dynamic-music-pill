@@ -222,7 +222,7 @@ This extension also provides a Nix Flake for easy installation directly from Git
 nix profile add github:Andbal23/dynamic-music-pill
 
 # GNOME 50:
-nix profile add github:Andbal23/dynamic-music-pill#gnome50
+nix profile add github:Andbal23/dynamic-music-pill/gnome50
 ```
 
 ##### Declarative (flake-based configuration)
@@ -230,20 +230,18 @@ nix profile add github:Andbal23/dynamic-music-pill#gnome50
 Add the input to your `flake.nix`:
 
 ```nix
+# GNOME 45-49:
 inputs.dynamic-music-pill.url = "github:Andbal23/dynamic-music-pill";
+
+# GNOME 50:
+inputs.dynamic-music-pill.url = "github:Andbal23/dynamic-music-pill/gnome50";
 ```
 
 Then add the package to your `configuration.nix` or Home Manager config:
 
 ```nix
-# GNOME 45-49:
 environment.systemPackages = [
   inputs.dynamic-music-pill.packages.${pkgs.system}.default
-];
-
-# GNOME 50:
-environment.systemPackages = [
-  inputs.dynamic-music-pill.packages.${pkgs.system}.gnome50
 ];
 ```
 
