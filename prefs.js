@@ -7,6 +7,7 @@ import Gdk from 'gi://Gdk';
 
 export default class DynamicMusicPrefs extends ExtensionPreferences {
     fillPreferencesWindow(window) {
+        window.search_enabled = true;
         const settings = this.getSettings();
         const PREFS_KEYS = [
             'scroll-text', 'scroll-on-hover-only', 'freeze-scroll-on-pause', 'show-album-art', 'enable-shadow', 'hide-default-player',
