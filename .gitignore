@@ -2,9 +2,14 @@
 node_modules/
 srcJS/
 logs/
+dist-extension/
 
 *.log
 *.tmp
 *.bak
 *.swp
 *.tsbuildinfo
+*.zip
+.DS_Store
+.idea/
+.vscode/
