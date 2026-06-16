@@ -1,19 +1,21 @@
+const PREFIX = "[DMP]";
+
 export function logInfo(message: string): void {
-    console.info(`[DMP] ${message}`);
+    console.log(`${PREFIX} ${message}`);
 }
 
 export function logWarning(message: string): void {
-    console.warn(`[DMP] ${message}`);
+    console.warn(`${PREFIX} ${message}`);
 }
 
 export function logDebug(message: string): void {
-    console.debug(`[DMP] ${message}`);
+    console.log(`${PREFIX} [DEBUG] ${message}`);
 }
 
 export function logError(message: unknown): void {
-    console.error(`[DMP] ${message}`);
+    console.error(`${PREFIX} ${message}`);
 
     if (message instanceof Error) {
-        console.error(`[DMP] Stack trace: ${message.stack}`);
+        console.error(`${PREFIX} Stack trace: ${message.stack}`);
     }
 }
