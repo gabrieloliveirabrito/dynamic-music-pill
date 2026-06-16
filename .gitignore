@@ -1,0 +1,10 @@
+.git
+node_modules/
+srcJS/
+logs/
+
+*.log
+*.tmp
+*.bak
+*.swp
+*.tsbuildinfo
