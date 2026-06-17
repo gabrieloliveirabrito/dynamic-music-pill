@@ -5,6 +5,7 @@ import chokidar from "chokidar"
 let buildingTimer: NodeJS.Timeout | null = null;
 let gnomeProcess: ChildProcess | null = null;
 let rebuilding = false;
+let enabled = true;
 
 const LOG_REGEX =
     /\[DMP\]|Dynamic Music Pill|dynamic-music-pill@andbal|JS ERROR|Exception/;
@@ -97,14 +98,36 @@ async function main() {
         process.stdin.setRawMode(true);
     }
 
-    process.stdin.on("keypress", (_, key) => {
-        if (key.ctrl && key.name === "c") {
-            stopGnome();
-            process.exit(0);
-        }
+    process.on("SIGINT", () => stopGnome())
+    process.on("SIGTERM", () => stopGnome())
+    process.on("SIGHUP", () => stopGnome())
 
-        if (key.ctrl && key.name === "r") {
-            void reload();
+    // fallback extra (não confiável sozinho)
+    process.on("beforeExit", () => {
+        stopGnome()
+    })
+
+    process.stdin.on("keypress", (_, key) => {
+        if (key.ctrl) {
+            switch (key.name) {
+                case "c":
+                    stopGnome();
+                    process.exit(0);
+
+                case "r":
+                    void reload();
+                    break;
+
+                case "s":
+                    console.log(enabled ? "Auto reload already enabled" : "Auto reload enabled");
+                    enabled = true;
+                    break;
+
+                case "d":
+                    console.log(!enabled ? "Auto reload already disabled" : "Auto reload disabled");
+                    enabled = false;
+                    break;
+            }
         }
     });
 
@@ -116,6 +139,11 @@ async function main() {
 
     watcher.on("all", (event, path) => {
         console.log(`File ${event}: ${path}`);
+
+        if (!enabled) {
+            console.log("The auto reload is disabled!");
+            return;
+        }
 
         if (buildingTimer) {
             clearTimeout(buildingTimer);
@@ -131,6 +159,8 @@ async function main() {
     console.log("Watcher ready");
 
     console.log("");
+    console.log("⌨️  Ctrl+S = start watch reload");
+    console.log("⌨️  Ctrl+D = stop watch reload");
     console.log("⌨️  Ctrl+R = reload");
     console.log("⌨️  Ctrl+C = exit");
 }
