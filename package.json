@@ -11,7 +11,7 @@
     "watch": "node esbuild.config.mjs --watch",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
-    "dev": "./debug.sh"
+    "dev": "tsx watcher.ts"
   },
   "devEngines": {
     "packageManager": {
@@ -31,6 +31,7 @@
     "chokidar": "^5.0.0",
     "esbuild": "^0.28.1",
     "ts-node": "^10.9.2",
+    "tsx": "^4.22.4",
     "typescript": "^6.0.3"
   }
 }
