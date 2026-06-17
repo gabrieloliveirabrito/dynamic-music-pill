@@ -19,8 +19,8 @@ export default class DynamicMusicExtension extends Extension {
         // this._controller = new MusicController(this);
         // this._controller.enable();
         
+        console.log("[DMP] Base enabled");
         this._distributionExtension.enable();
-        console.log("[DMP] Dynamic Music Pill enabled");
     }
 
     disable() {
@@ -29,7 +29,7 @@ export default class DynamicMusicExtension extends Extension {
         //     this._controller = null;
         // }
         // this._settings = null;
+        console.log("[DMP] Base disabled");
         this._distributionExtension.disable();
-        console.log("[DMP] Dynamic Music Pill disabled");
     }
 }

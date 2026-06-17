@@ -18,8 +18,8 @@ export default class DynamicMusicPillExtension {
         instance = this;
     }
 
-    enable() {
-                
+    enable() { 
+        logInfo("Extension enabled.");
     }
 
     disable() {
