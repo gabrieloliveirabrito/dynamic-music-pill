@@ -2,6 +2,7 @@
 node_modules/
 srcJS/
 logs/
+dist/
 dist-extension/
 
 *.log
