@@ -1,14 +1,15 @@
 export type TrackInfo = {
-    playbackStatus?: boolean;
+    playbackStatus?: string;
     title?: string;
     artist?: string[];
     album?: string;
     artUrl?: string;
-    length?: number;
     trackId?: string;
-    canPlay?: boolean;
-    canPause?: boolean;
-    canSeek?: boolean;
-    canGoPrevious?: boolean;
-    canGoNext?: boolean;
+    length: number;
+    canPlay: boolean;
+    canPause: boolean;
+    canSeek: boolean;
+    canGoPrevious: boolean;
+    canGoNext: boolean;
+    rate: number;
 }
