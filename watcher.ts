@@ -23,9 +23,21 @@ function run(command: string, args: string[]) {
     });
 }
 
-async function build() {
+async function build() : Promise<boolean> {
     console.log("🔧 Building...");
-    await run("bash", ["-c", "./install.sh"]);
+
+    try {
+        await run("bash", ["-c", "./install.sh"]);
+        return true;
+    } catch (error) {
+        console.log("Failed to build the project!");
+
+        if (error instanceof Error) {
+            console.log(error);
+        }
+
+        return false;
+    }
 }
 
 function stopGnome() {
@@ -78,9 +90,9 @@ async function reload() {
 
         stopGnome();
 
-        await build();
-
-        startGnome();
+        if(await build()) {
+            startGnome();
+        }
     } catch (err) {
         console.error(err);
     } finally {
