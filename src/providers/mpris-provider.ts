@@ -4,51 +4,34 @@ import { IMPrisProvider, MPRISCallback } from "@/interfaces/impris-provider";
 import { TrackInfo } from "@/types/track-info";
 import { logDebug, logInfo, logObject, logWarning } from "@/utils/log";
 import { MTRISConstants } from "@/constants";
+import { mapObject, MapperType } from "@/utils/mapper";
+import { getDBusSessionAddress } from "@/utils/development";
+import { DefaultTrackInfo } from "@/constants/mpris-constants";
 
-export type MTRISMap = {
-    [K: string]: (v: any, state: TrackInfo) => void;
+const MTRISMap: MapperType<TrackInfo> = {
+    "PlaybackStatus": (s, v) => s.playbackStatus = v,
+    "xesam:title": (s, v) => s.title = v,
+    "xesam:artist": (s, v) => s.artist = v,
+    "xesam:album": (s, v) => s.album = v,
+    "mpris:artUrl": (s, v) => s.artUrl = v,
+    "mpris:length": (s, v) => s.length = v,
+    "mpris:trackid": (s, v) => s.trackId = v,
+    "CanPlay": (s, v) => s.canPlay = v,
+    "CanPause": (s, v) => s.canPause = v,
+    "CanSeek": (s, v) => s.canSeek = v,
+    "CanGoNext": (s, v) => s.canGoNext = v,
+    "CanGoPrevious": (s, v) => s.canGoPrevious = v,
+    "Rate": (s, v) => s.rate = v
 }
 
-const mapper: MTRISMap = {
-    "PlaybackStatus": (v, state) => state.playbackStatus = v,
-    "xesam:title": (v, state) => state.title = v,
-    "xesam:artist": (v, state) => state.artist = v,
-    "xesam:album": (v, state) => state.album = v,
-    "mpris:artUrl": (v, state) => state.artUrl = v,
-    "mpris:length": (v, state) => state.length = v,
-    "mpris:trackid": (v, state) => state.trackId = v,
-    "CanPlay": (v, state) => state.canPlay = v,
-    "CanPause": (v, state) => state.canPause = v,
-    "CanSeek": (v, state) => state.canSeek = v,
-    "CanGoNext": (v, state) => state.canGoNext = v,
-    "CanGoPrevious": (v, state) => state.canGoPrevious = v,
-};
-
 export function createMPRISProvider(): IMPrisProvider {
+    const address = getDBusSessionAddress();
+    
+
     let callbacks = new Map<string, MPRISCallback>();
     let connection: GIO.DBusConnection | null = null;
     let signalId: number | null = null;
-    let state: TrackInfo = {}
-
-    function mapState(object: any) {
-        for (let [key, value] of Object.entries(object))
-        {
-            value = value as typeof GLib.Variant ? (value as GLib.Variant).deep_unpack() : value;
-            
-            if (key === "Metadata" && value && typeof value === "object") {
-                mapState(value);
-                continue;
-            }
-
-            logInfo(`Mapping ${key}`);
-            if (mapper[key]) {
-                mapper[key](value, state);
-                continue;
-            } else {
-                logWarning(`Cannot find mapper for key ${key}`)
-            }
-        }
-    }
+    let state: TrackInfo = { ...DefaultTrackInfo }
 
     function signalEmit(conn: GIO.DBusConnection, sender_name: string | null, object_path: string, interface_name: string, signal_name: string, parameters: GLib.Variant) {
         if (!object_path.startsWith(MTRISConstants.MPRIS_OBJECT)) {
@@ -66,14 +49,14 @@ export function createMPRISProvider(): IMPrisProvider {
         }
         logObject(changed);
 
-        mapState(changed);
+        state = mapObject(changed, MTRISMap, state);
         callbacks.forEach(c => c(state))
     }
 
     function start() {
         logInfo("Creating DBus connection");
         connection = GIO.DBusConnection.new_for_address_sync(
-            'unix:path=/run/user/1000/bus',
+            address,
             GIO.DBusConnectionFlags.AUTHENTICATION_CLIENT
             | GIO.DBusConnectionFlags.MESSAGE_BUS_CONNECTION,
             null,

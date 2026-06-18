@@ -1,3 +1,4 @@
+import { DefaultTrackInfo } from "@/constants/mpris-constants";
 import { IMPrisProvider, MPRISCallback } from "@/interfaces/impris-provider";
 import { TrackInfo } from "@/types/track-info";
 import { logInfo } from "@/utils/log";
@@ -27,7 +28,8 @@ export function createMockMPRISProvider(): IMPrisProvider {
                 emit({
                     title: `Test track ${counter}`,
                     artist: ["Enygma"],
-                    album: "None"
+                    album: "None",
+                    ...DefaultTrackInfo
                 });
 
                 return GLib.SOURCE_CONTINUE;
