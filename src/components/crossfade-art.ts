@@ -1,3 +1,4 @@
+import { CrossfadeArtConstants } from "@/constants";
 import Clutter from "@girs/clutter-18/clutter-18"
 import { GObject } from "@girs/gobject-2.0"
 import { St } from "@girs/st-18/st-18"
@@ -16,7 +17,7 @@ export const CrossfadeArt = GObject.registerClass(
             this.layoutManager = new Clutter.BinLayout();
             this.set_layout_manager(this.layoutManager);
 
-            this._radius = 10;
+            this._radius = CrossfadeArtConstants.RADIUS;
             this._shadowCSS = "box-shadow: none;";
         }
 
@@ -34,7 +35,9 @@ export const CrossfadeArt = GObject.registerClass(
 
             let hasArt = !!this._currentUrl && this._currentUrl.length > 0;
             let activeShadow = hasArt ? this._shadowCSS : "box-shadow: none;";
-            let bgColor = hasArt ? "background-color: #000000;" : "background-color: transparent;";
+            let bgColor = hasArt ?
+                `background-color: ${CrossfadeArtConstants.DEFAULT_COLOR};`
+                : "background-color: transparent;";
 
             this.set_style(`${activeShadow} ${bgColor}`);
         }
@@ -60,11 +63,12 @@ export const CrossfadeArt = GObject.registerClass(
         }
 
         getRadius(): number {
-            return isNaN(this._radius) ? 10 : this._radius;
+            return isNaN(this._radius) ? CrossfadeArtConstants.RADIUS 
+            : this._radius;
         }
 
         setRadius(radius: number) {
-            this._radius = isNaN(radius) ? 10 : radius;
+            this._radius = isNaN(radius) ? CrossfadeArtConstants.RADIUS  : radius;
             this.set_style(`border-radius: ${radius}px; ${this._shadowCSS}`);
         }
 
@@ -95,15 +99,15 @@ export const CrossfadeArt = GObject.registerClass(
             this._refreshLayerStyle(newLayer);
 
             newLayer.ease({
-                opacity: 255,
-                duration: 1800,
+                opacity: CrossfadeArtConstants.EASE_OPACITY,
+                duration: CrossfadeArtConstants.EASE_DURATION,
                 mode: Clutter.AnimationMode.EASE_OUT_QUAD,
                 onStopped: (isFinished) => {
                     if (!isFinished) {
                         return;
                     }
 
-                    newLayer.opacity = 255;
+                    newLayer.opacity = CrossfadeArtConstants.EASE_OPACITY;
 
                     let currentChildren = this.get_children();
                     let myIndex = currentChildren.indexOf(newLayer);
@@ -114,7 +118,7 @@ export const CrossfadeArt = GObject.registerClass(
 
                             oldLayer.ease({
                                 opacity: 0,
-                                duration: 300,
+                                duration: CrossfadeArtConstants.EASE_OUT_DURATION,
                                 mode: Clutter.AnimationMode.EASE_OUT_QUAD,
                                 onStopped: (_) => oldLayer.destroy()
                             })
