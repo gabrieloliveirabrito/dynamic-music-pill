@@ -19,5 +19,5 @@
       "./node_modules/@girs"
     ]
   },
-  "include": ["src"]
+  "include": ["src", "./node_modules/@girs/**/*.d.ts"]
 }
