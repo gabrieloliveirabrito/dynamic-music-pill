@@ -7,6 +7,7 @@ const ctx = await esbuild.context({
     entryPoints: ["src/extension.ts"],
     bundle: true,
     minify: release,
+    treeShaking: false,
     outfile: "dist/extension.js",
     format: "esm",
     target: "es2017",
@@ -15,7 +16,10 @@ const ctx = await esbuild.context({
     logLevel: "info",
     external: [
         "resource://*",
-        "gi://*"
+        "gi://*",
+        "system",
+        "gettext",
+        "cairo"
     ]
 }); 
 
