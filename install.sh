@@ -3,7 +3,7 @@
 EXT=dynamic-music-pill@andbal
 DEST="$HOME/.local/share/gnome-shell/extensions/$EXT"
 
-pnpm build
+pnpm build || exit 1
 
 rm -rf "$DEST"
 
