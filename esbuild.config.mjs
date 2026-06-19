@@ -4,11 +4,10 @@ const watch = process.argv.includes("--watch");
 const release = process.argv.includes("--release");
 
 const ctx = await esbuild.context({
-    entryPoints: ["src/extension.ts"],
+    entryPoints: ["src/extension.ts", "src/prefs.ts"],
     bundle: true,
     minify: release,
-    treeShaking: false,
-    outfile: "dist/extension.js",
+    outdir: ".",
     format: "esm",
     target: "es2017",
     sourcemap: true,
@@ -16,10 +15,7 @@ const ctx = await esbuild.context({
     logLevel: "info",
     external: [
         "resource://*",
-        "gi://*",
-        "system",
-        "gettext",
-        "cairo"
+        "gi://*"
     ]
 }); 
 
@@ -27,7 +23,16 @@ if (watch) {
     await ctx.watch();
     console.log("👀 watching...");
 } else {
-    await ctx.rebuild();
+    let result = await ctx.rebuild();
     await ctx.dispose();
-    console.log("✅ build done");
+
+    console.log(JSON.stringify(result));
+
+    if (result.errors.length === 0) {
+        console.log("✅ build done");
+        process.exit(0);
+    } else {
+        console.log("failed to build");
+        process.exit(1);
+    }
 }

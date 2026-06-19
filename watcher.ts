@@ -101,8 +101,9 @@ async function reload() {
 }
 
 async function main() {
-    await build();
-    startGnome();
+    if(await build()) {
+        startGnome();
+    }
 
     readline.emitKeypressEvents(process.stdin);
 

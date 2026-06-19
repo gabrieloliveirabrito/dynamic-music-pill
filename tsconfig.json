@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "node",
+    "module": "esnext",
+    "moduleResolution": "bundler",
     "baseUrl": ".",
     "paths": {
       "@/*": [
@@ -20,17 +20,13 @@
     ],
     "noEmit": true,
     "ignoreDeprecations": "6.0",
-    "experimentalDecorators": true,
     "typeRoots": [
       "./node_modules/@types",
       "./node_modules/@girs"
     ]
   },
-  "files": [
-    "src/extension.ts"
-  ],
   "include": [
-    "./node_modules/@girs/**/*.d.ts",
-    "src"
+    "src",
+    "./node_modules/@girs/**/*.d.ts"
   ]
 }

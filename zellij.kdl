@@ -83,6 +83,6 @@ layout {
     }
 
     tab name="Terminal" {
-        pane name="Commands" command="fish"
+        pane name="Commands" command="zsh"
     }
 }
