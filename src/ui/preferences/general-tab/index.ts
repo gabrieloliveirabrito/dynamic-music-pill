@@ -8,13 +8,15 @@ import { AlwaysShowRow } from "./always-show-row";
 import { ArtRow } from "./art-row";
 import { FallbackRow } from "./fallback-row";
 import { ScrollCtrlRow } from "./scroll-ctrl-row";
+import { SettingsProvider } from "@/providers/settings-provider";
+import { ScrollActionRow } from "./scroll-action-row";
 
 export class GeneralTab extends Adw.PreferencesPage {
     static {
         GObject.registerClass(this);
     }
 
-    constructor(settings: Gio.Settings, properties?: PreferencesPageProps, ...args: any[]) {
+    constructor(settings: SettingsProvider, properties?: PreferencesPageProps, ...args: any[]) {
         super(properties, args);
 
         const genGroup = new Adw.PreferencesGroup({
@@ -35,7 +37,7 @@ export class GeneralTab extends Adw.PreferencesPage {
 
         const fallbackRow = new FallbackRow(settings, {
             title: _("Fallback Album Art"),
-            subtitle: settings.get_string("fallback-art-path") || _("No image selected")
+            subtitle: settings.fallbackArt.artPath || _("No image selected")
         });
         genGroup.add(fallbackRow);
 
@@ -44,6 +46,12 @@ export class GeneralTab extends Adw.PreferencesPage {
             subtitle: _('Change Tracks, Volume or Media Player using scroll wheel or touchpad')
         });
         genGroup.add(scrollCtrlRow);
+
+        const scrollActionRow = new ScrollActionRow(settings, {
+            title: _('Scroll Action'),
+            subtitle: _('Choose what scrolling on the pill should do'),
+        })
+        genGroup.add(scrollActionRow);
 
         this.add(genGroup);
     }

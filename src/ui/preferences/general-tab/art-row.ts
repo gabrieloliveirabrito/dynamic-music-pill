@@ -3,21 +3,22 @@ import Adw from "gi://Adw"
 import Gtk from "gi://Gtk"
 import GObject from "gi://GObject"
 import Gio from "gi://Gio"
+import { SettingsProvider } from "@/providers/settings-provider"
 
 export class ArtRow extends Adw.ActionRow {
     static {
         GObject.registerClass(this)
     }
 
-    constructor(settings: Gio.Settings, properties?: ActionRowProps, ...args: any[]) {
+    constructor(settings: SettingsProvider, properties?: ActionRowProps, ...args: any[]) {
         super(properties, args);
 
         const artToggle = new Gtk.Switch({
-            active: settings.get_boolean('show-album-art'),
+            active: settings.pill.showAlbumArt,
             valign: Gtk.Align.CENTER
         });
         this.add_suffix(artToggle);
 
-        settings.bind('show-album-art', artToggle, 'active', Gio.SettingsBindFlags.DEFAULT);
+        settings.pill.bind("showAlbumArt", artToggle, "active")
     }
 }

@@ -5,6 +5,14 @@ const map = createSettingsMap({
     enabled: {
         key: "enable-scroll-controls",
         default: false
+    },
+    action: {
+        key: "scroll-action",
+        default: ""
+    },
+    onHoverOnly: {
+        key: "scroll-on-hover-only",
+        default: false
     }
 })
 

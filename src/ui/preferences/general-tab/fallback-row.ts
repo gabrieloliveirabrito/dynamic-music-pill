@@ -2,14 +2,16 @@ import Adw from "gi://Adw";
 import Gtk from "gi://Gtk"
 import GObject from "gi://GObject"
 import Gio from "gi://Gio"
+import { gettext as _ } from "@girs/gnome-shell/extensions/prefs"
 import { ActionRowProps } from "@/types/shell-types";
+import { SettingsProvider } from "@/providers/settings-provider";
 
 export class FallbackRow extends Adw.ActionRow {
     static {
         GObject.registerClass(this)
     }
 
-    constructor(settings: Gio.Settings, properties?: ActionRowProps, ...args: any[]) {
+    constructor(settings: SettingsProvider, properties?: ActionRowProps, ...args: any[]) {
         super(properties, args);
 
         const fallbackBtn = new Gtk.Button({
@@ -18,7 +20,7 @@ export class FallbackRow extends Adw.ActionRow {
             css_classes: ['center']
         })
 
-        fallbackBtn.connect('clicked', async () => {
+        fallbackBtn.connect('clicked', () => {
             let dialog = new Gtk.FileDialog({
                 title: _('Select Fallback Image')
             });
@@ -35,17 +37,19 @@ export class FallbackRow extends Adw.ActionRow {
             dialog.set_filters(filterList);
 
             try {
-                let file = await dialog.open(null, null);
+                dialog.open(null, null, (dlg, res) => {
+                    let file = dlg?.open_finish(res);
 
-                if (file) {
-                    let path = file.get_path();
+                    if (file) {
+                        let path = file.get_path();
 
-                    if (path) {
-                        settings.set_string("fallback-art-path", path);
+                        if (path) {
+                            settings.fallbackArt.artPath = path;
 
-                        this.subtitle = path;
+                            this.subtitle = path;
+                        }
                     }
-                }
+                });
             }
             catch (e) {
                 logError(e);
@@ -59,7 +63,7 @@ export class FallbackRow extends Adw.ActionRow {
         })
 
         clearFallbackBtn.connect("clicked", () => {
-            settings.set_string("fallback-art-path", '');
+            settings.fallbackArt.artPath = '';
 
             this.subtitle = _("No image selected");
         })
@@ -72,6 +76,6 @@ export class FallbackRow extends Adw.ActionRow {
         btnBox.append(clearFallbackBtn);
         this.add_suffix(btnBox);
 
-        settings.bind('show-album-art', this, 'sensitive', Gio.SettingsBindFlags.DEFAULT);
+        settings.pill.bind("showAlbumArt", this, "sensitive");
     }
 }
