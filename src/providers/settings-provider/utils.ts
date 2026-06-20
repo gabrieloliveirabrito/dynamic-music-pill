@@ -24,15 +24,40 @@ export type SettingsProperties<TMap extends SettingsMap> = {
 
 export type SchemaKey<T extends SettingsMap> = T[keyof T]["key"];
 
-export type SettingsGroup<TMap extends SettingsMap> =
-    SettingsProperties<TMap> & {
-        bind<K extends keyof TMap>(
-            prop: K,
-            object: GObject.Object,
-            property: string,
-            flags?: Gio.SettingsBindFlags,
-        ): void;
-    };
+type RemoveIndexSignature<T> = {
+    [K in keyof T as string extends K
+    ? never
+    : number extends K
+    ? never
+    : symbol extends K
+    ? never
+    : K]: T[K];
+};
+
+export type SettingsSignal<TMap extends SettingsMap> = `changed::${SchemaKey<TMap>}` | keyof RemoveIndexSignature<Gio.Settings.SignalSignatures>;
+
+export type SettingsSignalCallback<TMap extends SettingsMap, TSignal> = TSignal extends `changed::${string}`
+    ? (key: string) => void
+    : TSignal extends keyof Gio.Settings.SignalSignatures
+    ? Gio.Settings.SignalSignatures[TSignal]
+    : never;
+
+export type SettingsActions<TMap extends SettingsMap> = {
+    bind<K extends keyof TMap>(
+        prop: K,
+        object: GObject.Object,
+        property: string,
+        flags?: Gio.SettingsBindFlags,
+    ): void;
+
+    connect<K extends keyof Gio.Settings.SignalSignatures>(
+        signal: K | `changed::${SchemaKey<TMap>}`,
+        callback: Gio.Settings.SignalSignatures[K]
+    ): number;
+};
+
+export type SettingsGroup<TMap extends SettingsMap> = SettingsProperties<TMap> & SettingsActions<TMap>;
+
 
 //??
 export function createSettingsMap<const T extends SettingsMap>(map: T): T {
@@ -42,8 +67,8 @@ export function createSettingsMap<const T extends SettingsMap>(map: T): T {
 export function createSettingsGroup<TMap extends SettingsMap>(
     settings: Gio.Settings,
     map: TMap,
-) : SettingsGroup<TMap> {
-    const methods = {
+): SettingsGroup<TMap> {
+    const methods: SettingsActions<TMap> = {
         bind<K extends keyof TMap>(
             prop: K,
             object: GObject.Object,
@@ -57,6 +82,12 @@ export function createSettingsGroup<TMap extends SettingsMap>(
                 flags,
             );
         },
+        connect<K extends keyof Gio.Settings.SignalSignatures>(
+            signal: K | `changed::${SchemaKey<TMap>}`,
+            callback: Gio.Settings.SignalSignatures[K]
+        ): number {
+            return settings.connect(signal, callback);
+        }
     };
 
     return new Proxy(methods, {

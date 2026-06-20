@@ -4,6 +4,7 @@ import { createFallbackArtsSettings, FallbackArtSettingsSchema, FallbackArtSetti
 import { createPillSettings, PillSettingsSchema, PillSettingsType } from "./pill"
 
 export type SettingsProvider = {
+    connect: <K extends keyof Gio.Settings.SignalSignatures>(signal: K, callback: Gio.Settings.SignalSignatures[K]) => number,
     scrollControls: ScrollControlSettingsType,
     fallbackArt: FallbackArtSettingsType,
     pill: PillSettingsType
@@ -14,7 +15,12 @@ export function createSettingsProvider(settings: Gio.Settings): SettingsProvider
     const fallbackArt = createFallbackArtsSettings(settings);
     const pill = createPillSettings(settings);
 
+    function connect<K extends keyof Gio.Settings.SignalSignatures>(signal: K, callback: Gio.Settings.SignalSignatures[K]): number {
+        return settings.connect(signal, callback);
+    }
+
     return {
+        connect,
         scrollControls,
         fallbackArt,
         pill
