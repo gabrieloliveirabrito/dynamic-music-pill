@@ -1,33 +1,80 @@
-import { Extension } from "@girs/gnome-shell/src/extensions/extension"
+import { MetadataJson } from "node_modules/@girs/gnome-shell/dist/types/extension-metadata";
 import { logDebug, logInfo, logWarning, logError } from "./utils/log";
 import { isDevelopment } from "./utils/development";
 import { IMPrisProvider } from "./interfaces/impris-provider";
-import { createMockMPRISProvider } from "./providers/mock";
+import { Extension } from "@girs/gnome-shell/extensions/extension"
+import Gio from "@girs/gio-2.0"
 import { createMPRISProvider } from "./providers/mpris-provider";
+import { createMockMPRISProvider } from "./providers/mock";
+import { AppContext } from "./types/app-context";
+import { createSettingsProvider, SettingsProvider } from "./providers/settings-provider";
 
+/**
+ * Global variable to store the extension instance
+ */
 let instance: DynamicMusicPillExtension | null = null;
 
-export function getInstance(): DynamicMusicPillExtension | null {
+/**
+ * Get the application context
+ * @returns The application context
+ * @throws Error if called before instance was created
+ */
+export function getAppContext() : AppContext {
     if (instance === null) {
-        throw new Error("getInstance called before instance was created");
+        throw new Error("getAppContext called before instance was created!");
     }
-    return instance;
+
+    return instance.context;
 }
 
-export default class DynamicMusicPillExtension {
-    extension: Extension;
+/**
+ * Main extension class for Dynamic Music Pill
+ * This class manages the extension lifecycle and provides access to core components
+ */
+export default class DynamicMusicPillExtension extends Extension {
+    /**
+     * Application context containing references to key components
+     */
+    context: AppContext;
+    
+    /**
+     * MPRIS provider for music control
+     */
     provider: IMPrisProvider;
+    
+    /**
+     * Settings provider for extension configuration
+     */
+    settings: SettingsProvider;
 
-    constructor(extension: Extension) {
-        this.extension = extension;
+    /**
+     * Creates a new instance of the DynamicMusicPillExtension
+     * @param metadata Extension metadata
+     */
+    constructor(metadata: MetadataJson) {
+        super(metadata)
         instance = this;
+
+        this.initTranslations("dynamic-music-pill");
+
+        this.settings = createSettingsProvider(this.getSettings());
 
         this.provider = createMPRISProvider();
         this.provider.addCallback("first", (track) => {
             logInfo(`Chegou aqui ${JSON.stringify(track)}`);
         })
+
+        this.context = {
+            extension: this,
+            settings: this.settings,
+            mpris: this.provider
+        };
     }
 
+    /**
+     * Enables the extension
+     * Starts the MPRIS provider and logs information
+     */
     enable() {
         logInfo("Extension enabled.");
         logInfo(isDevelopment() ? "Is Dev" : "Is Not Dev");
@@ -35,6 +82,10 @@ export default class DynamicMusicPillExtension {
         this.provider.start();
     }
 
+    /**
+     * Disables the extension
+     * Stops the MPRIS provider and logs a warning
+     */
     disable() {
         this.provider.stop();
         
