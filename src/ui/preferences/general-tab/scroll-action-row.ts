@@ -1,4 +1,3 @@
-import { gettext as _ } from "@girs/gnome-shell/extensions/prefs"
 import { SettingsProvider } from "@/providers/settings-provider"
 import Adw from "gi://Adw"
 import GObject from "gi://GObject"
@@ -30,7 +29,13 @@ export class ScrollActionRow extends Adw.ComboRow {
         this.set_model(scrollActionModel);
         this.set_selected(selectedIdx);
 
-        settings.connect("notify::selected", () => {
+        settings.connect("changed::scroll-action", () => {
+            const action = settings.scrollControls.action;
+
+            this.selected = ActionIdMap[action] ?? 0;
+        });
+
+        this.connect("notify::selected", () => {
             let val = 'track';
 
             if (this.selected === 1)

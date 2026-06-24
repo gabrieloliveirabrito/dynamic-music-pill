@@ -2,7 +2,6 @@ import { ActionRowProps } from "@/types/shell-types"
 import Adw from "gi://Adw"
 import Gtk from "gi://Gtk"
 import GObject from "gi://GObject"
-import Gio from "gi://Gio"
 import { SettingsProvider } from "@/providers/settings-provider"
 
 export class ArtRow extends Adw.ActionRow {

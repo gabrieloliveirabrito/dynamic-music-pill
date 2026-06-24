@@ -1,4 +1,4 @@
-import { ExtensionPreferences, gettext as _ } from "@girs/gnome-shell/extensions/prefs"
+import { ExtensionPreferences } from "@girs/gnome-shell/extensions/prefs"
 import Adw from "gi://Adw";
 import { GeneralTab } from "./ui/preferences";
 import { createSettingsProvider } from "./providers/settings-provider";
@@ -30,6 +30,7 @@ const PREFS_KEYS = [
 export default class DynamicMusicPillPrefs extends ExtensionPreferences {
     async fillPreferencesWindow(window: Adw.PreferencesWindow): Promise<void> {
         window.search_enabled = true;
+        pkg.initGettext();
 
         const settings = this.getSettings();
         const settingsProvider = createSettingsProvider(settings);

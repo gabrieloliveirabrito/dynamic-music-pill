@@ -1,7 +1,6 @@
 import Adw from "gi://Adw"
 import Gtk from "gi://Gtk"
 import GObject from "gi://GObject"
-import { gettext as _ } from "@girs/gnome-shell/extensions/prefs"
 import { SettingsProvider } from "@/providers/settings-provider"
 import { ActionRowProps } from "@/types/shell-types"
 

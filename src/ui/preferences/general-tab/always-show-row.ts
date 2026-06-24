@@ -1,6 +1,5 @@
 import Gtk from "gi://Gtk"
 import GObject from "gi://GObject"
-import Gio from "gi://Gio"
 import Adw from "gi://Adw"
 import { ActionRowProps } from "@/types/shell-types";
 import { SettingsProvider } from "@/providers/settings-provider";

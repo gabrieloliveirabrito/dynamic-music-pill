@@ -1,8 +1,5 @@
 import { PreferencesPageProps } from "@/types/shell-types";
-import { gettext as _ } from "@girs/gnome-shell/extensions/prefs"
 import Adw from "gi://Adw";
-import Gio from "gi://Gio"
-import Gtk from "gi://Gtk"
 import GObject from "gi://GObject"
 import { AlwaysShowRow } from "./always-show-row";
 import { ArtRow } from "./art-row";
@@ -21,7 +18,7 @@ export class GeneralTab extends Adw.PreferencesPage {
 
         const genGroup = new Adw.PreferencesGroup({
             title: _("General Settings")
-        })
+        })        
 
         const alwaysShowRow = new AlwaysShowRow(settings, {
             title: _("Always ON"),
