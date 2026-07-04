@@ -1,7 +1,8 @@
 import { ExtensionPreferences } from "@girs/gnome-shell/extensions/prefs"
 import Adw from "gi://Adw";
-import { GeneralTab } from "./ui/preferences";
+import { MainPage, PopupPage, StylePage } from "./ui/preferences";
 import { createSettingsProvider } from "./providers/settings-provider";
+import { t } from "./utils/translate";
 
 
 const PREFS_KEYS = [
@@ -28,6 +29,10 @@ const PREFS_KEYS = [
 ];
 
 export default class DynamicMusicPillPrefs extends ExtensionPreferences {
+    static updateGroupVisibility(positioning: string) {
+        //TODO: connect settings to group
+    }
+
     async fillPreferencesWindow(window: Adw.PreferencesWindow): Promise<void> {
         window.search_enabled = true;
         pkg.initGettext();
@@ -35,10 +40,22 @@ export default class DynamicMusicPillPrefs extends ExtensionPreferences {
         const settings = this.getSettings();
         const settingsProvider = createSettingsProvider(settings);
 
-        let mainPage = new GeneralTab(settingsProvider, {
-            title: _('Main Pill'),
+        const mainPage = new MainPage(settingsProvider, {
+            title: t('Main Pill'),
             icon_name: 'preferences-system-symbolic'
         });
         window.add(mainPage);
+
+        const popupPage = new PopupPage(settingsProvider, {
+            title: t('Pop-up Menu'),
+            icon_name: 'view-more-symbolic'
+        });
+        window.add(popupPage);
+
+        const stylePage = new StylePage(settingsProvider, {
+            title: t('Style & Layout'),
+            icon_name: 'applications-graphics-symbolic'
+        });
+        window.add(stylePage);
     }
 }
