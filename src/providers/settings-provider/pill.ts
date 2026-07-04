@@ -9,6 +9,58 @@ const map = createSettingsMap({
     showAlbumArt: {
         key: "show-album-art",
         default: true
+    },
+    tabletMode: {
+        key: "tablet-mode",
+        default: 0
+    },
+    controlsPosition: {
+        key: "pill-controls-position",
+        default: 0
+    },
+    inlineArtist: {
+        key: "inline-artist",
+        default: false
+    },
+    showArtist: {
+        key: "show-artist",
+        default: true
+    },
+    hideText: {
+        key: "hide-text",
+        default: false
+    },
+    enableShadow: {
+        key: "enable-shadow",
+        default: false
+    },
+    shadowOpacity: {
+        key: "shadow-opacity",
+        default: 50
+    },
+    shadowBlur: {
+        key: "shadow-blur",
+        default: 0
+    },
+    dynamicWidth: {
+        key: "pill-dynamic-width",
+        default: false
+    },
+    alignmentPreset: {
+        key: "position-mode",
+        default: 0
+    },
+    manualIndex: {
+        key: "dock-position",
+        default: 0
+    },
+    verticalOffset: {
+        key: "vertical-offset",
+        default: 0
+    },
+    horizontalOffset: {
+        key: "horizontal-offset",
+        default: 0
     }
 })
 

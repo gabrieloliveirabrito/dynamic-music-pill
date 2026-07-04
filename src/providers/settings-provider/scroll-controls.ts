@@ -13,6 +13,22 @@ const map = createSettingsMap({
     onHoverOnly: {
         key: "scroll-on-hover-only",
         default: false
+    },
+    invert: {
+        key: "invert-scroll-animation",
+        default: false
+    },
+    invertScrollDirection: {
+        key: "invert-scroll-direction",
+        default: false
+    },
+    scrollText: {
+        key: "scroll-text",
+        default: true
+    },
+    freezeOnPause: {
+        key: "freeze-scroll-on-pause",
+        default: true
     }
 })
 
