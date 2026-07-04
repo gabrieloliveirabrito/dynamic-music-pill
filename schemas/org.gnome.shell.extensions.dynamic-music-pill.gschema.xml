@@ -326,7 +326,7 @@
       <summary>Show Album Art</summary>
     </key>
 	<key name="enable-lyrics" type="b">
-      <default>true</default>
+      <default>false</default>
       <summary>Enable Lyrics Display</summary>
     </key>
     <key name="lyrics-language-preference" type="i">
