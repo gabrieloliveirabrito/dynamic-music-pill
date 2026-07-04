@@ -16,12 +16,22 @@ Portar a extensão **Dynamic Music Pill** de JavaScript para **TypeScript**, com
 
 ## Build
 
+**Dependencies:** `pnpm`, `msgfmt` (gettext), `glib-compile-schemas` (glib2).
+
 ```bash
 pnpm install
-pnpm build      # tsc --noEmit + esbuild
-pnpm watch      # rebuild contínuo
-pnpm typecheck  # apenas verificação de tipos
+pnpm build      # locale + schema + TypeScript/esbuild
+make build      # equivalent
 ```
+
+| Script | Command | Output |
+|--------|---------|--------|
+| Full build | `pnpm build` | `.mo`, `gschemas.compiled`, `extension.js`, `prefs.js` |
+| Translations | `pnpm run build:locale` | `locale/**/LC_MESSAGES/*.mo` from `po/*.po` |
+| GSettings | `pnpm run build:schema` | `schemas/gschemas.compiled` |
+| JS only | `pnpm run build:js` | `extension.js`, `prefs.js` |
+
+> `.mo` and `schemas/gschemas.compiled` are gitignored — regenerate after clone or when editing `po/` / `schemas/`.
 
 Saída na raiz: `extension.js`, `prefs.js` e source maps.
 

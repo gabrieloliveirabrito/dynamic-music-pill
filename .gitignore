@@ -5,6 +5,15 @@ logs/
 dist/
 dist-extension/
 
+# Build artifacts (gerados por pnpm build / make build)
+*.js.map
+schemas/gschemas.compiled
+locale/**/LC_MESSAGES/*.mo
+
+# Python
+scripts/__pycache__/
+__pycache__/
+
 *.log
 *.tmp
 *.bak
@@ -14,3 +23,4 @@ dist-extension/
 .DS_Store
 .idea/
 .vscode/
+.cursor/

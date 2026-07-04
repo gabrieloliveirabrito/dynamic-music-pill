@@ -36,24 +36,37 @@ Use these files to validate behavior during the port; they must not be modified.
 
 ## Getting started
 
+**Build dependencies:** `pnpm`, `msgfmt` (gettext), and `glib-compile-schemas` (glib2).
+
 ```bash
 pnpm install
-pnpm build
+pnpm build          # locale (.mo) + schema + TypeScript/esbuild
+# equivalent: make build
 ```
+
+Individual steps:
+
+```bash
+pnpm run build:locale   # po/*.po -> locale/**/LC_MESSAGES/*.mo
+pnpm run build:schema   # schemas/ -> gschemas.compiled
+pnpm run build:js       # TypeScript + esbuild only
+```
+
+> **Note:** `.mo` files and `schemas/gschemas.compiled` are not tracked in git (see `.gitignore`). Always run `pnpm build` after cloning or when changing translations/schema.
 
 Development watch:
 
 ```bash
-pnpm watch
+pnpm watch            # JS only; run build:locale/schema manually when needed
 ```
 
-Install locally (adjust paths as needed):
+Install locally:
 
 ```bash
-./install.sh
+./install.sh          # pnpm build + rsync + glib-compile-schemas at destination
 ```
 
-Compile Brazilian Portuguese translations:
+Validate Brazilian Portuguese translation:
 
 ```bash
 msgfmt -c po/pt_BR.po -o locale/pt_BR/LC_MESSAGES/dynamic-music-pill.mo

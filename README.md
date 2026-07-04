@@ -192,12 +192,24 @@ mkdir -p ~/.local/share/gnome-shell/extensions/dynamic-music-pill@andbal
 cp -r * ~/.local/share/gnome-shell/extensions/dynamic-music-pill@andbal/
 ```
 
-**5.** Compile GSettings schemas:
+**5.** Compile GSettings schemas and translations (required for this fork):
 
 ```bash
 cd ~/.local/share/gnome-shell/extensions/dynamic-music-pill@andbal
+
+# GSettings schema (required)
 glib-compile-schemas schemas/
+
+# Translations — compile from po/ if .mo files are missing
+# Requires gettext (msgfmt). Or run `pnpm build` from the repo before copying.
+for po in po/*.po; do
+  lang="$(basename "$po" .po)"
+  mkdir -p "locale/$lang/LC_MESSAGES"
+  msgfmt "$po" -o "locale/$lang/LC_MESSAGES/dynamic-music-pill.mo"
+done
 ```
+
+> **TypeScript fork:** `.mo` and `gschemas.compiled` are build artifacts (not in git). From the repo root use `pnpm build` or `make build` — see [`README.fork.pt.md`](README.fork.pt.md).
 
 **6.** Restart GNOME Shell:
 

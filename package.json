@@ -7,10 +7,13 @@
   "author": "",
   "license": "ISC",
   "scripts": {
-    "build": "tsc --noEmit && node esbuild.config.mjs",
+    "build": "pnpm run build:locale && pnpm run build:schema && pnpm run build:js",
+    "build:js": "tsc --noEmit && node esbuild.config.mjs",
+    "build:locale": "bash scripts/build-locale.sh",
+    "build:schema": "bash scripts/build-schema.sh",
     "watch": "node esbuild.config.mjs --watch",
     "typecheck": "tsc --noEmit",
-    "clean": "rm -rf dist",
+    "clean": "rm -rf dist && rm -f schemas/gschemas.compiled && find locale -name '*.mo' -delete 2>/dev/null || true",
     "dev": "tsx watcher.ts"
   },
   "devEngines": {
