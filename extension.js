@@ -398,6 +398,18 @@ var map3 = createSettingsMap({
   horizontalOffset: {
     key: "horizontal-offset",
     default: 0
+  },
+  albumArtSize: {
+    key: "dock-art-size",
+    default: 16
+  },
+  dockWidth: {
+    key: "pill-width",
+    default: 100
+  },
+  dockHeight: {
+    key: "pill-height",
+    default: 32
   }
 });
 function createPillSettings(settings) {
@@ -630,6 +642,22 @@ var map7 = createSettingsMap({
   targetContainer: {
     key: "target-container",
     default: 0
+  },
+  syncAccentColor: {
+    key: "sync-accent-color",
+    default: false
+  },
+  useCustomColors: {
+    key: "use-custom-colors",
+    default: false
+  },
+  customBgColor: {
+    key: "custom-bg-color",
+    default: "40,40,40"
+  },
+  customTextColor: {
+    key: "custom-text-color",
+    default: "40,40,40"
   }
 });
 function createStyleSettings(settings) {

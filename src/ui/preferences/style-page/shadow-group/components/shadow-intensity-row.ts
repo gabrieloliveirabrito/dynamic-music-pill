@@ -17,5 +17,6 @@ export class ShadowIntensityRow extends Adw.ActionRow {
         });
         settings.pill.bind('shadowOpacity', shadowIntensityRow, 'value');
         this.add_suffix(shadowIntensityRow);
+        settings.pill.bind("enableShadow", this, "sensitive");
     }
 }

@@ -1392,8 +1392,8 @@ GObject56.registerClass(_PopupPage);
 var PopupPage = _PopupPage;
 
 // src/ui/preferences/style-page/index.ts
-import Adw82 from "gi://Adw";
-import GObject82 from "gi://GObject";
+import Adw91 from "gi://Adw";
+import GObject91 from "gi://GObject";
 
 // src/ui/preferences/style-page/look-group/index.ts
 import Adw65 from "gi://Adw";
@@ -1607,8 +1607,8 @@ GObject65.registerClass(_LookGroup);
 var LookGroup = _LookGroup;
 
 // src/ui/preferences/style-page/background-transparency/index.ts
-import Adw72 from "gi://Adw";
-import GObject72 from "gi://GObject";
+import Adw71 from "gi://Adw";
+import GObject71 from "gi://GObject";
 
 // src/ui/preferences/style-page/background-transparency/components/enable-transparency-row.ts
 import Adw66 from "gi://Adw";
@@ -1665,64 +1665,46 @@ var _BackgroundOpacityRow = class _BackgroundOpacityRow extends Adw68.ActionRow 
 GObject68.registerClass(_BackgroundOpacityRow);
 var BackgroundOpacityRow = _BackgroundOpacityRow;
 
-// src/ui/preferences/style-page/background-transparency/components/main-pill-shadow-row.ts
+// src/ui/preferences/style-page/background-transparency/components/text-transparency-row.ts
 import Adw69 from "gi://Adw";
 import Gtk59 from "gi://Gtk";
 import GObject69 from "gi://GObject";
-var _MainPillShadowRow = class _MainPillShadowRow extends Adw69.ActionRow {
+var _TextTransparencyRow = class _TextTransparencyRow extends Adw69.ActionRow {
   constructor(settings, properties, ...args) {
     super(properties, args);
-    const mainPillShadowRow = new Gtk59.Switch({
-      active: settings.pill.enableShadow,
-      valign: Gtk59.Align.CENTER
-    });
-    settings.pill.bind("enableShadow", mainPillShadowRow, "active");
-    this.add_suffix(mainPillShadowRow);
-  }
-};
-GObject69.registerClass(_MainPillShadowRow);
-var MainPillShadowRow = _MainPillShadowRow;
-
-// src/ui/preferences/style-page/background-transparency/components/text-transparency-row.ts
-import Adw70 from "gi://Adw";
-import Gtk60 from "gi://Gtk";
-import GObject70 from "gi://GObject";
-var _TextTransparencyRow = class _TextTransparencyRow extends Adw70.ActionRow {
-  constructor(settings, properties, ...args) {
-    super(properties, args);
-    const textTransparencyRow = new Gtk60.Switch({
+    const textTransparencyRow = new Gtk59.Switch({
       active: settings.style.textTransparency,
-      valign: Gtk60.Align.CENTER
+      valign: Gtk59.Align.CENTER
     });
     settings.style.bind("textTransparency", textTransparencyRow, "active");
     settings.style.bind("enableTransparency", this, "sensitive");
     this.add_suffix(textTransparencyRow);
   }
 };
-GObject70.registerClass(_TextTransparencyRow);
+GObject69.registerClass(_TextTransparencyRow);
 var TextTransparencyRow = _TextTransparencyRow;
 
 // src/ui/preferences/style-page/background-transparency/components/visualizer-transparency-row.ts
-import Adw71 from "gi://Adw";
-import Gtk61 from "gi://Gtk";
-import GObject71 from "gi://GObject";
-var _VisualizerTransparencyRow = class _VisualizerTransparencyRow extends Adw71.ActionRow {
+import Adw70 from "gi://Adw";
+import Gtk60 from "gi://Gtk";
+import GObject70 from "gi://GObject";
+var _VisualizerTransparencyRow = class _VisualizerTransparencyRow extends Adw70.ActionRow {
   constructor(settings, properties, ...args) {
     super(properties, args);
-    const visualizerTransparencyRow = new Gtk61.Switch({
+    const visualizerTransparencyRow = new Gtk60.Switch({
       active: settings.style.visualizerTransparency,
-      valign: Gtk61.Align.CENTER
+      valign: Gtk60.Align.CENTER
     });
     settings.style.bind("visualizerTransparency", visualizerTransparencyRow, "active");
     settings.style.bind("enableTransparency", this, "sensitive");
     this.add_suffix(visualizerTransparencyRow);
   }
 };
-GObject71.registerClass(_VisualizerTransparencyRow);
+GObject70.registerClass(_VisualizerTransparencyRow);
 var VisualizerTransparencyRow = _VisualizerTransparencyRow;
 
 // src/ui/preferences/style-page/background-transparency/index.ts
-var _BackgroundTransparencyGroup = class _BackgroundTransparencyGroup extends Adw72.PreferencesGroup {
+var _BackgroundTransparencyGroup = class _BackgroundTransparencyGroup extends Adw71.PreferencesGroup {
   constructor(settings, properties, ...args) {
     super(properties, args);
     const enableTransparencyRow = new EnableTransparencyRow(settings, {
@@ -1747,73 +1729,71 @@ var _BackgroundTransparencyGroup = class _BackgroundTransparencyGroup extends Ad
       title: t("Apply to Visualizer")
     });
     this.add(visualizerTransparencyRow);
-    const mainPillShadowRow = new MainPillShadowRow(settings, {
-      title: t("Main Pill Shadow")
-    });
-    this.add(mainPillShadowRow);
   }
 };
-GObject72.registerClass(_BackgroundTransparencyGroup);
+GObject71.registerClass(_BackgroundTransparencyGroup);
 var BackgroundTransparencyGroup = _BackgroundTransparencyGroup;
 
 // src/ui/preferences/style-page/shadow-group/index.ts
-import Adw76 from "gi://Adw";
-import GObject76 from "gi://GObject";
+import Adw75 from "gi://Adw";
+import GObject75 from "gi://GObject";
 
 // src/ui/preferences/style-page/shadow-group/components/enable-shadow-row.ts
-import Adw73 from "gi://Adw";
-import Gtk62 from "gi://Gtk";
-import GObject73 from "gi://GObject";
-var _EnableShadowRow = class _EnableShadowRow extends Adw73.ActionRow {
+import Adw72 from "gi://Adw";
+import Gtk61 from "gi://Gtk";
+import GObject72 from "gi://GObject";
+var _EnableShadowRow = class _EnableShadowRow extends Adw72.ActionRow {
   constructor(settings, properties, ...args) {
     super(properties, args);
-    const enableShadowRow = new Gtk62.Switch({
+    const enableShadowRow = new Gtk61.Switch({
       active: settings.pill.enableShadow,
-      valign: Gtk62.Align.CENTER
+      valign: Gtk61.Align.CENTER
     });
     settings.pill.bind("enableShadow", enableShadowRow, "active");
     this.add_suffix(enableShadowRow);
   }
 };
-GObject73.registerClass(_EnableShadowRow);
+GObject72.registerClass(_EnableShadowRow);
 var EnableShadowRow = _EnableShadowRow;
 
 // src/ui/preferences/style-page/shadow-group/components/shadow-intensity-row.ts
-import Adw74 from "gi://Adw";
-import Gtk63 from "gi://Gtk";
-import GObject74 from "gi://GObject";
-var _ShadowIntensityRow = class _ShadowIntensityRow extends Adw74.ActionRow {
+import Adw73 from "gi://Adw";
+import Gtk62 from "gi://Gtk";
+import GObject73 from "gi://GObject";
+var _ShadowIntensityRow = class _ShadowIntensityRow extends Adw73.ActionRow {
   constructor(settings, properties, ...args) {
     super(properties, args);
-    const shadowIntensityRow = new Adw74.SpinRow({
-      adjustment: new Gtk63.Adjustment({ lower: 0, upper: 100, step_increment: 5 })
+    const shadowIntensityRow = new Adw73.SpinRow({
+      adjustment: new Gtk62.Adjustment({ lower: 0, upper: 100, step_increment: 5 })
     });
     settings.pill.bind("shadowOpacity", shadowIntensityRow, "value");
     this.add_suffix(shadowIntensityRow);
+    settings.pill.bind("enableShadow", this, "sensitive");
   }
 };
-GObject74.registerClass(_ShadowIntensityRow);
+GObject73.registerClass(_ShadowIntensityRow);
 var ShadowIntensityRow = _ShadowIntensityRow;
 
 // src/ui/preferences/style-page/shadow-group/components/shadow-blur-row.ts
-import Adw75 from "gi://Adw";
-import Gtk64 from "gi://Gtk";
-import GObject75 from "gi://GObject";
-var _ShadowBlurRow = class _ShadowBlurRow extends Adw75.ActionRow {
+import Adw74 from "gi://Adw";
+import Gtk63 from "gi://Gtk";
+import GObject74 from "gi://GObject";
+var _ShadowBlurRow = class _ShadowBlurRow extends Adw74.ActionRow {
   constructor(settings, properties, ...args) {
     super(properties, args);
-    const shadowBlurRow = new Adw75.SpinRow({
-      adjustment: new Gtk64.Adjustment({ lower: 0, upper: 50, step_increment: 1 })
+    const shadowBlurRow = new Adw74.SpinRow({
+      adjustment: new Gtk63.Adjustment({ lower: 0, upper: 50, step_increment: 1 })
     });
     settings.pill.bind("shadowBlur", shadowBlurRow, "value");
     this.add_suffix(shadowBlurRow);
+    settings.pill.bind("enableShadow", this, "sensitive");
   }
 };
-GObject75.registerClass(_ShadowBlurRow);
+GObject74.registerClass(_ShadowBlurRow);
 var ShadowBlurRow = _ShadowBlurRow;
 
 // src/ui/preferences/style-page/shadow-group/index.ts
-var _ShadowGroup = class _ShadowGroup extends Adw76.PreferencesGroup {
+var _ShadowGroup = class _ShadowGroup extends Adw75.PreferencesGroup {
   constructor(settings, properties, ...args) {
     super(properties, args);
     const enableShadowRow = new EnableShadowRow(settings, {
@@ -1830,21 +1810,21 @@ var _ShadowGroup = class _ShadowGroup extends Adw76.PreferencesGroup {
     this.add(shadowBlurRow);
   }
 };
-GObject76.registerClass(_ShadowGroup);
+GObject75.registerClass(_ShadowGroup);
 var ShadowGroup = _ShadowGroup;
 
 // src/ui/preferences/style-page/positioning-group/index.ts
-import Adw81 from "gi://Adw";
-import GObject81 from "gi://GObject";
+import Adw82 from "gi://Adw";
+import GObject82 from "gi://GObject";
 
 // src/ui/preferences/style-page/positioning-group/components/container-target-row.ts
-import Adw77 from "gi://Adw";
-import Gtk65 from "gi://Gtk";
-import GObject77 from "gi://GObject";
-var _ContainerTargetRow = class _ContainerTargetRow extends Adw77.ComboRow {
+import Adw76 from "gi://Adw";
+import Gtk64 from "gi://Gtk";
+import GObject76 from "gi://GObject";
+var _ContainerTargetRow = class _ContainerTargetRow extends Adw76.ComboRow {
   constructor(settings, properties, ...args) {
     super(properties, args);
-    const targetModel = new Gtk65.StringList();
+    const targetModel = new Gtk64.StringList();
     targetModel.append(t("Dock"));
     targetModel.append(t("Panel: Left Box"));
     targetModel.append(t("Panel: Center Box"));
@@ -1859,35 +1839,35 @@ var _ContainerTargetRow = class _ContainerTargetRow extends Adw77.ComboRow {
     });
   }
 };
-GObject77.registerClass(_ContainerTargetRow);
+GObject76.registerClass(_ContainerTargetRow);
 var ContainerTargetRow = _ContainerTargetRow;
 
 // src/ui/preferences/style-page/positioning-group/components/dynamic-width-row.ts
-import Adw78 from "gi://Adw";
-import Gtk66 from "gi://Gtk";
-import GObject78 from "gi://GObject";
-var _DynamicWidthRow = class _DynamicWidthRow extends Adw78.ActionRow {
+import Adw77 from "gi://Adw";
+import Gtk65 from "gi://Gtk";
+import GObject77 from "gi://GObject";
+var _DynamicWidthRow = class _DynamicWidthRow extends Adw77.ActionRow {
   constructor(settings, properties, ...args) {
     super(properties, args);
-    const dynamicWidthRow = new Gtk66.Switch({
+    const dynamicWidthRow = new Gtk65.Switch({
       active: settings.pill.dynamicWidth,
-      valign: Gtk66.Align.CENTER
+      valign: Gtk65.Align.CENTER
     });
     settings.pill.bind("dynamicWidth", dynamicWidthRow, "active");
     this.add_suffix(dynamicWidthRow);
   }
 };
-GObject78.registerClass(_DynamicWidthRow);
+GObject77.registerClass(_DynamicWidthRow);
 var DynamicWidthRow = _DynamicWidthRow;
 
 // src/ui/preferences/style-page/positioning-group/components/alignment-preset-row.ts
-import Adw79 from "gi://Adw";
-import Gtk67 from "gi://Gtk";
-import GObject79 from "gi://GObject";
-var _AlignmentPresetRow = class _AlignmentPresetRow extends Adw79.ComboRow {
+import Adw78 from "gi://Adw";
+import Gtk66 from "gi://Gtk";
+import GObject78 from "gi://GObject";
+var _AlignmentPresetRow = class _AlignmentPresetRow extends Adw78.ComboRow {
   constructor(settings, properties, ...args) {
     super(properties, args);
-    const alignmentPresetRow = new Gtk67.StringList();
+    const alignmentPresetRow = new Gtk66.StringList();
     alignmentPresetRow.append(t("Manual Index"));
     alignmentPresetRow.append(t("First (Start)"));
     alignmentPresetRow.append(t("Center"));
@@ -1899,26 +1879,60 @@ var _AlignmentPresetRow = class _AlignmentPresetRow extends Adw79.ComboRow {
     });
   }
 };
-GObject79.registerClass(_AlignmentPresetRow);
+GObject78.registerClass(_AlignmentPresetRow);
 var AlignmentPresetRow = _AlignmentPresetRow;
 
 // src/ui/preferences/style-page/positioning-group/components/manual-index-row.ts
-import Adw80 from "gi://Adw";
-import Gtk68 from "gi://Gtk";
-import GObject80 from "gi://GObject";
-var _ManualIndexRow = class _ManualIndexRow extends Adw80.ActionRow {
+import Adw79 from "gi://Adw";
+import Gtk67 from "gi://Gtk";
+import GObject79 from "gi://GObject";
+var _ManualIndexRow = class _ManualIndexRow extends Adw79.ActionRow {
   constructor(settings, properties, ...args) {
     super(properties, args);
-    const manualIndexRow = new Adw80.SpinRow({ adjustment: new Gtk68.Adjustment({ lower: 0, upper: 20, step_increment: 1 }) });
+    const manualIndexRow = new Adw79.SpinRow({ adjustment: new Gtk67.Adjustment({ lower: 0, upper: 20, step_increment: 1 }) });
     settings.pill.bind("manualIndex", manualIndexRow, "value");
     this.add_suffix(manualIndexRow);
   }
 };
-GObject80.registerClass(_ManualIndexRow);
+GObject79.registerClass(_ManualIndexRow);
 var ManualIndexRow = _ManualIndexRow;
 
+// src/ui/preferences/style-page/positioning-group/components/vertical-offset-row.ts
+import Adw80 from "gi://Adw";
+import Gtk68 from "gi://Gtk";
+import GObject80 from "gi://GObject";
+var _VerticalOffsetRow = class _VerticalOffsetRow extends Adw80.ActionRow {
+  constructor(settings, props) {
+    super(props);
+    const vOffsetRow = new Adw80.SpinRow({
+      adjustment: new Gtk68.Adjustment({ lower: -30, upper: 30, step_increment: 1 })
+    });
+    settings.pill.bind("verticalOffset", vOffsetRow, "value");
+    this.add_suffix(vOffsetRow);
+  }
+};
+GObject80.registerClass(_VerticalOffsetRow);
+var VerticalOffsetRow = _VerticalOffsetRow;
+
+// src/ui/preferences/style-page/positioning-group/components/horizontal-offset-row.ts
+import Adw81 from "gi://Adw";
+import Gtk69 from "gi://Gtk";
+import GObject81 from "gi://GObject";
+var _HorizontalOffsetRow = class _HorizontalOffsetRow extends Adw81.ActionRow {
+  constructor(settings, props) {
+    super(props);
+    const hOffsetRow = new Adw81.SpinRow({
+      adjustment: new Gtk69.Adjustment({ lower: -50, upper: 50, step_increment: 1 })
+    });
+    settings.pill.bind("horizontalOffset", hOffsetRow, "value");
+    this.add_suffix(hOffsetRow);
+  }
+};
+GObject81.registerClass(_HorizontalOffsetRow);
+var HorizontalOffsetRow = _HorizontalOffsetRow;
+
 // src/ui/preferences/style-page/positioning-group/index.ts
-var _PositioningGroup = class _PositioningGroup extends Adw81.PreferencesGroup {
+var _PositioningGroup = class _PositioningGroup extends Adw82.PreferencesGroup {
   constructor(settings, properties, ...args) {
     super(properties, args);
     const positioningRow = new ContainerTargetRow(settings, {
@@ -1941,13 +1955,203 @@ var _PositioningGroup = class _PositioningGroup extends Adw81.PreferencesGroup {
       subtitle: t("Order in the list (0 is first). Only for Manual mode.")
     });
     this.add(manualIndexRow);
+    const verticalOffsetRow = new VerticalOffsetRow(settings, {
+      title: t("Vertical Offset (Y)"),
+      subtitle: t("Shift Up (-) or Down (+)")
+    });
+    this.add(verticalOffsetRow);
+    const horizontalOffsetRow = new HorizontalOffsetRow(settings, {
+      title: t("Horizontal Offset (X)"),
+      subtitle: t("Shift Left (-) or Right (+)")
+    });
+    this.add(horizontalOffsetRow);
   }
 };
-GObject81.registerClass(_PositioningGroup);
+GObject82.registerClass(_PositioningGroup);
 var PositioningGroup = _PositioningGroup;
 
+// src/ui/preferences/style-page/dimensions-group/index.ts
+import Adw86 from "gi://Adw";
+import GObject86 from "gi://GObject";
+
+// src/ui/preferences/style-page/dimensions-group/components/album-art-size-row.ts
+import Adw83 from "gi://Adw";
+import Gtk70 from "gi://Gtk";
+import GObject83 from "gi://GObject";
+var _AlbumArtSizeRow = class _AlbumArtSizeRow extends Adw83.ActionRow {
+  constructor(settings, props) {
+    super(props);
+    const albumArtSizeRow = new Adw83.SpinRow({
+      adjustment: new Gtk70.Adjustment({ lower: 16, upper: 48, step_increment: 1 })
+    });
+    settings.pill.bind("albumArtSize", albumArtSizeRow, "value");
+    this.add_suffix(albumArtSizeRow);
+  }
+};
+GObject83.registerClass(_AlbumArtSizeRow);
+var AlbumArtSizeRow = _AlbumArtSizeRow;
+
+// src/ui/preferences/style-page/dimensions-group/components/widget-width-row.ts
+import Adw84 from "gi://Adw";
+import Gtk71 from "gi://Gtk";
+import GObject84 from "gi://GObject";
+var _WidgetWidthRow = class _WidgetWidthRow extends Adw84.ActionRow {
+  constructor(settings, props) {
+    super(props);
+    const dockWidthRow = new Adw84.SpinRow({
+      adjustment: new Gtk71.Adjustment({ lower: 100, upper: 600, step_increment: 10 })
+    });
+    settings.pill.bind("dockWidth", dockWidthRow, "value");
+    this.add_suffix(dockWidthRow);
+  }
+};
+GObject84.registerClass(_WidgetWidthRow);
+var WidgetWidthRow = _WidgetWidthRow;
+
+// src/ui/preferences/style-page/dimensions-group/components/widget-height-row.ts
+import Adw85 from "gi://Adw";
+import Gtk72 from "gi://Gtk";
+import GObject85 from "gi://GObject";
+var _WidgetHeightRow = class _WidgetHeightRow extends Adw85.ActionRow {
+  constructor(settings, props) {
+    super(props);
+    const dockHeightRow = new Adw85.SpinRow({
+      adjustment: new Gtk72.Adjustment({ lower: 32, upper: 100, step_increment: 4 })
+    });
+    settings.pill.bind("dockHeight", dockHeightRow, "value");
+    this.add_suffix(dockHeightRow);
+  }
+};
+GObject85.registerClass(_WidgetHeightRow);
+var WidgetHeightRow = _WidgetHeightRow;
+
+// src/ui/preferences/style-page/dimensions-group/index.ts
+var _DimensionsGroup = class _DimensionsGroup extends Adw86.PreferencesGroup {
+  constructor(settings, properties, ...args) {
+    super(properties, args);
+    const albumArtSizeRow = new AlbumArtSizeRow(settings, {
+      title: t("Album Art Size")
+    });
+    this.add(albumArtSizeRow);
+    const widgetWidthRow = new WidgetWidthRow(settings, {
+      title: t("Widget Width")
+    });
+    this.add(widgetWidthRow);
+    const widgetHeightRow = new WidgetHeightRow(settings, {
+      title: t("Widget Height")
+    });
+    this.add(widgetHeightRow);
+  }
+};
+GObject86.registerClass(_DimensionsGroup);
+var DimensionsGroup = _DimensionsGroup;
+
+// src/ui/preferences/style-page/custom-colors/index.ts
+import Adw90 from "gi://Adw";
+import GObject90 from "gi://GObject";
+
+// src/ui/preferences/style-page/custom-colors/components/sync-accent-row.ts
+import Adw87 from "gi://Adw";
+import Gtk73 from "gi://Gtk";
+import GObject87 from "gi://GObject";
+var _SyncAccentRow = class _SyncAccentRow extends Adw87.ActionRow {
+  constructor(settings, props, ...args) {
+    super(props, args);
+    const syncAccentRow = new Gtk73.Switch({
+      active: settings.style.syncAccentColor,
+      valign: Gtk73.Align.CENTER
+    });
+    settings.style.bind("syncAccentColor", syncAccentRow, "active");
+    this.add_suffix(syncAccentRow);
+  }
+};
+GObject87.registerClass(_SyncAccentRow);
+var SyncAccentRow = _SyncAccentRow;
+
+// src/ui/preferences/style-page/custom-colors/components/use-custom-colors-row.ts
+import Adw88 from "gi://Adw";
+import Gtk74 from "gi://Gtk";
+import Gio2 from "gi://Gio";
+import GObject88 from "gi://GObject";
+var _UseCustomColorsRow = class _UseCustomColorsRow extends Adw88.ActionRow {
+  constructor(settings, props, ...args) {
+    super(props, args);
+    const useCustomColorsRow = new Gtk74.Switch({
+      active: settings.style.useCustomColors,
+      valign: Gtk74.Align.CENTER
+    });
+    settings.style.bind("useCustomColors", useCustomColorsRow, "active");
+    settings.style.bind("syncAccentColor", this, "sensitive", Gio2.SettingsBindFlags.DEFAULT | Gio2.SettingsBindFlags.INVERT_BOOLEAN);
+    this.add_suffix(useCustomColorsRow);
+  }
+};
+GObject88.registerClass(_UseCustomColorsRow);
+var UseCustomColorsRow = _UseCustomColorsRow;
+
+// src/ui/preferences/style-page/custom-colors/components/color-button-row.ts
+import Adw89 from "gi://Adw";
+import Gtk75 from "gi://Gtk";
+import Gdk from "gi://Gdk";
+import GObject89 from "gi://GObject";
+var _ColorButtonRow = class _ColorButtonRow extends Adw89.ActionRow {
+  constructor(settings, settingsKey, props, ...args) {
+    super(props, args);
+    const cStr = settings.style[settingsKey].split(",");
+    const c = new Gdk.RGBA();
+    c.parse(`rgb(${cStr[0] || 40},${cStr[1] || 40},${cStr[2] || 40})`);
+    const btn = new Gtk75.ColorButton({
+      rgba: c,
+      use_alpha: false,
+      valign: Gtk75.Align.CENTER
+    });
+    btn.connect("color-set", () => {
+      const rgba = btn.get_rgba();
+      const colorStr = `${Math.round(rgba.red * 255)},${Math.round(rgba.green * 255)},${Math.round(rgba.blue * 255)}`;
+      settings.style[settingsKey] = colorStr;
+    });
+    settings.style.connect(`changed::${settingsKey}`, () => {
+      const cStr2 = settings.style[settingsKey].split(",");
+      const c2 = new Gdk.RGBA();
+      c2.parse(`rgb(${cStr2[0] || 40},${cStr2[1] || 40},${cStr2[2] || 40})`);
+      btn.set_rgba(c2);
+    });
+    this.add_suffix(btn);
+    settings.style.bind("syncAccentColor", this, "sensitive");
+    settings.style.bind("useCustomColors", this, "sensitive");
+  }
+};
+GObject89.registerClass(_ColorButtonRow);
+var ColorButtonRow = _ColorButtonRow;
+
+// src/ui/preferences/style-page/custom-colors/index.ts
+var _CustomColorsGroup = class _CustomColorsGroup extends Adw90.PreferencesGroup {
+  constructor(settings, properties, ...args) {
+    super(properties, args);
+    const syncAccentRow = new SyncAccentRow(settings, {
+      title: t("Sync GNOME Accent Color"),
+      subtitle: t("Dynamically change the GNOME Shell accent color to match the album art")
+    });
+    this.add(syncAccentRow);
+    const useCustomColorsRow = new UseCustomColorsRow(settings, {
+      title: t("Use Custom Colors"),
+      subtitle: t("Override dynamic colors")
+    });
+    this.add(useCustomColorsRow);
+    const customBgColorRow = new ColorButtonRow(settings, "customBgColor", {
+      title: t("Background Color")
+    });
+    this.add(customBgColorRow);
+    const customTextColorRow = new ColorButtonRow(settings, "customTextColor", {
+      title: t("Text Color")
+    });
+    this.add(customTextColorRow);
+  }
+};
+GObject90.registerClass(_CustomColorsGroup);
+var CustomColorsGroup = _CustomColorsGroup;
+
 // src/ui/preferences/style-page/index.ts
-var _StylePage = class _StylePage extends Adw82.PreferencesPage {
+var _StylePage = class _StylePage extends Adw91.PreferencesPage {
   constructor(settings, properties, ...args) {
     super(properties, args);
     const lookGroup = new LookGroup(settings, {
@@ -1966,19 +2170,27 @@ var _StylePage = class _StylePage extends Adw82.PreferencesPage {
       title: t("Positioning")
     });
     this.add(positioningGroup);
+    const dimensionsGroup = new DimensionsGroup(settings, {
+      title: t("Dimensions (Dock Mode)")
+    });
+    this.add(dimensionsGroup);
+    const customColorsGroup = new CustomColorsGroup(settings, {
+      title: t("Custom Colors")
+    });
+    this.add(customColorsGroup);
   }
 };
-GObject82.registerClass(_StylePage);
+GObject91.registerClass(_StylePage);
 var StylePage = _StylePage;
 
 // src/providers/settings-provider/utils.ts
-import Gio2 from "gi://Gio";
+import Gio3 from "gi://Gio";
 function createSettingsMap(map8) {
   return map8;
 }
 function createSettingsGroup(settings, map8) {
   const methods = {
-    bind(prop, object, property, flags = Gio2.SettingsBindFlags.DEFAULT) {
+    bind(prop, object, property, flags = Gio3.SettingsBindFlags.DEFAULT) {
       settings.bind(
         map8[prop].key,
         object,
@@ -2131,6 +2343,18 @@ var map3 = createSettingsMap({
   horizontalOffset: {
     key: "horizontal-offset",
     default: 0
+  },
+  albumArtSize: {
+    key: "dock-art-size",
+    default: 16
+  },
+  dockWidth: {
+    key: "pill-width",
+    default: 100
+  },
+  dockHeight: {
+    key: "pill-height",
+    default: 32
   }
 });
 function createPillSettings(settings) {
@@ -2363,6 +2587,22 @@ var map7 = createSettingsMap({
   targetContainer: {
     key: "target-container",
     default: 0
+  },
+  syncAccentColor: {
+    key: "sync-accent-color",
+    default: false
+  },
+  useCustomColors: {
+    key: "use-custom-colors",
+    default: false
+  },
+  customBgColor: {
+    key: "custom-bg-color",
+    default: "40,40,40"
+  },
+  customTextColor: {
+    key: "custom-text-color",
+    default: "40,40,40"
   }
 });
 function createStyleSettings(settings) {

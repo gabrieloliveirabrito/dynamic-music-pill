@@ -17,5 +17,7 @@ export class ShadowBlurRow extends Adw.ActionRow {
         });
         settings.pill.bind('shadowBlur', shadowBlurRow, 'value');
         this.add_suffix(shadowBlurRow);
+
+        settings.pill.bind("enableShadow", this, "sensitive");
     }
 }

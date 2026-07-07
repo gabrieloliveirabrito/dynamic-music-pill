@@ -58,6 +58,22 @@ const map = createSettingsMap({
         key: 'target-container',
         default: 0
     },
+    syncAccentColor: {
+        key: 'sync-accent-color',
+        default: false
+    },
+    useCustomColors: {
+        key: 'use-custom-colors',
+        default: false
+    },
+    customBgColor: {
+        key: 'custom-bg-color',
+        default: '40,40,40'
+    },
+    customTextColor: {
+        key: 'custom-text-color',
+        default: '40,40,40'
+    }
 });
 
 export type StyleSettingsSchema = SchemaKey<typeof map>
