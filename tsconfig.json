@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "src/*"
+      ]
+    },
+    "strict": true,
+    "skipLibCheck": true,
+    "outDir": "dist",
+    "lib": [
+      "ES2017"
+    ],
+    "types": [
+      "node"
+    ],
+    "noEmit": true,
+    "ignoreDeprecations": "6.0",
+    "typeRoots": [
+      "./node_modules/@types",
+      "./node_modules/@girs"
+    ]
+  },
+  "include": [
+    "src",
+    "./node_modules/@girs/**/*.d.ts"
+  ]
+}

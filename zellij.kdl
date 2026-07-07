@@ -1,0 +1,88 @@
+theme "dracula"
+default_mode "normal"
+copy_command "wl-copy"
+
+pane_frames false
+pane_frames_hide_session_name true
+
+mouse_mode true
+scroll_buffer_size 5000
+
+keybinds {
+  normal {
+    unbind "Ctrl c"
+    unbind "Ctrl r"
+    unbind "Ctrl s"
+    unbind "Ctrl d"
+
+    unbind "Ctrl z"
+    unbind "Ctrl l"
+
+    bind "Alt h" { MoveFocus "Left"; }
+    bind "Alt j" { MoveFocus "Down"; }
+    bind "Alt k" { MoveFocus "Up"; }
+    bind "Alt l" { MoveFocus "Right"; }
+
+    bind "Alt n" { NewPane; }
+
+    bind "Alt t" { NewTab; }
+    bind "Alt q" { Quit; }
+  }
+
+  pane {
+    unbind "Ctrl c"
+    unbind "Ctrl r"
+    unbind "Ctrl s"
+    unbind "Ctrl d"
+  }
+
+  tab {
+    unbind "Ctrl c"
+    unbind "Ctrl r"
+    unbind "Ctrl s"
+    unbind "Ctrl d"
+  }
+
+  resize {
+    unbind "Ctrl c"
+    unbind "Ctrl r"
+    unbind "Ctrl s"
+    unbind "Ctrl d"
+  }
+
+  move {
+    unbind "Ctrl c"
+    unbind "Ctrl r"
+    unbind "Ctrl s"
+    unbind "Ctrl d"
+  }
+}
+
+layout {
+    default_tab_template {
+        pane size=1 borderless=true {
+            plugin location="zellij:tab-bar"
+        }
+
+        children
+
+        pane size=2 borderless=true {
+            plugin location="zellij:status-bar"
+        }
+    }
+    
+    tab name="Dev" {
+        pane name="Project" {
+            command "bash"
+            args "-c" "trap 'kill -TERM 0' SIGINT SIGTERM; pnpm dev"
+        }
+    }
+
+    tab name="Git" {
+        pane name="LazyGit" command="lazygit"
+    }
+
+    tab name="Terminal" {
+        pane name="Commands" command="zsh"
+    }
+}

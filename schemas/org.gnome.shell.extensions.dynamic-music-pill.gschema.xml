@@ -48,6 +48,17 @@
       <default>false</default>
       <summary>Show player selector in pop-up</summary>
     </key>
+    <key name="hide-auto-smart-selection" type="b">
+      <default>false</default>
+      <summary>Hide Auto (Smart Selection)</summary>
+      <description>Remove the automatic player selection entry from the player selector menu.</description>
+    </key>
+    <key name="popup-player-selector-position" type="i">
+      <default>0</default>
+      <range min="0" max="3"/>
+      <summary>Player Selector Position</summary>
+      <description>Position of the player selector in the pop-up: 0=Top, 1=Bottom, 2=Left, 3=Right</description>
+    </key>
     <key name="popup-follow-custom-bg" type="b">
       <default>false</default>
       <summary>Popup Follows Custom Background Color</summary>
@@ -189,6 +200,12 @@
       <summary>Tablet Controls Mode</summary>
       <description>0: Off, 1: Skip Only, 2: Play/Pause Only, 3: All Controls</description>
     </key>
+    <key name="pill-controls-position" type="i">
+      <default>0</default>
+      <range min="0" max="2"/>
+      <summary>Pill Controls Position</summary>
+      <description>Position of tablet controls in the pill: 0=Before Text, 1=After Text (before visualizer), 2=After Visualizer</description>
+    </key>
     <key name="popup-hide-on-leave" type="b">
       <default>false</default>
       <summary>Hide popup when mouse leaves</summary>
@@ -197,6 +214,11 @@
     <key name="inline-artist" type="b">
       <default>true</default>
       <summary>Append artist to title when squeezed</summary>
+    </key>
+    <key name="show-artist" type="b">
+      <default>true</default>
+      <summary>Show Artist</summary>
+      <description>Show the artist name in the main music pill.</description>
     </key>
 
     <key name="dock-art-size" type="i">
@@ -221,6 +243,11 @@
       <default>false</default>
       <summary>Scroll Text Only on Hover</summary>
       <description>When enabled, text only scrolls while hovering over the pill.</description>
+    </key>
+    <key name="freeze-scroll-on-pause" type="b">
+      <default>false</default>
+      <summary>Freeze Scroll on Pause</summary>
+      <description>Stop the text scrolling animation when the media player is paused.</description>
     </key>
     <key name="enable-transparency" type="b">
       <default>false</default>
