@@ -6,7 +6,6 @@ import { t } from "@/utils/translate";
 import { EnableTransparencyRow } from "./components/enable-transparency-row";
 import { ArtTransparencyRow } from "./components/art-transparency-row";
 import { BackgroundOpacityRow } from "./components/background-opacity-row";
-import { MainPillShadowRow } from "./components/main-pill-shadow-row";
 import { TextTransparencyRow } from "./components/text-transparency-row";
 import { VisualizerTransparencyRow } from "./components/visualizer-transparency-row";
 
@@ -44,10 +43,5 @@ export class BackgroundTransparencyGroup extends Adw.PreferencesGroup {
             title: t("Apply to Visualizer")
         });
         this.add(visualizerTransparencyRow);
-
-        const mainPillShadowRow = new MainPillShadowRow(settings, {
-            title: t("Main Pill Shadow")
-        });
-        this.add(mainPillShadowRow);
     }
 }

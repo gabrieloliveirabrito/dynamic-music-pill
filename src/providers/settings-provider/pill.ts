@@ -61,6 +61,18 @@ const map = createSettingsMap({
     horizontalOffset: {
         key: "horizontal-offset",
         default: 0
+    },
+    albumArtSize: {
+        key: "dock-art-size",
+        default: 16
+    },
+    dockWidth: {
+        key: "pill-width",
+        default: 100
+    },
+    dockHeight: {
+        key: "pill-height",
+        default: 32
     }
 })
 

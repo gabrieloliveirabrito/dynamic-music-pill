@@ -7,6 +7,8 @@ import { t } from "@/utils/translate";
 import { BackgroundTransparencyGroup } from "./background-transparency";
 import { ShadowGroup } from "./shadow-group";
 import { PositioningGroup } from "./positioning-group";
+import { DimensionsGroup } from "./dimensions-group";
+import { CustomColorsGroup } from "./custom-colors";
 
 export class StylePage extends Adw.PreferencesPage {
     static {
@@ -35,5 +37,15 @@ export class StylePage extends Adw.PreferencesPage {
             title: t("Positioning")
         });
         this.add(positioningGroup);
+
+        const dimensionsGroup = new DimensionsGroup(settings, {
+            title: t("Dimensions (Dock Mode)")
+        });
+        this.add(dimensionsGroup);
+
+        const customColorsGroup = new CustomColorsGroup(settings, {
+            title: t("Custom Colors")
+        });
+        this.add(customColorsGroup);
     }
 }
