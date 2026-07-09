@@ -6,6 +6,7 @@ import { createLyricsSettings, LyricsSettingsType } from "./lyrics"
 import { createMouseActions, MouseActionsType } from "./mouse-actions"
 import { createPopupSettings, PopupSettingsType } from "./popup"
 import { createStyleSettings, StyleSettingsSchema, StyleSettingsType } from "./style"
+import { createSystemSettings, SystemSettingsType } from "./system"
 
 export type SettingsProvider = {
     connect: <K extends keyof Gio.Settings.SignalSignatures>(signal: K, callback: Gio.Settings.SignalSignatures[K]) => number,
@@ -15,7 +16,8 @@ export type SettingsProvider = {
     lyrics: LyricsSettingsType,
     mouseActions: MouseActionsType,
     popup: PopupSettingsType,
-    style: StyleSettingsType
+    style: StyleSettingsType,
+    system: SystemSettingsType
 }
 
 export function createSettingsProvider(settings: Gio.Settings): SettingsProvider {
@@ -26,6 +28,7 @@ export function createSettingsProvider(settings: Gio.Settings): SettingsProvider
     const mouseActions = createMouseActions(settings);
     const popup = createPopupSettings(settings);
     const style = createStyleSettings(settings);
+    const system = createSystemSettings(settings);
 
     function connect<K extends keyof Gio.Settings.SignalSignatures>(signal: K, callback: Gio.Settings.SignalSignatures[K]): number {
         return settings.connect(signal, callback);
@@ -39,7 +42,8 @@ export function createSettingsProvider(settings: Gio.Settings): SettingsProvider
         lyrics,
         mouseActions,
         popup,
-        style
+        style,
+        system
     }
 }
 
