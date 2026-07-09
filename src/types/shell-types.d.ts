@@ -9,3 +9,5 @@ export type PreferencesGroupProps = Partial<Adw.PreferencesGroup.ConstructorProp
 export type ActionRowProps = Partial<Adw.ActionRow.ConstructorProps>;
 export type ComboRowProps = Partial<Adw.ComboRow.ConstructorProps>;
 export type SpinRowProps = Partial<Adw.SpinRow.ConstructorProps>;
+export type EntryRowProps = Partial<Adw.EntryRow.ConstructorProps>;
+export type ExpanderRowProps = Partial<Adw.ExpanderRow.ConstructorProps>;
