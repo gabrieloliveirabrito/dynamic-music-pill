@@ -53,9 +53,7 @@ function stopGnome() {
 function startGnome() {
     console.log("🚀 Starting GNOME sandbox...");
 
-    gnomeProcess = spawn(
-        "dbus-run-session",
-        ["bash", "-c", "./runner.sh"],
+    gnomeProcess = spawn("bash", ["-c", "./mutter.sh"],
         {
             stdio: ["ignore", "pipe", "pipe"],
         }
@@ -145,7 +143,7 @@ async function main() {
     });
 
     const watcher = chokidar.watch([
-        "src", "schemas", "locales", "metadata.json"
+        "src", "locales", "metadata.json"
     ], {
         ignoreInitial: true,
     });
