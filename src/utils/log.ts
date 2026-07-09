@@ -1,13 +1,15 @@
+import GLib from "gi://GLib";
 import { LogConstants } from "@/constants";
+import { smartUnpack } from "./packing";
 
 const PREFIX = LogConstants.LOG_PREFIX;
 
 export function logInfo(message: string): void {
-    console.log(`${PREFIX} ${message}`);
+    console.log(`${PREFIX} [INFO] ${message}`);
 }
 
 export function logWarning(message: string): void {
-    console.warn(`${PREFIX} ${message}`);
+    console.warn(`${PREFIX} [WARNING] ${message}`);
 }
 
 export function logDebug(message: string): void {
@@ -15,7 +17,7 @@ export function logDebug(message: string): void {
 }
 
 export function logError(message: unknown): void {
-    console.error(`${PREFIX} ${message}`);
+    console.error(`${PREFIX} [ERROR] ${message}`);
 
     if (message instanceof Error) {
         console.error(`${PREFIX} Stack trace: ${message.stack}`);
@@ -23,10 +25,11 @@ export function logError(message: unknown): void {
 }
 
 export function logTrace(message: string) {
-    console.trace(`${PREFIX} ${message}`);
+    console.trace(`${PREFIX} [TRACE] ${message}`);
 }
 
-export function logObject(object: any | null | undefined): void {
+export function logObject(object: any | null | undefined, level: string = ""): void {
+    const nextLevel = `${level}-`;
     if (object === null) {
         logTrace("Object is null");
         return;
@@ -37,12 +40,36 @@ export function logObject(object: any | null | undefined): void {
         return;
     }
 
-    let inspected = JSON.stringify(object, (key, value) => {
-        if (value && value.deep_unpack) {
-            return value.deep_unpack();
-        }
+    if (object instanceof GLib.Variant) {
+        logObject(smartUnpack(object), nextLevel);
+        return;
+    }
 
-        return value;
-    })
-    logInfo(`Inspecting object ${inspected}`);
+    if (typeof object === 'string') {
+        logTrace(`${level} String ${object}`);
+        return;
+    }
+
+    if (typeof object === 'number') {
+        logTrace(`${level} Number ${object}`);
+        return;
+    }
+
+    if (typeof object === 'boolean') {
+        logTrace(`${level} Boolean ${object}`);
+        return;
+    }
+
+    if (Array.isArray(object)) {
+        for (const item of object) {
+            logObject(item, nextLevel);
+        }
+        return;
+    }
+    
+    const variant = object.deep_unpack ? smartUnpack(object) : object;    
+    const keys = Object.keys(variant);
+    keys.forEach(key => {
+        logTrace(`${nextLevel}${key} = ${smartUnpack(variant[key])}`);
+    });
 }
