@@ -1,5 +1,5 @@
 import Gio from "gi://Gio"
-import { createSettingsGroup, createSettingsMap, SchemaKey, SettingsGroup } from "./utils";
+import { createSettingsGroup, createSettingsMap, getSettingsKeys, SchemaKey, SettingsGroup } from "./utils";
 
 const map = createSettingsMap({
     enabled: {
@@ -33,7 +33,8 @@ const map = createSettingsMap({
 })
 
 export type ScrollControlSettingsType = SettingsGroup<typeof map>;
-export type ScrollControlSettingsSchema = SchemaKey<typeof map>
+export type ScrollControlSettingsSchema = SchemaKey<typeof map>;
+export const ScrollControlSettingsKeys = getSettingsKeys(map);
 
 export function createScrollControlsSettings(settings: Gio.Settings) {
     return createSettingsGroup(settings, map);

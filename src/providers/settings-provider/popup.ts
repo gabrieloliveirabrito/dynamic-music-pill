@@ -1,4 +1,4 @@
-import { createSettingsMap, createSettingsGroup, SchemaKey, SettingsGroup } from "./utils";
+import { createSettingsMap, createSettingsGroup, SchemaKey, SettingsGroup, getSettingsKeys } from "./utils";
 import Gio from "gi://Gio";
 
 const map = createSettingsMap({
@@ -114,6 +114,7 @@ const map = createSettingsMap({
 
 export type PopupSettingsSchema = SchemaKey<typeof map>
 export type PopupSettingsType = SettingsGroup<typeof map>
+export const PopupSettingsKeys = getSettingsKeys(map);
 
 export function createPopupSettings(settings: Gio.Settings): PopupSettingsType {
     return createSettingsGroup(settings, map);

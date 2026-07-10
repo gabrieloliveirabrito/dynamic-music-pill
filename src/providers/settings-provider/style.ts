@@ -1,5 +1,5 @@
 import Gio from "gi://Gio";
-import { createSettingsGroup, createSettingsMap, SchemaKey, SettingsGroup } from "./utils";
+import { createSettingsGroup, createSettingsMap, getSettingsKeys, SchemaKey, SettingsGroup } from "./utils";
 
 const map = createSettingsMap({
     visualizerAnimation: {
@@ -78,6 +78,7 @@ const map = createSettingsMap({
 
 export type StyleSettingsSchema = SchemaKey<typeof map>
 export type StyleSettingsType = SettingsGroup<typeof map>
+export const StyleSettingsKeys = getSettingsKeys(map);
 
 export function createStyleSettings(settings: Gio.Settings): StyleSettingsType {
     return createSettingsGroup(settings, map);

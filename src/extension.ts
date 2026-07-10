@@ -8,6 +8,7 @@ import { createMPRISProvider } from "./providers/mpris-provider";
 import { createMockMPRISProvider } from "./providers/mock";
 import { AppContext } from "./types/app-context";
 import { createSettingsProvider, SettingsProvider } from "./providers/settings-provider";
+import { loadEnv } from "./utils/env";
 
 /**
  * Global variable to store the extension instance
@@ -54,6 +55,8 @@ export default class DynamicMusicPillExtension extends Extension {
     constructor(metadata: MetadataJson) {
         super(metadata)
         instance = this;
+
+        loadEnv();
 
         this.initTranslations("dynamic-music-pill");
 
