@@ -10,6 +10,8 @@ import { AppMappingGroup } from "./aps-mapping-group";
 import { DBusProvider } from "@/providers/dbus-provider";
 import { RunningPlayersGroup } from "./running-players-group";
 import { BackupGroup } from "./backup-group";
+import { CacheGroup } from "./cache-group";
+import { DangerGroup } from "./danger-group";
 
 export class SystemPage extends Adw.PreferencesPage {
     static {
@@ -47,9 +49,19 @@ export class SystemPage extends Adw.PreferencesPage {
         this.add(activePlayersGroup);
 
         const backupGroup = new BackupGroup(settings, {
-            title: t('Backup and Restore Settings')
+            title: t('Backup & Restore')
         });
         this.add(backupGroup);
+
+        const cacheGroup = new CacheGroup(settings, {
+            title: t('Album Art Cache')
+        });
+        this.add(cacheGroup);
+
+        const dangerGroup = new DangerGroup(settings, {
+            title: t('Danger Zone')
+        });
+        this.add(dangerGroup);
     }
 
     get isRefreshingPlayers(): boolean {
