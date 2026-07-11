@@ -2,7 +2,7 @@ import Gio from "gi://Gio";
 import { getDBusSessionAddress } from "@/utils/development";
 import { smartUnpack } from "@/utils/packing";
 import { MPRIS_INTERFACE, PLAYER_INTERFACE } from "@/constants/mpris-constants";
-import { logInfo, logObject } from "@/utils/log";
+import { logDebug, logInfo, logObject } from "@/utils/log";
 
 export interface DBusProvider {
     listNames(): string[];
@@ -11,11 +11,10 @@ export interface DBusProvider {
 
 export function createDBusProvider(): DBusProvider {
     const address = getDBusSessionAddress();
-    logInfo(`DBus address: ${address}`);
+    logDebug(`Creating DBus connection for address: ${address}`);
 
     const flags = Gio.DBusConnectionFlags.AUTHENTICATION_CLIENT | Gio.DBusConnectionFlags.MESSAGE_BUS_CONNECTION;
-    const connection = Gio.DBusConnection.new_for_address_sync(address, flags, null, null);
-    
+    const connection = Gio.DBusConnection.new_for_address_sync(address, flags, null, null);    
 
     function listNames() {
         const result = connection.call_sync(
@@ -31,7 +30,7 @@ export function createDBusProvider(): DBusProvider {
 
         const names = smartUnpack(result)[0];
         logInfo(`Names: ${names.filter((name: string) => name.startsWith(`${PLAYER_INTERFACE}`)).join(", ")}`);
-        
+
         return names.filter((name: string) => name.startsWith(`${PLAYER_INTERFACE}.`));
     }
 

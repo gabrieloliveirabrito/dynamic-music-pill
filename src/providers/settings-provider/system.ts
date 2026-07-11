@@ -1,5 +1,5 @@
 import Gio from "gi://Gio";
-import { createSettingsMap, createSettingsGroup, SchemaKey, SettingsGroup } from "./utils";
+import { createSettingsMap, createSettingsGroup, SchemaKey, SettingsGroup, getSettingsKeys } from "./utils";
 
 const map = createSettingsMap({
     hideDefaultPlayer: {
@@ -30,6 +30,7 @@ const map = createSettingsMap({
 
 export type SystemSettingsSchema = SchemaKey<typeof map>
 export type SystemSettingsType = SettingsGroup<typeof map>
+export const SystemSettingsKeys = getSettingsKeys(map);
 
 export function createSystemSettings(settings: Gio.Settings): SystemSettingsType {
     return createSettingsGroup(settings, map);

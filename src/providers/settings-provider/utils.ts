@@ -64,6 +64,10 @@ export function createSettingsMap<const T extends SettingsMap>(map: T): T {
     return map;
 }
 
+export function getSettingsKeys<TMap extends SettingsMap>(map: TMap): string[] {
+    return Object.values(map).map(entry => entry.key);
+}
+
 export function createSettingsGroup<TMap extends SettingsMap>(
     settings: Gio.Settings,
     map: TMap,

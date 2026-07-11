@@ -1,5 +1,5 @@
 import Gio from "gi://Gio"
-import { createSettingsMap, SchemaKey, SettingsGroup, createSettingsGroup } from "./utils"
+import { createSettingsMap, SchemaKey, SettingsGroup, createSettingsGroup, getSettingsKeys } from "./utils"
 
 const map = createSettingsMap({
     leftClick: {
@@ -30,6 +30,7 @@ const map = createSettingsMap({
 
 export type MouseActionsSchema = SchemaKey<typeof map>
 export type MouseActionsType = SettingsGroup<typeof map>
+export const MouseActionsKeys = getSettingsKeys(map);
 
 export function createMouseActions(settings: Gio.Settings) {
     return createSettingsGroup(settings, map)

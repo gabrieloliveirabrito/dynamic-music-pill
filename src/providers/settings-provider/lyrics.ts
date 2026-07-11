@@ -1,5 +1,5 @@
 import Gio from "gi://Gio"
-import { createSettingsMap, createSettingsGroup, SchemaKey, SettingsGroup } from "./utils";
+import { createSettingsMap, createSettingsGroup, SchemaKey, SettingsGroup, getSettingsKeys } from "./utils";
 
 const map = createSettingsMap({
     enable: {
@@ -22,6 +22,7 @@ const map = createSettingsMap({
 
 export type LyricsSettingsType = SettingsGroup<typeof map>;
 export type LyricsSettingsSchema = SchemaKey<typeof map>
+export const LyricsSettingsKeys = getSettingsKeys(map);
 
 export function createLyricsSettings(settings: Gio.Settings) {
     return createSettingsGroup(settings, map);

@@ -1,0 +1,206 @@
+[
+    {
+      "version": "1.2.0 - Latest Update",
+      "subtitle": "New Features & Bug Fixes",
+      "expanded": true,
+      "sections": [
+        {
+          "title": "✨ New Features",
+          "items": [
+            "Added a new toggle 'Show artist'.",
+            "Tablet mode buttons with new positions.",
+            "Option to move the Media Source buttons to another placement.",
+            "Added a toggle to hide Auto (Smart Selection).",
+            "Parallelized lyric fetching requests.",
+            "Updated translations.",
+            "Added an option to pause text scrolling while playback is paused."
+          ]
+        },
+        {
+          "title": "🐛 Bug Fixes",
+          "items": [
+            "Fixed the artist name being cropped in Panel Mode.",
+            "Fixed the artist name and song title not displaying correctly on startup."
+          ]
+        }
+      ]
+    },
+    {
+      "version": "1.1.0",
+      "subtitle": "Custom Buttons & Bug Fixes",
+      "expanded": false,
+      "sections": [
+        {
+          "title": "✨ New Features",
+          "items": [
+            "Added a 'Scroll Action' mode for fast-forward and rewind.",
+            "Added per-app volume control.",
+            "Restored the original GNOME accent color after the player closes."
+          ]
+        },
+        {
+          "title": "🐛 Bug Fixes",
+          "items": [
+            "Fixed a crash in the Lyrics view.",
+            "Fixed a Telegram integration crash."
+          ]
+        }
+      ]
+    },
+    {
+      "version": "1.0.0",
+      "subtitle": "Custom Buttons & Bug Fixes",
+      "expanded": false,
+      "sections": [
+        {
+          "title": "✨ New Features",
+          "items": [
+            "Added up to two customizable control buttons to the pop-up (Volume, Seek, Audio Output, Sleep Timer, Playback Speed or Recently Played).",
+            "Added a first-time hint suggesting users explore additional settings.",
+            "Added a setting to scroll long text only while hovering over the pill."
+          ]
+        },
+        {
+          "title": "🐛 Bug Fixes",
+          "items": [
+            "Fixed GNOME Shell freezes caused by unexpected metadata states.",
+            "Fixed History displaying incorrect album art for slow players and preventing duplicate entries.",
+            "Fixed Dash to Dock autohide breaking after locking and unlocking the screen.",
+            "Fixed duplicate pills occasionally appearing after unlock.",
+            "Fixed duplicate title and artist display.",
+            "Fixed the visualizer not updating correctly when switching between Pill and Pop-up modes.",
+            "Fixed the History scroll area becoming covered and unclickable.",
+            "Fixed the first-time hint buttons (Settings and Close) not responding."
+          ]
+        }
+      ]
+    },
+    {
+      "version": "V29",
+      "subtitle": "Real-Time Visualizer, App Mapping & Major Fixes",
+      "expanded": false,
+      "sections": [
+        {
+          "title": "✨ New Features",
+          "items": [
+            "Added a CAVA-powered real-time audio visualizer.",
+            "Added Accent Color Sync based on the current album artwork.",
+            "Added manual App ID mapping for unsupported players.",
+            "Introduced multi-language support.",
+            "Implemented a shared visualizer engine for better performance.",
+            "Added an internal cache system."
+          ]
+        },
+        {
+          "title": "🎨 Customization & Enhancements",
+          "items": [
+            "Added advanced visualizer customization (bars, width, height, margin and border radius).",
+            "Added adjustable fade animations for lyrics and scrolling text.",
+            "Added dedicated Tablet Mode controls and touchscreen improvements.",
+            "Added vinyl rotation speed and automatic pop-up hide options.",
+            "Added dynamic width with crossfade and an Outer Edge Margin setting."
+          ]
+        },
+        {
+          "title": "🐛 Bug Fixes",
+          "items": [
+            "Fixed blurry album art and text inside the pop-up.",
+            "Fixed background colors not updating correctly from album artwork.",
+            "Fixed selecting a paused player hiding the pill and breaking the player selector.",
+            "Fixed Spotify window detection when closing.",
+            "Fixed the microphone activating while using the CAVA visualizer.",
+            "Fixed floating menu alignment with Dash to Dock.",
+            "Fixed Dash to Dock alignment when changing icon positions.",
+            "Fixed Strawberry album artwork not loading correctly."
+          ]
+        }
+      ]
+    },
+    {
+      "version": "V27",
+      "subtitle": "Small Features & Fixes",
+      "expanded": false,
+      "sections": [
+        {
+          "title": "✨ Improvements",
+          "items": [
+            "Added Double Click mouse action.",
+            "Added Always ON mode."
+          ]
+        },
+        {
+          "title": "🐛 Bug Fixes",
+          "items": [
+            "Fixed the seek bar becoming glitchy.",
+            "Fixed high CPU usage with Dash to Dock autohide mode."
+          ]
+        }
+      ]
+    },
+    {
+      "version": "V26",
+      "subtitle": "Dynamic Contrast & Readability Improvements",
+      "expanded": false,
+      "sections": [
+        {
+          "title": "✨ Improvements",
+          "items": [
+            "Added dynamic contrast for album art, text and controls.",
+            "Player Selector now follows custom color settings.",
+            "Applied dynamic contrast to the Player Selector.",
+            "Improved DBus player detection for names and icons."
+          ]
+        },
+        {
+          "title": "🐛 Bug Fixes",
+          "items": [
+            "Fixed pop-up resizing and jumping when Custom Width was enabled."
+          ]
+        }
+      ]
+    },
+    {
+      "version": "V25",
+      "subtitle": "Ubuntu Dock Support, UI Fixes & Stability",
+      "expanded": false,
+      "sections": [
+        {
+          "title": "✨ Improvements",
+          "items": [
+            "Added automatic vertical mode for side docks (Ubuntu Dock, etc.).",
+            "Improved seek bar synchronization.",
+            "Added a toggle to disable the Main Pill outline border."
+          ]
+        },
+        {
+          "title": "🐛 Bug Fixes",
+          "items": [
+            "Fixed the pill disappearing when moving the dock.",
+            "Fixed the pill hitbox."
+          ]
+        }
+      ]
+    },
+    {
+      "version": "V21-V23",
+      "subtitle": "Custom Colors & Player Selector",
+      "expanded": false,
+      "sections": [
+        {
+          "title": "✨ Improvements",
+          "items": [
+            "Added custom text and background colors.",
+            "Introduced the new Player Selector.",
+            "Added the Invert Scrolling option.",
+            "Added a new Hover mouse action."
+          ]
+        },
+        {
+          "title": "🐛 General",
+          "items": [
+            "Various bug fixes and performance improvements."
+          ]
+        }
+      ]
+    }
+  ]

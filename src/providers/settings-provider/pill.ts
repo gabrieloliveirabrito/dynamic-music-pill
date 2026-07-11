@@ -1,5 +1,5 @@
 import Gio from "gi://Gio"
-import { createSettingsGroup, createSettingsMap, SchemaKey, SettingsGroup } from "./utils";
+import { createSettingsGroup, createSettingsMap, getSettingsKeys, SchemaKey, SettingsGroup } from "./utils";
 
 const map = createSettingsMap({
     alwaysShow: {
@@ -78,6 +78,7 @@ const map = createSettingsMap({
 
 export type PillSettingsSchema = SchemaKey<typeof map>
 export type PillSettingsType = SettingsGroup<typeof map>
+export const PillSettingsKeys = getSettingsKeys(map);
 
 export function createPillSettings(settings: Gio.Settings) {
     return createSettingsGroup(settings, map);
