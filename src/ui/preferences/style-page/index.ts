@@ -9,6 +9,7 @@ import { ShadowGroup } from "./shadow-group";
 import { PositioningGroup } from "./positioning-group";
 import { DimensionsGroup } from "./dimensions-group";
 import { CustomColorsGroup } from "./custom-colors";
+import { PanelGroup } from "./panel-group";
 
 export class StylePage extends Adw.PreferencesPage {
     static {
@@ -42,6 +43,11 @@ export class StylePage extends Adw.PreferencesPage {
             title: t("Dimensions (Dock Mode)")
         });
         this.add(dimensionsGroup);
+
+        const panelGroup = new PanelGroup(settings, {
+            title: t("Dimensions (Panel Mode)")
+        });
+        this.add(panelGroup);
 
         const customColorsGroup = new CustomColorsGroup(settings, {
             title: t("Custom Colors")

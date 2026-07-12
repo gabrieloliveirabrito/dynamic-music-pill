@@ -28,41 +28,42 @@ export function logTrace(message: string) {
     console.trace(`${PREFIX} [TRACE] ${message}`);
 }
 
-export function logObject(object: any | null | undefined, level: string = ""): void {
+export function logObject(object: any | null | undefined, level: string = "", trace: boolean = false): void {
     const nextLevel = `${level}-`;
+    const logFn = trace ? logTrace : logInfo;
     if (object === null) {
-        logTrace("Object is null");
+        logFn(`${level} Object is null`);
         return;
     }
 
     if (object === undefined) {
-        logTrace("Object is undefined");
+        logFn(`${level} Object is undefined`);
         return;
     }
 
     if (object instanceof GLib.Variant) {
-        logObject(smartUnpack(object), nextLevel);
+        logObject(smartUnpack(object), nextLevel, trace);
         return;
     }
 
     if (typeof object === 'string') {
-        logTrace(`${level} String ${object}`);
+        logFn(`${level} String ${object}`);
         return;
     }
 
     if (typeof object === 'number') {
-        logTrace(`${level} Number ${object}`);
+        logFn(`${level} Number ${object}`);
         return;
     }
 
     if (typeof object === 'boolean') {
-        logTrace(`${level} Boolean ${object}`);
+        logFn(`${level} Boolean ${object}`);
         return;
     }
 
     if (Array.isArray(object)) {
         for (const item of object) {
-            logObject(item, nextLevel);
+            logObject(item, nextLevel, trace);
         }
         return;
     }
@@ -70,6 +71,7 @@ export function logObject(object: any | null | undefined, level: string = ""): v
     const variant = object.deep_unpack ? smartUnpack(object) : object;    
     const keys = Object.keys(variant);
     keys.forEach(key => {
-        logTrace(`${nextLevel}${key} = ${smartUnpack(variant[key])}`);
+        logFn(`${nextLevel} ${key}`);
+        logObject(variant[key], nextLevel, trace);
     });
 }

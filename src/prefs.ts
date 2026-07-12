@@ -1,9 +1,9 @@
 import { ExtensionPreferences } from "@girs/gnome-shell/extensions/prefs"
 import Adw from "gi://Adw";
-import { MainPage, PopupPage, StylePage, SystemPage } from "./ui/preferences";
+import { AboutPage, MainPage, PopupPage, StylePage, SystemPage } from "./ui/preferences";
 import { createSettingsProvider } from "./providers/settings-provider";
 import { t } from "./utils/translate";
-import { createDBusProvider } from "./providers/dbus-provider";
+import { DBusProvider } from "./providers/dbus-provider";
 import { loadEnv } from "./utils/env";
 
 
@@ -43,10 +43,11 @@ export default class DynamicMusicPillPrefs extends ExtensionPreferences {
 
         const settings = this.getSettings();
         const settingsProvider = createSettingsProvider(settings);
-        const dbusProvider = createDBusProvider();
+        const dbusProvider = new DBusProvider();
+        dbusProvider.start();
 
         window.connect("destroy", () => {
-            dbusProvider.destroy();
+            dbusProvider.stop();
         });
 
         const mainPage = new MainPage(settingsProvider, {
@@ -72,5 +73,11 @@ export default class DynamicMusicPillPrefs extends ExtensionPreferences {
             icon_name: 'utilities-terminal-symbolic'
         });
         window.add(systemPage);
+
+        const aboutPage = new AboutPage(this, {
+            title: t('About'),
+            icon_name: 'help-about-symbolic'
+        });
+        window.add(aboutPage);
     }
 }

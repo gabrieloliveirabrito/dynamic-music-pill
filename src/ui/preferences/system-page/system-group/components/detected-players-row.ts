@@ -35,8 +35,7 @@ export class DetectedPlayersRow extends Adw.ActionRow {
             }
 
             try {
-                const names = dbusProvider.listNames();
-                let mpris = names.filter(n => n.startsWith('org.mpris.MediaPlayer2.'));
+                const mpris = dbusProvider.listPlayers();
 
                 let apps = mpris.map(n => n.replace('org.mpris.MediaPlayer2.', '').split('.')[0]);
                 if (apps.length === 0) {

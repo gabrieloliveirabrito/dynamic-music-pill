@@ -4,11 +4,12 @@ import { isDevelopment } from "./utils/development";
 import { IMPrisProvider } from "./interfaces/impris-provider";
 import { Extension } from "@girs/gnome-shell/extensions/extension"
 import Gio from "@girs/gio-2.0"
-import { createMPRISProvider } from "./providers/mpris-provider";
+//import { createMPRISProvider } from "./providers/mpris-provider";
 import { createMockMPRISProvider } from "./providers/mock";
 import { AppContext } from "./types/app-context";
 import { createSettingsProvider, SettingsProvider } from "./providers/settings-provider";
 import { loadEnv } from "./utils/env";
+import { DBusProvider } from "./providers/dbus-provider";
 
 /**
  * Global variable to store the extension instance
@@ -41,12 +42,14 @@ export default class DynamicMusicPillExtension extends Extension {
     /**
      * MPRIS provider for music control
      */
-    provider: IMPrisProvider;
+    //provider: IMPrisProvider;
     
     /**
      * Settings provider for extension configuration
      */
     settings: SettingsProvider;
+
+    dbusProvider: DBusProvider;
 
     /**
      * Creates a new instance of the DynamicMusicPillExtension
@@ -61,16 +64,17 @@ export default class DynamicMusicPillExtension extends Extension {
         this.initTranslations("dynamic-music-pill");
 
         this.settings = createSettingsProvider(this.getSettings());
+        this.dbusProvider = new DBusProvider();
 
-        this.provider = createMPRISProvider();
-        this.provider.addCallback("first", (track) => {
+        //this.provider = createMPRISProvider(this.dbusProvider);
+        /*this.provider.addCallback("first", (track) => {
             logInfo(`Chegou aqui ${JSON.stringify(track)}`);
-        })
+        })*/
 
         this.context = {
             extension: this,
             settings: this.settings,
-            mpris: this.provider
+            //mpris: this.provider
         };
     }
 
@@ -82,7 +86,8 @@ export default class DynamicMusicPillExtension extends Extension {
         logInfo("Extension enabled.");
         logInfo(isDevelopment() ? "Is Dev" : "Is Not Dev");
         
-        this.provider.start();
+        this.dbusProvider.start();
+        //this.provider.start();
     }
 
     /**
@@ -90,7 +95,8 @@ export default class DynamicMusicPillExtension extends Extension {
      * Stops the MPRIS provider and logs a warning
      */
     disable() {
-        this.provider.stop();
+        //this.provider.stop();
+        this.dbusProvider.stop();
         
         logWarning("Extension disabled.");
     }

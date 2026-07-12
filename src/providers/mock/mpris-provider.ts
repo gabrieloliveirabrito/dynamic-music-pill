@@ -1,6 +1,5 @@
-import { DefaultTrackInfo } from "@/constants/mpris-constants";
 import { IMPrisProvider, MPRISCallback } from "@/interfaces/impris-provider";
-import { TrackInfo } from "@/types/track-info";
+import { TrackInfo } from "@/types/player-types";
 import { logInfo } from "@/utils/log";
 import GLib from "@girs/glib-2.0";
 
@@ -19,22 +18,21 @@ export function createMockMPRISProvider(): IMPrisProvider {
 
     function start() {
         logInfo(`Starting MPRIS mock provider`);
-        intervalId = GLib.timeout_add(
-            GLib.PRIORITY_DEFAULT,
-            5000,
-            () => {
-                counter++;
+        // intervalId = GLib.timeout_add(
+        //     GLib.PRIORITY_DEFAULT,
+        //     5000,
+        //     () => {
+        //         counter++;
 
-                emit({
-                    title: `Test track ${counter}`,
-                    artist: ["Enygma"],
-                    album: "None",
-                    ...DefaultTrackInfo
-                });
+        //         emit({
+        //             title: `Test track ${counter}`,
+        //             artist: ["Enygma"],
+        //             album: "None"
+        //         });
 
-                return GLib.SOURCE_CONTINUE;
-            }
-        );
+        //         return GLib.SOURCE_CONTINUE;
+        //     }
+        // );
         logInfo(`Created GLib timeout with id ${intervalId}`);
     }
 

@@ -73,7 +73,19 @@ const map = createSettingsMap({
     customTextColor: {
         key: 'custom-text-color',
         default: '40,40,40'
-    }
+    },
+    panelArtSize: {
+        key: 'panel-art-size',
+        default: 14
+    },
+    panelWidth: {
+        key: 'panel-pill-width',
+        default: 100
+    },
+    panelHeight: {
+        key: 'panel-pill-height',
+        default: 100
+    },
 });
 
 export type StyleSettingsSchema = SchemaKey<typeof map>

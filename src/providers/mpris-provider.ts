@@ -1,107 +1,112 @@
-import GIO from "@girs/gio-2.0"
-import GLib from "@girs/glib-2.0";
-import { IMPrisProvider, MPRISCallback } from "@/interfaces/impris-provider";
-import { TrackInfo } from "@/types/track-info";
-import { logDebug, logInfo, logObject, logWarning } from "@/utils/log";
-import { MTRISConstants } from "@/constants";
-import { mapObject, MapperType } from "@/utils/mapper";
-import { getDBusSessionAddress } from "@/utils/development";
-import { DefaultTrackInfo } from "@/constants/mpris-constants";
+// import GIO from "@girs/gio-2.0"
+// import GLib from "@girs/glib-2.0";
+// import { IMPrisProvider, MPRISCallback } from "@/interfaces/impris-provider";
+// import { PlayerState, TrackInfo } from "@/types/player-types";
+// import { logDebug, logInfo, logObject, logWarning } from "@/utils/log";
+// import { MPRISConstants } from "@/constants";
+// import { mapObject, MapperType } from "@/utils/mapper";
+// import { getDBusSessionAddress } from "@/utils/development";
+// import { DBusProvider } from "./dbus-provider";
 
-const MTRISMap: MapperType<TrackInfo> = {
-    "PlaybackStatus": (s, v) => s.playbackStatus = v,
-    "xesam:title": (s, v) => s.title = v,
-    "xesam:artist": (s, v) => s.artist = v,
-    "xesam:album": (s, v) => s.album = v,
-    "mpris:artUrl": (s, v) => s.artUrl = v,
-    "mpris:length": (s, v) => s.length = v,
-    "mpris:trackid": (s, v) => s.trackId = v,
-    "CanPlay": (s, v) => s.canPlay = v,
-    "CanPause": (s, v) => s.canPause = v,
-    "CanSeek": (s, v) => s.canSeek = v,
-    "CanGoNext": (s, v) => s.canGoNext = v,
-    "CanGoPrevious": (s, v) => s.canGoPrevious = v,
-    "Rate": (s, v) => s.rate = v
-}
+// const MTRISMap: MapperType<MPRISState> = {
+//     "PlaybackStatus": (s, v) => s.playerState.playbackStatus = v,
+//     "CanPlay": (s, v) => s.playerState.canPlay = v,
+//     "CanPause": (s, v) => s.playerState.canPause = v,
+//     "CanSeek": (s, v) => s.playerState.canSeek = v,
+//     "CanGoNext": (s, v) => s.playerState.canGoNext = v,
+//     "CanGoPrevious": (s, v) => s.playerState.canGoPrevious = v,
+//     "Rate": (s, v) => s.playerState.rate = v,
+//     "xesam:title": (s, v) => s.trackInfo.title = v,
+//     "xesam:artist": (s, v) => s.trackInfo.artist = v,
+//     "xesam:album": (s, v) => s.trackInfo.album = v,
+//     "mpris:artUrl": (s, v) => s.trackInfo.artUrl = v,
+//     "mpris:length": (s, v) => s.trackInfo.length = v,
+//     "mpris:trackid": (s, v) => s.trackInfo.trackId = v,
+// }
 
-export function createMPRISProvider(): IMPrisProvider {
-    const address = getDBusSessionAddress();
-    
+// interface MPRISState {
+//     trackInfo: TrackInfo;
+//     playerState: PlayerState;
+// }
 
-    let callbacks = new Map<string, MPRISCallback>();
-    let connection: GIO.DBusConnection | null = null;
-    let signalId: number | null = null;
-    let state: TrackInfo = { ...DefaultTrackInfo }
+// export function createMPRISProvider(dbus: DBusProvider): IMPrisProvider {
+//     const _state: MPRISState = {
+//         playerState: {
+//             playbackStatus: "Stopped",
+//             canPlay: false,
+//             canPause: false,
+//             canSeek: false,
+//             canGoNext: false,
+//             canGoPrevious: false,
+//             rate: 1.0,
+//         },
+//         trackInfo: {
+//             length: 0,
+//         },
+//     }    
 
-    function signalEmit(conn: GIO.DBusConnection, sender_name: string | null, object_path: string, interface_name: string, signal_name: string, parameters: GLib.Variant) {
-        if (!object_path.startsWith(MTRISConstants.MPRIS_OBJECT)) {
-            return;
-        }
+//     let callbacks = new Map<string, MPRISCallback>();
+//     let connection: GIO.DBusConnection | null = null;
+//     let signalId: number | null = null;
 
-        const unpacked: any[] = parameters.deep_unpack() as any[];
-        if (!Array.isArray(unpacked)) {
-            return;
-        }
+//     function signalEmit(conn: GIO.DBusConnection, sender_name: string | null, object_path: string, interface_name: string, signal_name: string, parameters: GLib.Variant) {
+//         if (!object_path.startsWith(MPRISConstants.MPRIS_OBJECT)) {
+//             return;
+//         }
 
-        const [iface, changed] = unpacked;
-        if (iface != MTRISConstants.MPRIS_INTERFACE) {
-            return;
-        }
-        logObject(changed);
+//         const unpacked: any[] = parameters.deep_unpack() as any[];
+//         if (!Array.isArray(unpacked)) {
+//             return;
+//         }
 
-        state = mapObject(changed, MTRISMap, state);
-        callbacks.forEach(c => c(state))
-    }
+//         const [iface, changed] = unpacked;
+//         if (iface != MPRISConstants.MPRIS_INTERFACE) {
+//             return;
+//         }
+//         logObject(changed);
 
-    function start() {
-        logInfo("Creating DBus connection");
-        connection = GIO.DBusConnection.new_for_address_sync(
-            address,
-            GIO.DBusConnectionFlags.AUTHENTICATION_CLIENT
-            | GIO.DBusConnectionFlags.MESSAGE_BUS_CONNECTION,
-            null,
-            null
-        );
+//         //state = mapObject(changed, MTRISMap, state);
+//         //callbacks.forEach(c => c(state))
+//     }
 
-        logInfo("Subscribe signal PropertiesChanged")
-        signalId = connection.signal_subscribe(
-            null,
-            "org.freedesktop.DBus.Properties",
-            "PropertiesChanged",
-            null,
-            null,
-            GIO.DBusSignalFlags.NONE,
-            signalEmit
-        )
-    }
+//     function start() {
+//         dbus.addPlaybackStatusCallback((status, rate) => {
+//             _state.playerState.playbackStatus = status;
+//             _state.playerState.rate = rate;
+//         });
+        
+//         dbus.addPlayerStateCallback((state) => {
+//             _state.playerState = state;
+//         });
+//     }
 
-    function stop() {
-        if (connection && signalId !== null) {
-            connection.signal_unsubscribe(signalId);
-            connection.close_sync(null);
-        }
+//     function stop() {
+//         if (connection && signalId !== null) {
+//             connection.signal_unsubscribe(signalId);
+//             connection.close_sync(null);
+//         }
 
-        connection = null;
-        signalId = null;
-        callbacks.clear();
-    }
+//         connection = null;
+//         signalId = null;
+//         callbacks.clear();
+//     }
 
-    function addCallback(name: string, callback: MPRISCallback): void {
-        if (callbacks.has(name)) {
-            logError(`Callback ${name} already exists!`);
-            return;
-        }
+//     function addCallback(name: string, callback: MPRISCallback): void {
+//         if (callbacks.has(name)) {
+//             logError(`Callback ${name} already exists!`);
+//             return;
+//         }
 
-        callbacks.set(name, callback);
-    }
+//         callbacks.set(name, callback);
+//     }
 
-    function removeCallback(name: string): boolean {
-        if (!callbacks.has(name)) {
-            return false;
-        }
+//     function removeCallback(name: string): boolean {
+//         if (!callbacks.has(name)) {
+//             return false;
+//         }
 
-        return callbacks.delete(name);
-    }
+//         return callbacks.delete(name);
+//     }
 
-    return { start, stop, addCallback, removeCallback }
-}
+//     return { start, stop, addCallback, removeCallback }
+// }

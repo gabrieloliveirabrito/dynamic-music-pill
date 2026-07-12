@@ -1,4 +1,4 @@
-import { TrackInfo } from "@/types/track-info";
+import { TrackInfo } from "@/types/player-types";
 
 export type MPRISCallback = (track: TrackInfo) => void;
 

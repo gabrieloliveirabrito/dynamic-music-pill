@@ -1,4 +1,4 @@
-import { TrackInfo } from "@/types/track-info"
+import { TrackInfo } from "@/types/player-types"
 import { logDebug, logInfo } from "./log";
 import { smartUnpack } from "./packing";
 

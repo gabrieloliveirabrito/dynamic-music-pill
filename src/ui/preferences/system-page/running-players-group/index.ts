@@ -71,8 +71,7 @@ export class RunningPlayersGroup extends Adw.PreferencesGroup {
         this.clearRows();
 
         const currentAppMapping = this.settings.system.appNameMapping;
-        const names = this.dbusProvider.listNames();
-        const mprisNames = names.filter(n => n.startsWith(`${PLAYER_INTERFACE}.`));
+        const mprisNames = this.dbusProvider.listPlayers();
 
         if (mprisNames.length === 0) {
             this.set_description(t("No active players detected. Open a music app first!"))
