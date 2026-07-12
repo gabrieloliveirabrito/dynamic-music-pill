@@ -1,10 +1,9 @@
-import { CrossfadeArtConstants } from "@/constants";
-import { WidgetProps } from "@/types/shell-types";
+import St from "@girs/st-18/st-18"
+import GObject from "gi://GObject"
 import Clutter from "@girs/clutter-18/clutter-18"
-import GObject from "@girs/gobject-2.0"
-import { St } from "@girs/st-18/st-18"
+import { CrossfadeArtConstants } from "@/constants";
 
-export class CrossfadeArt extends St.Widget {
+export class CrossfadeArt extends St.Widget<Clutter.BinLayout> {
     private _radius: number = CrossfadeArtConstants.RADIUS;
     private _shadowCSS: string = "box-shadow: none;";
     private _lastCSS?: string;
@@ -15,9 +14,10 @@ export class CrossfadeArt extends St.Widget {
         GObject.registerClass(this);
     }
 
-    constructor(properties?: WidgetProps, ...args: any[]) {
+    constructor(properties?: Partial<St.Widget.ConstructorProps>, ...args: any[]) {
         super(properties, args);
 
+        this.layoutManager = new Clutter.BinLayout();
         this.set_style_class_name("art-widget");
         this.set_clip_to_allocation(false);
         this.set_x_expand(false);
@@ -37,11 +37,7 @@ export class CrossfadeArt extends St.Widget {
     }
 
     private _refreshLayerStyle(layer: CrossfadeArt) {
-        let layerParent = layer.get_parent();
-        if (!layerParent) {
-            return;
-        }
-
+        if (!layer || !layer.get_parent()) return;
         let bgCSS = layer._bgUrl ? `background-image: ("${layer._bgUrl}");` : '';
 
         let radius = this.getRadius();
@@ -64,25 +60,30 @@ export class CrossfadeArt extends St.Widget {
     setRadius(radius: number) {
         this._radius = isNaN(radius) ? CrossfadeArtConstants.RADIUS : radius;
         this.set_style(`border-radius: ${radius}px; ${this._shadowCSS}`);
+
+        const actors = this.get_children().filter(c => c instanceof CrossfadeArt);
+        actors.forEach(c => c._refreshLayerStyle(c));
     }
 
     setShadowStyle(cssString: string) {
         this._shadowCSS = cssString;
         this._updateContainerStyle();
 
-        let actors = this.get_children();
-        actors.forEach(a => a instanceof CrossfadeArt && a._refreshLayerStyle(a));
+        const actors = this.get_children().filter(c => c instanceof CrossfadeArt);
+        actors.forEach(a => a._refreshLayerStyle(a));
     }
 
     setArt(newUrl: string, force: boolean = false) {
-        let children = this.get_children();
-        if (children.length > 0 && children.find(c => c instanceof CrossfadeArt && c._bgUrl === newUrl)) {
+        let children = this.get_children().filter(c => c instanceof CrossfadeArt && c._bgUrl === newUrl);
+        if (children.length > 0) {
             return;
         }
-
+        
+        this._currentUrl = newUrl;
+        this._updateContainerStyle();
         children.forEach(c => c.remove_all_transitions());
 
-        let newLayer: CrossfadeArt = new CrossfadeArt({
+        let newLayer = new CrossfadeArt({
             x_expand: true,
             y_expand: true,
             opacity: 0
@@ -93,28 +94,26 @@ export class CrossfadeArt extends St.Widget {
         this._refreshLayerStyle(newLayer);
 
         newLayer.ease({
-            opacity: CrossfadeArtConstants.EASE_OPACITY,
-            duration: CrossfadeArtConstants.EASE_DURATION,
+            opacity: 255,
+            duration: 1000,
             mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-            onStopped: (isFinished) => {
-                if (!isFinished) {
-                    return;
-                }
+            onStopped: (isFinished: boolean) => {
+                if (!isFinished) return;
 
-                newLayer.opacity = CrossfadeArtConstants.EASE_OPACITY;
+                newLayer.opacity = 255;
 
                 let currentChildren = this.get_children();
-                let myIndex = currentChildren.indexOf(newLayer);
+                let layerIndex = currentChildren.indexOf(newLayer);
 
-                if (myIndex > 0) {
-                    for (let i = 0; i < myIndex; i++) {
+                if (layerIndex > 0) {
+                    for (let i = 0; i < layerIndex; i++) {
                         let oldLayer = currentChildren[i];
 
                         oldLayer.ease({
                             opacity: 0,
-                            duration: CrossfadeArtConstants.EASE_OUT_DURATION,
+                            duration: 300,
                             mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-                            onStopped: (_) => oldLayer.destroy()
+                            onStopped: () => oldLayer.destroy()
                         })
                     }
                 }

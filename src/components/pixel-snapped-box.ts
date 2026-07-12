@@ -1,7 +1,6 @@
-import { BoxLayoutProps } from "@/types/shell-types"
-import Clutter from "@girs/clutter-18"
-import { GObject } from "@girs/gobject-2.0/gobject-2.0"
-import { St } from "@girs/st-18/st-18"
+import St from "@girs/st-18/st-18"
+import GObject from "gi://GObject"
+import Clutter from "@girs/clutter-18/clutter-18"
 
 
 export class PixelSnappedBox extends St.BoxLayout {
