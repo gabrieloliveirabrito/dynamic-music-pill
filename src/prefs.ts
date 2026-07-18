@@ -1,10 +1,10 @@
 import { ExtensionPreferences } from "@girs/gnome-shell/extensions/prefs"
 import Adw from "gi://Adw";
-import { MainPage, PopupPage, StylePage, SystemPage } from "./ui/preferences";
+import { AboutPage, MainPage, PopupPage, StylePage, SystemPage } from "./ui/preferences";
 import { createSettingsProvider } from "./providers/settings-provider";
 import { t } from "./utils/translate";
-import { createDBusProvider } from "./providers/dbus-provider";
 import { loadEnv } from "./utils/env";
+import { MPRISProvider } from "./providers/mpris-provider";
 
 
 const PREFS_KEYS = [
@@ -43,10 +43,11 @@ export default class DynamicMusicPillPrefs extends ExtensionPreferences {
 
         const settings = this.getSettings();
         const settingsProvider = createSettingsProvider(settings);
-        const dbusProvider = createDBusProvider();
+        const mpris = new MPRISProvider();
+        mpris.start();
 
         window.connect("destroy", () => {
-            dbusProvider.destroy();
+            mpris.stop();
         });
 
         const mainPage = new MainPage(settingsProvider, {
@@ -67,10 +68,16 @@ export default class DynamicMusicPillPrefs extends ExtensionPreferences {
         });
         window.add(stylePage);
 
-        const systemPage = new SystemPage(settingsProvider, dbusProvider, {
+        const systemPage = new SystemPage(settingsProvider, mpris, {
             title: t('System & Reset'),
             icon_name: 'utilities-terminal-symbolic'
         });
         window.add(systemPage);
+
+        const aboutPage = new AboutPage(this, {
+            title: t('About'),
+            icon_name: 'help-about-symbolic'
+        });
+        window.add(aboutPage);
     }
 }

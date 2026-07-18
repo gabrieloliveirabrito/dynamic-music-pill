@@ -5,14 +5,14 @@ import { SettingsProvider } from "@/providers/settings-provider"
 import { ActionRowProps } from "@/types/shell-types"
 import { smartUnpack } from "@/utils/packing"
 import { t } from "@/utils/translate"
-import { DBusProvider } from "@/providers/dbus-provider"
+import { MPRISProvider } from "@/providers/mpris-provider"
 
 export class DetectedPlayersRow extends Adw.ActionRow {
     static {
         GObject.registerClass(this)
     }
 
-    constructor(settings: SettingsProvider, dbusProvider: DBusProvider, properties: ActionRowProps, ...args: any[]) {
+    constructor(settings: SettingsProvider, mpris: MPRISProvider, properties: ActionRowProps, ...args: any[]) {
         super(properties, args)
 
         const refreshBtn = new Gtk.Button({
@@ -35,10 +35,9 @@ export class DetectedPlayersRow extends Adw.ActionRow {
             }
 
             try {
-                const names = dbusProvider.listNames();
-                let mpris = names.filter(n => n.startsWith('org.mpris.MediaPlayer2.'));
+                const mprisNames = mpris.listPlayers();
 
-                let apps = mpris.map(n => n.replace('org.mpris.MediaPlayer2.', '').split('.')[0]);
+                let apps = mprisNames.map(n => n.replace('org.mpris.MediaPlayer2.', '').split('.')[0]);
                 if (apps.length === 0) {
                     playerBox.append(new Gtk.Label({ label: t('No players found') }));
                 } else {

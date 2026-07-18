@@ -1,13 +1,13 @@
 import Adw from "gi://Adw";
 import GObject from "gi://GObject";
-import { SettingsProvider } from "@/providers/settings-provider";
 import { PreferencesGroupProps } from "@/types/shell-types";
-import { AlbumArtSizeRow } from "./components/album-art-size-row";
+import { SettingsProvider } from "@/providers/settings-provider";
+import { ArtSizeRow } from "./components.ts/art-size-row";
 import { t } from "@/utils/translate";
-import { WidgetWidthRow } from "./components/widget-width-row";
-import { WidgetHeightRow } from "./components/widget-height-row";
+import { WidgetWidthRow } from "./components.ts/widget-width-row";
+import { WidgetHeightRow } from "./components.ts/widget-height-row";
 
-export class DimensionsGroup extends Adw.PreferencesGroup {
+export class PanelGroup extends Adw.PreferencesGroup {
     static {
         GObject.registerClass(this);
     }
@@ -15,10 +15,10 @@ export class DimensionsGroup extends Adw.PreferencesGroup {
     constructor(settings: SettingsProvider, properties?: PreferencesGroupProps, ...args: any[]) {
         super(properties, args);
 
-        const albumArtSizeRow = new AlbumArtSizeRow(settings, {
+        const artSizeRow = new ArtSizeRow(settings, {
             title: t("Album Art Size")
         });
-        this.add(albumArtSizeRow);
+        this.add(artSizeRow);
 
         const widgetWidthRow = new WidgetWidthRow(settings, {
             title: t("Widget Width")
@@ -31,8 +31,8 @@ export class DimensionsGroup extends Adw.PreferencesGroup {
         this.add(widgetHeightRow);
 
         settings.style.connect("changed::target-container", () => {
-            this.set_visible(settings.style.targetContainer === 0);
+            this.set_visible(settings.style.targetContainer !== 0);
         });
-        this.set_visible(settings.style.targetContainer === 0);
+        this.set_visible(settings.style.targetContainer !== 0);
     }
 }

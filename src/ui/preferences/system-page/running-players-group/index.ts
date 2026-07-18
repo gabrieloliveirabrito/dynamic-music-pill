@@ -6,14 +6,14 @@ import GLib from "gi://GLib";
 import { SettingsProvider } from "@/providers/settings-provider";
 import { PreferencesGroupProps } from "@/types/shell-types";
 import { t } from "@/utils/translate";
-import { DBusProvider } from "@/providers/dbus-provider";
 import { PLAYER_INTERFACE } from "@/constants/mpris-constants";
 import { SystemPage } from "..";
 import { logInfo } from "@/utils/log";
+import { MPRISProvider } from "@/providers/mpris-provider";
 
 type RunningPlayersGroupProps = {
     settings: SettingsProvider;
-    dbusProvider: DBusProvider;
+    mpris: MPRISProvider;
     systemPage: SystemPage;
 } & PreferencesGroupProps;
 
@@ -23,16 +23,16 @@ export class RunningPlayersGroup extends Adw.PreferencesGroup {
     }
 
     private settings: SettingsProvider;
-    private dbusProvider: DBusProvider;
+    private mpris: MPRISProvider;
     private systemPage: SystemPage;
     private rows: Adw.ActionRow[] = [];
 
     constructor(properties: RunningPlayersGroupProps, ...args: any[]) {
-        const { settings, dbusProvider, systemPage, ...props } = properties;
+        const { settings, mpris, systemPage, ...props } = properties;
         super(props, args);
 
         this.settings = settings;
-        this.dbusProvider = dbusProvider;
+        this.mpris = mpris;
         this.systemPage = systemPage;
 
         const refreshMappingRow = new Adw.ActionRow({
@@ -71,8 +71,7 @@ export class RunningPlayersGroup extends Adw.PreferencesGroup {
         this.clearRows();
 
         const currentAppMapping = this.settings.system.appNameMapping;
-        const names = this.dbusProvider.listNames();
-        const mprisNames = names.filter(n => n.startsWith(`${PLAYER_INTERFACE}.`));
+        const mprisNames = this.mpris.listPlayers();
 
         if (mprisNames.length === 0) {
             this.set_description(t("No active players detected. Open a music app first!"))

@@ -9,14 +9,14 @@ import { CompatibilityDelayRow } from "./components/compatiblity-delay-row";
 import { FilterModeRow } from "./components/filter-mode-row";
 import { FilteredPlayersRow } from "./components/filtered-players-row";
 import { DetectedPlayersRow } from "./components/detected-players-row";
-import { DBusProvider } from "@/providers/dbus-provider";
+import { MPRISProvider } from "@/providers/mpris-provider";
 
 export class SystemGroup extends Adw.PreferencesGroup {
     static {
         GObject.registerClass(this);
     }
 
-    constructor(settings: SettingsProvider, dbusProvider: DBusProvider, properties?: PreferencesGroupProps, ...args: any[]) {
+    constructor(settings: SettingsProvider, mpris: MPRISProvider, properties?: PreferencesGroupProps, ...args: any[]) {
         super(properties, args);
 
         const hidePlayerRow = new HidePlayerRow(settings, {
@@ -48,7 +48,7 @@ export class SystemGroup extends Adw.PreferencesGroup {
         });
         this.add(filterListRow)
 
-        const detectedPlayersRow = new DetectedPlayersRow(settings, dbusProvider, {
+        const detectedPlayersRow = new DetectedPlayersRow(settings, mpris, {
             title: t('Detected Players'),
             subtitle: t('Click an active player to add it to the filter list')
         });
