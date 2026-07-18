@@ -5,12 +5,28 @@ export function smartUnpack(object: any) : any {
         return null;
     }
 
-    if (object instanceof GLib.Variant) {
-        return object.deepUnpack();
-    }
+    if (object instanceof GLib.Variant || typeof object === 'object') {
+        let unpacked : any = object.deepUnpack ? object.deepUnpack() : object;
+        if (!unpacked) {
+            return unpacked;
+        }
 
-    if (Array.isArray(object)) {
-        return object.map(smartUnpack);
+        if (Array.isArray(unpacked)) {
+            return unpacked.map(smartUnpack);
+        }
+
+        const entries = Object.entries(unpacked);
+        if (entries.length === 0) {
+            return unpacked;
+        }
+
+        for (const [key, value] of entries) {
+            if (value instanceof GLib.Variant) {
+                unpacked[key] = smartUnpack(value);
+            }
+        }
+
+        return unpacked;
     }
 
     return object;
