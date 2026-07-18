@@ -7,11 +7,11 @@ import { SystemGroup } from "./system-group";
 import { t } from "@/utils/translate";
 import { MappingHelpGroup } from "./mapping-help";
 import { AppMappingGroup } from "./aps-mapping-group";
-import { DBusProvider } from "@/providers/dbus-provider";
 import { RunningPlayersGroup } from "./running-players-group";
 import { BackupGroup } from "./backup-group";
 import { CacheGroup } from "./cache-group";
 import { DangerGroup } from "./danger-group";
+import { MPRISProvider } from "@/providers/mpris-provider";
 
 export class SystemPage extends Adw.PreferencesPage {
     static {
@@ -20,10 +20,10 @@ export class SystemPage extends Adw.PreferencesPage {
 
     private _isRefreshingPlayers = false;
 
-    constructor(settings: SettingsProvider, dbusProvider: DBusProvider, properties?: PreferencesPageProps, ...args: any[]) {
+    constructor(settings: SettingsProvider, mpris: MPRISProvider, properties?: PreferencesPageProps, ...args: any[]) {
         super(properties, args);
 
-        const systemGroup = new SystemGroup(settings, dbusProvider, {
+        const systemGroup = new SystemGroup(settings, mpris, {
             title: t("System")
         });
         this.add(systemGroup);
@@ -42,7 +42,7 @@ export class SystemPage extends Adw.PreferencesPage {
         const activePlayersGroup = new RunningPlayersGroup({
             systemPage: this,
             settings: settings,
-            dbusProvider: dbusProvider,
+            mpris: mpris,
             title: t('Running Players Detection'),
             description: t('Click on a detected player to automatically fill the mapping.')
         });
