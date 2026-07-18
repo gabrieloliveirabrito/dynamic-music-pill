@@ -3,8 +3,8 @@ import Adw from "gi://Adw";
 import { AboutPage, MainPage, PopupPage, StylePage, SystemPage } from "./ui/preferences";
 import { createSettingsProvider } from "./providers/settings-provider";
 import { t } from "./utils/translate";
-import { DBusProvider } from "./providers/dbus-provider";
 import { loadEnv } from "./utils/env";
+import { MPRISProvider } from "./providers/mpris-provider";
 
 
 const PREFS_KEYS = [
@@ -43,11 +43,11 @@ export default class DynamicMusicPillPrefs extends ExtensionPreferences {
 
         const settings = this.getSettings();
         const settingsProvider = createSettingsProvider(settings);
-        const dbusProvider = new DBusProvider();
-        dbusProvider.start();
+        const mpris = new MPRISProvider();
+        mpris.start();
 
         window.connect("destroy", () => {
-            dbusProvider.stop();
+            mpris.stop();
         });
 
         const mainPage = new MainPage(settingsProvider, {
@@ -68,7 +68,7 @@ export default class DynamicMusicPillPrefs extends ExtensionPreferences {
         });
         window.add(stylePage);
 
-        const systemPage = new SystemPage(settingsProvider, dbusProvider, {
+        const systemPage = new SystemPage(settingsProvider, mpris, {
             title: t('System & Reset'),
             icon_name: 'utilities-terminal-symbolic'
         });
