@@ -5,16 +5,21 @@ export type TrackInfo = {
     artUrl?: string;
     trackId?: string;
     length: number;
+    rate: number;
 }
 
 export type PlaybackStatus = "Playing" | "Paused" | "Stopped";
 
-export type PlayerState = {
+export type PlayerInfo = {
     playbackStatus: PlaybackStatus;
-    canPlay: boolean;
-    canPause: boolean;
-    canSeek: boolean;
+    canControl: boolean;
     canGoNext: boolean;
     canGoPrevious: boolean;
-    rate: number;
+    canPause: boolean;
+    canPlay: boolean;
+    canSeek: boolean;
+    volume: number;
+    minimumRate: number;
+    maximumRate: number;
+    position: number;
 }
