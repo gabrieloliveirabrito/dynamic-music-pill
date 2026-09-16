@@ -2677,6 +2677,7 @@ import Gtk86 from "gi://Gtk";
 var PLAYER_INTERFACE = "org.mpris.MediaPlayer2";
 var MPRIS_INTERFACE = `${PLAYER_INTERFACE}.Player`;
 var MPRIS_OBJECT = "/org/mpris/MediaPlayer2";
+var DBUS_PROPERTIES_INTERFACE = "org.freedesktop.DBus.Properties";
 
 // src/ui/preferences/system-page/running-players-group/index.ts
 var _RunningPlayersGroup = class _RunningPlayersGroup extends Adw106.PreferencesGroup {
@@ -3075,6 +3076,10 @@ var map6 = createSettingsMap({
   autoHidePlayer: {
     key: "hide-auto-smart-selection",
     default: false
+  },
+  selectedPlayerBus: {
+    key: "selected-player-bus",
+    default: ""
   },
   showAlbumTitle: {
     key: "popup-show-album-title",
@@ -4026,6 +4031,7 @@ var TrackInfoMap = {
   "mpris:artUrl": (t2, v) => t2.artUrl = v,
   "mpris:length": (t2, v) => t2.length = v,
   "mpris:trackid": (t2, v) => t2.trackId = v,
+  "xesam:url": (t2, v) => t2.url = v,
   "rate": (t2, v) => t2.rate = v
 };
 
@@ -4044,16 +4050,22 @@ var DEFAULT_PLAYER_STATE = {
   position: 0
 };
 var _MediaPlayer = class _MediaPlayer extends GObject117.Object {
-  constructor(name, owner, mpris) {
+  constructor(busName, owner, mpris) {
     super();
-    __publicField(this, "_name");
+    __publicField(this, "_busName");
     __publicField(this, "_owner");
     __publicField(this, "_mpris");
     __publicField(this, "_connection");
     __publicField(this, "_playerPropertiesTimer", null);
+    __publicField(this, "_propertiesSignal", null);
     __publicField(this, "_state");
-    logDebug(`Creating MediaPlayer for ${name}`);
-    this._name = name;
+    __publicField(this, "_identity", null);
+    __publicField(this, "_desktopEntry", null);
+    __publicField(this, "_lastPlayingTime", 0);
+    __publicField(this, "_lastSeen", Date.now());
+    __publicField(this, "_lastTrackId", null);
+    logDebug(`Creating MediaPlayer for ${busName}`);
+    this._busName = busName;
     this._owner = owner;
     this._mpris = mpris;
     this._connection = mpris.getConnection();
@@ -4061,17 +4073,191 @@ var _MediaPlayer = class _MediaPlayer extends GObject117.Object {
       player: __spreadValues({}, DEFAULT_PLAYER_STATE),
       trackInfo: void 0
     };
-    this._playerPropertiesTimer = GLib8.timeout_add(GLib8.PRIORITY_DEFAULT, 1e3, this._playerTimerCallback.bind(this));
-    this._mpris.emit("player-added", this._name, this);
+    this._fetchRootProperties();
+    this._refreshState();
+    this._propertiesSignal = this._connection.signal_subscribe(
+      this._busName,
+      DBUS_PROPERTIES_INTERFACE,
+      "PropertiesChanged",
+      MPRIS_OBJECT,
+      null,
+      Gio8.DBusSignalFlags.NONE,
+      this._onPropertiesChanged.bind(this)
+    );
+    this._playerPropertiesTimer = GLib8.timeout_add(
+      GLib8.PRIORITY_DEFAULT,
+      5e3,
+      this._fallbackPoll.bind(this)
+    );
+    this._mpris.emit("player-added", this._busName, this);
+  }
+  getDescriptor() {
+    var _a, _b;
+    return {
+      busName: this._busName,
+      identity: (_a = this._identity) != null ? _a : void 0,
+      desktopEntry: (_b = this._desktopEntry) != null ? _b : void 0,
+      lastPlayingTime: this._lastPlayingTime,
+      lastSeen: this._lastSeen
+    };
   }
   getPlayerState() {
-    if (this._connection === null) {
-      return this._state;
-    }
-    const [result] = smartUnpack(this._connection.call_sync(
-      this._name,
+    return this._state;
+  }
+  getTrackInfo() {
+    return this._state.trackInfo;
+  }
+  getPlayerInfo() {
+    return this._state.player;
+  }
+  getName() {
+    return this._busName;
+  }
+  getBusName() {
+    return this._busName;
+  }
+  getOwner() {
+    return this._owner;
+  }
+  getIdentity() {
+    return this._identity;
+  }
+  getDesktopEntry() {
+    return this._desktopEntry;
+  }
+  getLastPlayingTime() {
+    return this._lastPlayingTime;
+  }
+  playPause() {
+    this._callPlayerMethod("PlayPause");
+  }
+  next() {
+    this._callPlayerMethod("Next");
+  }
+  previous() {
+    this._callPlayerMethod("Previous");
+  }
+  seek(offsetMicros) {
+    this._connection.call_sync(
+      this._busName,
       MPRIS_OBJECT,
-      "org.freedesktop.DBus.Properties",
+      MPRIS_INTERFACE,
+      "Seek",
+      new GLib8.Variant("(x)", [offsetMicros]),
+      null,
+      Gio8.DBusCallFlags.NONE,
+      -1,
+      null
+    );
+  }
+  setPosition(positionUs) {
+    var _a;
+    const trackId = ((_a = this._state.trackInfo) == null ? void 0 : _a.trackId) || "/org/mpris/MediaPlayer2/TrackList/NoTrack";
+    this._connection.call_sync(
+      this._busName,
+      MPRIS_OBJECT,
+      MPRIS_INTERFACE,
+      "SetPosition",
+      new GLib8.Variant("(ox)", [trackId, positionUs]),
+      null,
+      Gio8.DBusCallFlags.NONE,
+      -1,
+      null
+    );
+    this._state.player.position = positionUs;
+  }
+  raise() {
+    this._connection.call_sync(
+      this._busName,
+      MPRIS_OBJECT,
+      PLAYER_INTERFACE,
+      "Raise",
+      null,
+      null,
+      Gio8.DBusCallFlags.NONE,
+      -1,
+      null
+    );
+  }
+  quit() {
+    this._connection.call_sync(
+      this._busName,
+      MPRIS_OBJECT,
+      PLAYER_INTERFACE,
+      "Quit",
+      null,
+      null,
+      Gio8.DBusCallFlags.NONE,
+      -1,
+      null
+    );
+  }
+  removePlayer() {
+    logDebug(`Removing MediaPlayer for ${this._busName}`);
+    this._mpris.emit("player-removed", this._busName, this);
+    if (this._propertiesSignal !== null) {
+      this._connection.signal_unsubscribe(this._propertiesSignal);
+      this._propertiesSignal = null;
+    }
+    if (this._playerPropertiesTimer !== null) {
+      GLib8.source_remove(this._playerPropertiesTimer);
+      this._playerPropertiesTimer = null;
+    }
+    this._state = {
+      player: __spreadValues({}, DEFAULT_PLAYER_STATE),
+      trackInfo: void 0
+    };
+  }
+  _callPlayerMethod(method) {
+    this._connection.call_sync(
+      this._busName,
+      MPRIS_OBJECT,
+      MPRIS_INTERFACE,
+      method,
+      null,
+      null,
+      Gio8.DBusCallFlags.NONE,
+      -1,
+      null
+    );
+  }
+  _fetchRootProperties() {
+    try {
+      const [result] = smartUnpack(this._connection.call_sync(
+        this._busName,
+        MPRIS_OBJECT,
+        DBUS_PROPERTIES_INTERFACE,
+        "GetAll",
+        new GLib8.Variant("(s)", [PLAYER_INTERFACE]),
+        null,
+        Gio8.DBusCallFlags.NONE,
+        -1,
+        null
+      ));
+      if (!result) {
+        return;
+      }
+      if (result["Identity"]) {
+        this._identity = String(smartUnpack(result["Identity"]));
+      }
+      if (result["DesktopEntry"]) {
+        this._desktopEntry = String(smartUnpack(result["DesktopEntry"]));
+      }
+    } catch (e) {
+    }
+  }
+  _refreshState() {
+    try {
+      const newState = this._fetchPlayerState();
+      this._applyState(newState);
+    } catch (e) {
+    }
+  }
+  _fetchPlayerState() {
+    const [result] = smartUnpack(this._connection.call_sync(
+      this._busName,
+      MPRIS_OBJECT,
+      DBUS_PROPERTIES_INTERFACE,
       "GetAll",
       new GLib8.Variant("(s)", [MPRIS_INTERFACE]),
       null,
@@ -4084,57 +4270,96 @@ var _MediaPlayer = class _MediaPlayer extends GObject117.Object {
     }
     const playerState = mapObject(result, PlayerStateMap);
     const trackInfo = mapObject(result, TrackInfoMap);
-    const state = {
-      player: playerState,
-      trackInfo
-    };
-    return state;
+    return { player: playerState, trackInfo };
   }
-  getTrackInfo() {
-    return this._state.trackInfo;
-  }
-  getPlayerInfo() {
-    return this._state.player;
-  }
-  getName() {
-    return this._name;
-  }
-  getOwner() {
-    return this._owner;
-  }
-  removePlayer() {
-    logDebug(`Removing MediaPlayer for ${this._name}`);
-    this._mpris.emit("player-removed", this._name, this);
-    if (this._playerPropertiesTimer !== null) {
-      GLib8.source_remove(this._playerPropertiesTimer);
-      this._playerPropertiesTimer = null;
-    }
-    this._state = {
-      player: __spreadValues({}, DEFAULT_PLAYER_STATE),
-      trackInfo: void 0
-    };
-  }
-  _playerTimerCallback() {
-    const newState = this.getPlayerState();
+  _applyState(newState) {
+    var _a, _b;
     const oldState = this._state;
-    const [playerChanged, [playerPath, oldPlayerValue, newPlayerValue]] = checkChanged(oldState.player, newState.player);
-    const [trackChanged, [trackPath, oldTrackValue, newTrackValue]] = checkChanged(oldState.trackInfo, newState.trackInfo);
+    this._lastSeen = Date.now();
+    if (newState.player.playbackStatus === "Playing") {
+      this._lastPlayingTime = Date.now();
+    }
+    const trackId = (_b = (_a = newState.trackInfo) == null ? void 0 : _a.trackId) != null ? _b : null;
+    if (trackId && trackId !== this._lastTrackId) {
+      this._lastTrackId = trackId;
+    }
+    const [playerChanged] = checkChanged(oldState.player, newState.player);
+    const [trackChanged] = checkChanged(oldState.trackInfo, newState.trackInfo);
     if (playerChanged) {
       this._state.player = newState.player;
-      this._mpris.emit("player-state-changed", this._name, this);
+      this._mpris.emit("player-state-changed", this._busName, this);
       if (newState.player.playbackStatus !== oldState.player.playbackStatus) {
-        this._mpris.emit("player-status-changed", this._name, newState.player.playbackStatus);
+        this._mpris.emit("player-status-changed", this._busName, newState.player.playbackStatus);
       }
     }
     if (trackChanged) {
       this._state.trackInfo = newState.trackInfo;
-      this._mpris.emit("player-track-changed", this._name, this);
+      this._mpris.emit("player-track-changed", this._busName, this);
     }
+  }
+  _onPropertiesChanged(_connection, _sender, _path, _iface, _signal, parameters) {
+    const [iface, changed] = smartUnpack(parameters);
+    if (iface !== MPRIS_INTERFACE || !changed) {
+      return;
+    }
+    const merged = __spreadValues(__spreadValues({}, this._flattenState(this._state)), changed);
+    const playerState = mapObject(merged, PlayerStateMap);
+    const trackInfo = mapObject(merged, TrackInfoMap);
+    this._applyState({ player: playerState, trackInfo });
+  }
+  _flattenState(state) {
+    const flat = {
+      PlaybackStatus: state.player.playbackStatus,
+      CanControl: state.player.canControl,
+      CanGoNext: state.player.canGoNext,
+      CanGoPrevious: state.player.canGoPrevious,
+      CanPause: state.player.canPause,
+      CanPlay: state.player.canPlay,
+      CanSeek: state.player.canSeek,
+      Volume: state.player.volume,
+      MinimumRate: state.player.minimumRate,
+      MaximumRate: state.player.maximumRate,
+      Position: state.player.position
+    };
+    if (state.trackInfo) {
+      flat["xesam:title"] = state.trackInfo.title;
+      flat["xesam:artist"] = state.trackInfo.artist;
+      flat["xesam:album"] = state.trackInfo.album;
+      flat["mpris:artUrl"] = state.trackInfo.artUrl;
+      flat["mpris:length"] = state.trackInfo.length;
+      flat["mpris:trackid"] = state.trackInfo.trackId;
+    }
+    return flat;
+  }
+  _fallbackPoll() {
+    this._refreshState();
     return GLib8.SOURCE_CONTINUE;
   }
 };
 GObject117.registerClass(_MediaPlayer);
 var MediaPlayer = _MediaPlayer;
+
+// src/providers/mpris-provider/player-filter.ts
+function isPlayerAllowed(busName, system) {
+  const mode = system.playerFilterMode;
+  if (mode === 0) {
+    return true;
+  }
+  const listStr = system.filteredPlayers.toLowerCase();
+  const list = listStr.split(",").map((s) => s.trim()).filter((s) => s.length > 0);
+  if (list.length === 0) {
+    return mode === 1;
+  }
+  const lowerName = busName.toLowerCase();
+  const match = list.some((item) => lowerName.includes(item));
+  if (mode === 1) {
+    return !match;
+  }
+  if (mode === 2) {
+    return match;
+  }
+  return true;
+}
 
 // src/providers/mpris-provider/index.ts
 var flags = Gio9.DBusConnectionFlags.AUTHENTICATION_CLIENT | Gio9.DBusConnectionFlags.MESSAGE_BUS_CONNECTION;
@@ -4144,9 +4369,12 @@ var _MPRISProvider = class _MPRISProvider extends GObject118.Object {
     __publicField(this, "_address", getDBusSessionAddress());
     __publicField(this, "_connection", null);
     __publicField(this, "_nameOwnerChangedSignal", null);
+    /** keyed by MPRIS bus name */
     __publicField(this, "_players", /* @__PURE__ */ new Map());
+    __publicField(this, "_systemSettings", null);
   }
-  start() {
+  start(systemSettings) {
+    this._systemSettings = systemSettings != null ? systemSettings : null;
     logDebug(`Creating DBus connection for address: ${this._address}`);
     this._connection = Gio9.DBusConnection.new_for_address_sync(this._address, flags, null, null);
     this._nameOwnerChangedSignal = this._connection.signal_subscribe(
@@ -4158,15 +4386,7 @@ var _MPRISProvider = class _MPRISProvider extends GObject118.Object {
       Gio9.DBusSignalFlags.NONE,
       this._nameOwnerChanged.bind(this)
     );
-    const names = this.listPlayers();
-    for (const name of names) {
-      const owner = this.getPlayerOwner(name);
-      if (!owner) {
-        continue;
-      }
-      const player = new MediaPlayer(name, owner, this);
-      this._players.set(owner, player);
-    }
+    this.rescan();
   }
   stop() {
     if (this._connection === null) {
@@ -4183,6 +4403,10 @@ var _MPRISProvider = class _MPRISProvider extends GObject118.Object {
     }
     this._connection.close_sync(null);
     this._connection = null;
+    this._systemSettings = null;
+  }
+  setSystemSettings(systemSettings) {
+    this._systemSettings = systemSettings;
   }
   getConnection() {
     if (this._connection === null) {
@@ -4190,24 +4414,64 @@ var _MPRISProvider = class _MPRISProvider extends GObject118.Object {
     }
     return this._connection;
   }
+  getPlayer(busName) {
+    return this._players.get(busName);
+  }
+  getPlayers() {
+    return Array.from(this._players.values());
+  }
+  getPlayerBusNames() {
+    return Array.from(this._players.keys());
+  }
+  rescan() {
+    if (this._connection === null) {
+      return;
+    }
+    const names = this.listPlayers().filter((name) => this._shouldAllow(name));
+    let changed = false;
+    for (const name of names) {
+      if (!this._players.has(name)) {
+        const owner = this.getPlayerOwner(name);
+        if (!owner) {
+          continue;
+        }
+        this._players.set(name, new MediaPlayer(name, owner, this));
+        changed = true;
+      }
+    }
+    for (const busName of [...this._players.keys()]) {
+      if (!names.includes(busName)) {
+        const player = this._players.get(busName);
+        player == null ? void 0 : player.removePlayer();
+        this._players.delete(busName);
+        changed = true;
+      }
+    }
+    if (changed) {
+      logDebug(`MPRIS rescan: ${this._players.size} player(s)`);
+    }
+  }
   getPlayerOwner(name) {
     if (!this._connection) {
       return void 0;
     }
-    logDebug(`Getting owner for player: ${name}`);
-    const result = this._connection.call_sync(
-      "org.freedesktop.DBus",
-      "/org/freedesktop/DBus",
-      "org.freedesktop.DBus",
-      "GetNameOwner",
-      new GLib9.Variant("(s)", [name]),
-      null,
-      Gio9.DBusCallFlags.NONE,
-      -1,
-      null
-    );
-    const [owner] = smartUnpack(result);
-    return owner || void 0;
+    try {
+      const result = this._connection.call_sync(
+        "org.freedesktop.DBus",
+        "/org/freedesktop/DBus",
+        "org.freedesktop.DBus",
+        "GetNameOwner",
+        new GLib9.Variant("(s)", [name]),
+        null,
+        Gio9.DBusCallFlags.NONE,
+        -1,
+        null
+      );
+      const [owner] = smartUnpack(result);
+      return owner || void 0;
+    } catch (e) {
+      return void 0;
+    }
   }
   listPlayers() {
     if (this._connection === null) {
@@ -4227,10 +4491,13 @@ var _MPRISProvider = class _MPRISProvider extends GObject118.Object {
     const names = smartUnpack(result)[0];
     return names.filter((name) => name.startsWith(`${PLAYER_INTERFACE}.`));
   }
-  getPlayer(name) {
-    return this._players.get(name);
+  _shouldAllow(busName) {
+    if (!this._systemSettings) {
+      return true;
+    }
+    return isPlayerAllowed(busName, this._systemSettings);
   }
-  _nameOwnerChanged(connection, sender_name, object_path, interface_name, signal_name, parameters) {
+  _nameOwnerChanged(_connection, sender_name, object_path, interface_name, signal_name, parameters) {
     const [name, oldOwner, newOwner] = smartUnpack(parameters);
     if (!(name == null ? void 0 : name.startsWith(PLAYER_INTERFACE))) {
       return;
@@ -4240,21 +4507,17 @@ var _MPRISProvider = class _MPRISProvider extends GObject118.Object {
     if (name === void 0 || oldOwner === void 0 || newOwner === void 0) {
       return;
     }
-    if (oldOwner === newOwner || oldOwner.length === 0 && this._players.has(newOwner)) {
+    if (newOwner.length === 0 && this._players.has(name)) {
+      const player = this._players.get(name);
+      player == null ? void 0 : player.removePlayer();
+      this._players.delete(name);
       return;
     }
-    if (newOwner.length === 0 && this._players.has(oldOwner)) {
-      const player = this._players.get(oldOwner);
-      if (player) {
-        player.removePlayer();
-        this._players.delete(oldOwner);
-      }
+    if (newOwner.length > 0 && !this._players.has(name) && this._shouldAllow(name)) {
+      this._players.set(name, new MediaPlayer(name, newOwner, this));
       return;
     }
-    if (newOwner.length > 0 && !this._players.has(newOwner)) {
-      const player = new MediaPlayer(name, newOwner, this);
-      this._players.set(newOwner, player);
-    }
+    this.rescan();
   }
 };
 GObject118.registerClass({
