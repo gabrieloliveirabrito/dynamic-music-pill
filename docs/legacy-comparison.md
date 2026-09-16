@@ -6,12 +6,13 @@ Referência imutável: `extension-old.js`, `prefs-old.js`.
 
 | Legado (conceito) | TypeScript (`src/`) | Status |
 |-------------------|---------------------|--------|
-| Controller / MPRIS | `providers/mpris-provider.ts`, `controllers/music-controller.ts` | Parcial |
-| Music pill UI | `ui/music-pill/` | Em progresso |
-| Expanded player / pop-up | A portar | Pendente |
-| Preferências | `prefs.ts`, `ui/preferences/` | Parcial (aba General) |
-| Visualizadores | A portar | Pendente |
-| Settings keys | `providers/settings-provider/*` | Parcial |
+| Controller / MPRIS | `providers/mpris-provider/`, `controllers/music-controller.ts` | MVP runtime |
+| Music pill UI | `ui/music-pill/` | MVP (componentizado) |
+| Expanded player / pop-up | `ui/expanded-player/` | MVP parcial |
+| Player selector | `ui/player-selector/` | MVP |
+| Visualizers | `ui/visualizers/` | Simulado (cava pendente) |
+| Lyrics | `services/lyrics/client.ts` | Cliente pronto, UI pendente |
+| Preferências | `prefs.ts`, `ui/preferences/` | Quase completo |
 
 ## Padrões mantidos
 

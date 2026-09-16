@@ -1,7 +1,6 @@
-import St from "@girs/st-18/st-18"
-import GObject from "gi://GObject"
-import Clutter from "@girs/clutter-18/clutter-18"
-
+import St from "gi://St";
+import GObject from "gi://GObject";
+import Clutter from "gi://Clutter";
 
 export class PixelSnappedBox extends St.BoxLayout {
     static {

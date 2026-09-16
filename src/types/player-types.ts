@@ -3,6 +3,7 @@ export type TrackInfo = {
     artist?: string[];
     album?: string;
     artUrl?: string;
+    url?: string;
     trackId?: string;
     length: number;
     rate: number;
@@ -22,4 +23,20 @@ export type PlayerInfo = {
     minimumRate: number;
     maximumRate: number;
     position: number;
+}
+
+export type PlayerDescriptor = {
+    busName: string;
+    identity?: string;
+    desktopEntry?: string;
+    lastPlayingTime: number;
+    lastSeen: number;
+}
+
+export type DisplayTrack = {
+    busName: string;
+    title?: string;
+    artist?: string;
+    artUrl?: string;
+    url?: string;
 }

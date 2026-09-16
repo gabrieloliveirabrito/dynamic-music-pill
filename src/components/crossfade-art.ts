@@ -1,123 +1,121 @@
-import St from "@girs/st-18/st-18"
-import GObject from "gi://GObject"
-import Clutter from "@girs/clutter-18/clutter-18"
-import { CrossfadeArtConstants } from "@/constants";
+import St from "gi://St";
+import GObject from "gi://GObject";
+import Clutter from "gi://Clutter";
 
-export class CrossfadeArt extends St.Widget<Clutter.BinLayout> {
-    private _radius: number = CrossfadeArtConstants.RADIUS;
-    private _shadowCSS: string = "box-shadow: none;";
-    private _lastCSS?: string;
-    private _currentUrl?: string;
-    private _bgUrl?: string;
+type Easeable = { ease(props: Record<string, unknown>): void };
+type ArtLayer = St.Widget & { _bgUrl?: string; _lastCss?: string };
 
+/**
+ * Faithful port of srcJS/uiWidgets.js CrossfadeArt.
+ * Layers are plain St.Widget (not nested CrossfadeArt).
+ */
+export class CrossfadeArt extends St.Widget {
     static {
         GObject.registerClass(this);
     }
 
-    constructor(properties?: Partial<St.Widget.ConstructorProps>, ...args: any[]) {
-        super(properties, args);
+    private _radius = 10;
+    private _shadowCSS = "box-shadow: none;";
+    private _currentUrl?: string;
 
-        this.layoutManager = new Clutter.BinLayout();
-        this.set_style_class_name("art-widget");
-        this.set_clip_to_allocation(false);
-        this.set_x_expand(false);
-        this.set_y_expand(false);
+    constructor(properties?: Partial<St.Widget.ConstructorProps>) {
+        super({
+            layout_manager: new Clutter.BinLayout(),
+            style_class: "art-widget",
+            clip_to_allocation: false,
+            x_expand: false,
+            y_expand: false,
+            ...properties,
+        });
     }
 
-    private _updateContainerStyle() {
-        this.setRadius(this._radius);
-
-        let hasArt = !!this._currentUrl && this._currentUrl.length > 0;
-        let activeShadow = hasArt ? this._shadowCSS : "box-shadow: none;";
-        let bgColor = hasArt ?
-            `background-color: ${CrossfadeArtConstants.DEFAULT_COLOR};`
-            : "background-color: transparent;";
-
-        this.set_style(`${activeShadow} ${bgColor}`);
+    setRadius(r: number): void {
+        this._radius = typeof r === "number" && !Number.isNaN(r) ? r : 10;
+        this._updateContainerStyle();
+        for (const c of this.get_children()) {
+            this._refreshLayerStyle(c as ArtLayer);
+        }
     }
 
-    private _refreshLayerStyle(layer: CrossfadeArt) {
-        if (!layer || !layer.get_parent()) return;
-        let bgCSS = layer._bgUrl ? `background-image: ("${layer._bgUrl}");` : '';
+    setShadowStyle(cssString: string): void {
+        this._shadowCSS = cssString || "box-shadow: none;";
+        this._updateContainerStyle();
+        for (const c of this.get_children()) {
+            this._refreshLayerStyle(c as ArtLayer);
+        }
+    }
 
-        let radius = this.getRadius();
-        let radiusCSS = `border-radius: ${radius}px; background-size: cover; box-shadow: none; `;
+    private _updateContainerStyle(): void {
+        const safeR = typeof this._radius === "number" && !Number.isNaN(this._radius) ? this._radius : 10;
+        const hasArt = !!(this._currentUrl && this._currentUrl.length > 0);
+        const activeShadow = hasArt ? this._shadowCSS : "box-shadow: none;";
+        const bgColor = hasArt ? "background-color: #000000;" : "background-color: transparent;";
+        this.set_style(`border-radius: ${safeR}px; ${bgColor} ${activeShadow}`);
+    }
 
-        let fullCSS = bgCSS + radiusCSS;
-        if (fullCSS === layer._lastCSS) {
+    private _refreshLayerStyle(layer: ArtLayer): void {
+        if (!layer || !layer.get_parent()) {
+            return;
+        }
+        const url = layer._bgUrl;
+        const bgPart = url ? `background-image: url("${url}");` : "";
+        const safeR = typeof this._radius === "number" && !Number.isNaN(this._radius) ? this._radius : 10;
+        const newCss = `border-radius: ${safeR}px; background-size: cover; box-shadow: none; ${bgPart}`;
+        if (layer._lastCss === newCss) {
+            return;
+        }
+        layer._lastCss = newCss;
+        if (layer.get_parent()) {
+            layer.set_style(newCss);
+        }
+    }
+
+    setArt(newUrl: string | null, _force = false): void {
+        const children = this.get_children() as ArtLayer[];
+        if (children.length > 0 && children[children.length - 1]._bgUrl === newUrl) {
             return;
         }
 
-        layer._lastCSS = fullCSS;
-        layer.set_style(fullCSS);
-    }
-
-    getRadius(): number {
-        return isNaN(this._radius) ? CrossfadeArtConstants.RADIUS
-            : this._radius;
-    }
-
-    setRadius(radius: number) {
-        this._radius = isNaN(radius) ? CrossfadeArtConstants.RADIUS : radius;
-        this.set_style(`border-radius: ${radius}px; ${this._shadowCSS}`);
-
-        const actors = this.get_children().filter(c => c instanceof CrossfadeArt);
-        actors.forEach(c => c._refreshLayerStyle(c));
-    }
-
-    setShadowStyle(cssString: string) {
-        this._shadowCSS = cssString;
+        this._currentUrl = newUrl ?? undefined;
         this._updateContainerStyle();
 
-        const actors = this.get_children().filter(c => c instanceof CrossfadeArt);
-        actors.forEach(a => a._refreshLayerStyle(a));
-    }
-
-    setArt(newUrl: string, force: boolean = false) {
-        let children = this.get_children().filter(c => c instanceof CrossfadeArt && c._bgUrl === newUrl);
-        if (children.length > 0) {
-            return;
+        for (const c of this.get_children()) {
+            c.remove_all_transitions();
         }
-        
-        this._currentUrl = newUrl;
-        this._updateContainerStyle();
-        children.forEach(c => c.remove_all_transitions());
 
-        let newLayer = new CrossfadeArt({
+        const newLayer = new St.Widget({
             x_expand: true,
             y_expand: true,
-            opacity: 0
-        });
-        newLayer._bgUrl = newUrl;
+            opacity: 0,
+        }) as ArtLayer;
+        newLayer._bgUrl = newUrl ?? undefined;
 
         this.add_child(newLayer);
         this._refreshLayerStyle(newLayer);
 
-        newLayer.ease({
+        (newLayer as unknown as Easeable).ease({
             opacity: 255,
-            duration: 1000,
+            duration: 1800,
             mode: Clutter.AnimationMode.EASE_OUT_QUAD,
             onStopped: (isFinished: boolean) => {
-                if (!isFinished) return;
-
+                if (!isFinished) {
+                    return;
+                }
                 newLayer.opacity = 255;
-
-                let currentChildren = this.get_children();
-                let layerIndex = currentChildren.indexOf(newLayer);
-
-                if (layerIndex > 0) {
-                    for (let i = 0; i < layerIndex; i++) {
-                        let oldLayer = currentChildren[i];
-
-                        oldLayer.ease({
+                const currentChildren = this.get_children();
+                const myIndex = currentChildren.indexOf(newLayer);
+                if (myIndex > 0) {
+                    for (let i = 0; i < myIndex; i++) {
+                        const oldLayer = currentChildren[i];
+                        (oldLayer as unknown as Easeable).ease({
                             opacity: 0,
                             duration: 300,
                             mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-                            onStopped: () => oldLayer.destroy()
-                        })
+                            onStopped: () => oldLayer.destroy(),
+                        });
                     }
                 }
-            }
-        })
+            },
+        });
     }
 }

@@ -8,5 +8,6 @@ export const TrackInfoMap : MapperType<TrackInfo> = {
     "mpris:artUrl": (t, v) => t.artUrl = v,
     "mpris:length": (t, v) => t.length = v,
     "mpris:trackid": (t, v) => t.trackId = v,
+    "xesam:url": (t, v) => t.url = v,
     "rate": (t, v) => t.rate = v
 }

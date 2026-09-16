@@ -1,13 +1,15 @@
-import St from "@girs/st-18/st-18"
-import Clutter from "@girs/clutter-18/clutter-18"
-import GObject from "@girs/gobject-2.0/gobject-2.0"
+import St from "gi://St";
+import Clutter from "gi://Clutter";
+import GObject from "gi://GObject";
 import Pango from "gi://Pango";
 import GLib from "gi://GLib";
 import { getAppContext } from "@/extension";
 import { AppContext } from "@/types/app-context";
 import { PixelSnappedBox } from "./pixel-snapped-box";
-import { WidgetProps } from "@/types/shell-types";
 import { TextFadeEffect } from "./effects/text-fade-effect";
+
+type Easeable = { ease(props: Record<string, unknown>): void };
+const ease = (actor: object): Easeable => actor as Easeable;
 
 export class ScrollLabel extends St.Widget {
     private _appContext: AppContext;
@@ -39,11 +41,11 @@ export class ScrollLabel extends St.Widget {
         GObject.registerClass(this)
     }
 
-    constructor(styleClass: string, properties?: Partial<St.Widget.ConstructorProps>, ...args: any[]) {
-        super(properties, args);
+    constructor(styleClass: string, properties?: Partial<St.Widget.ConstructorProps>) {
+        super(properties ?? {});
 
-        this.layoutManager = new Clutter.BinLayout();
-        this.set_x_expand(true)
+        this.layout_manager = new Clutter.BinLayout();
+        this.set_x_expand(true);
         this.set_y_expand(false);
         this.set_clip_to_allocation(true);
 
@@ -57,24 +59,24 @@ export class ScrollLabel extends St.Widget {
             x_align: Clutter.ActorAlign.CENTER,
             y_align: Clutter.ActorAlign.CENTER,
             orientation: Clutter.Orientation.HORIZONTAL
-        })
-        this.add_child(this._container)
+        });
+        this.add_child(this._container);
 
         this._label1 = new St.Label({
-            style_class: styleClass,
+            style_class: styleClass || "music-label-title",
             y_align: Clutter.ActorAlign.CENTER,
         });
         this._label1.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
         this._label1.clutter_text.line_wrap = false;
 
         this._label2 = new St.Label({
-            style_class: styleClass,
+            style_class: styleClass || "music-label-title",
             y_align: Clutter.ActorAlign.CENTER,
         });
         this._label2.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
         this._label2.clutter_text.line_wrap = false;
 
-        this._separator = new St.Widget({ width: 30});
+        this._separator = new St.Widget({ width: 30 });
 
         this._container.add_child(this._label1);
         this._container.add_child(this._separator);
@@ -137,7 +139,7 @@ export class ScrollLabel extends St.Widget {
         }
 
         let fontDesc = this._label1.get_theme_node().get_font();
-        let fadeWidth = (fontDesc.get_size() / Pango.SCALE) * 4;
+        let fadeWidth = (fontDesc.get_size() / Pango.SCALE) + 4;
 
         if (!this._fadeEffect) {
             this._fadeEffect = new TextFadeEffect(fadeWidth);
@@ -212,12 +214,12 @@ export class ScrollLabel extends St.Widget {
     private _updatePausedState() {
         let shouldPause = this._playerPaused && this._appContext.settings.scrollControls.freezeOnPause;
         if (shouldPause) {
-            if (this._paused) {
-                return;
+            if (!this._paused) {
+                this._paused = true;
+                // Cancel all pending timers so none of them can restart the scroll
+                this._cleanupTimers();
+                this._stopAnimation(true);
             }
-
-            this._cleanupTimers();
-            this._stopAnimation(true);
         } else if (this._paused) {
             this._paused = false;
             this._checkResize();
@@ -354,7 +356,7 @@ export class ScrollLabel extends St.Widget {
         if (!isLyric || (isLyric && lyricFadeEnabled)) {
             let duration = isLyric ? lyrics.fadeDuration : 300;
             this._label1.opacity = 0;
-            this._label1.ease({
+            ease(this._label1).ease({
                 opacity: 255,
                 duration: duration,
                 mode: Clutter.AnimationMode.EASE_OUT_QUAD
@@ -442,43 +444,58 @@ export class ScrollLabel extends St.Widget {
         const distance = textWidth + 30;
         const duration = (distance / 30) * 1000;
 
+        // Faithful to srcJS/uiWidgets.js: 2s pause between cycles.
+        // Never call loop() synchronously from onStopped — ease can finish
+        // sync and blow the stack ("too much recursion").
         const loop = () => {
             if (this._gameMode || !this.get_parent()) {
-                return GLib.SOURCE_REMOVE;
+                return;
             }
 
-            if (this._pendingScrollStop) {
-                this._pendingScrollStop = false;
-                this._isScrolling = false;
-                this._stopAnimation(true);
-                this._container.x_align = Clutter.ActorAlign.CENTER;
-                this._label2.hide();
-                this._separator.hide();
+            this._setFadeOutEffect(false, true, true);
 
-                return GLib.SOURCE_REMOVE;
+            if (this._scrollTimer) {
+                GLib.Source.remove(this._scrollTimer);
             }
-
-            this._setFadeOutEffect(true, true, true);
-
-            this._container.ease({
-                translationX: -distance,
-                duration: duration,
-                mode: Clutter.AnimationMode.LINEAR,
-                onStopped: (isFinished) => {
-                    if (!isFinished || this._gameMode || this._pendingScrollStop) {
-                        this._isScrolling = false;
-                        this._pendingScrollStop = false;
-
-                        return;
-                    }
-
-                    this._container.translation_x = 0;
-                    loop();
+            this._scrollTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 2000, () => {
+                this._scrollTimer = null;
+                if (this._gameMode || !this.get_parent()) {
+                    return GLib.SOURCE_REMOVE;
                 }
-            });
 
-            return GLib.SOURCE_REMOVE;
-        }
+                if (this._pendingScrollStop) {
+                    this._pendingScrollStop = false;
+                    this._isScrolling = false;
+                    this._stopAnimation(true);
+                    this._container.x_align = Clutter.ActorAlign.CENTER;
+                    this._label2.hide();
+                    this._separator.hide();
+                    return GLib.SOURCE_REMOVE;
+                }
+
+                this._setFadeOutEffect(true, true, true);
+
+                ease(this._container).ease({
+                    translation_x: -distance,
+                    duration,
+                    mode: Clutter.AnimationMode.LINEAR,
+                    onStopped: (isFinished: boolean) => {
+                        if (!isFinished || this._gameMode || this._pendingScrollStop) {
+                            this._isScrolling = false;
+                            this._pendingScrollStop = false;
+                            return;
+                        }
+
+                        this._container.translation_x = 0;
+                        GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+                            loop();
+                            return GLib.SOURCE_REMOVE;
+                        });
+                    },
+                });
+                return GLib.SOURCE_REMOVE;
+            });
+        };
         loop();
     }
 
@@ -515,14 +532,14 @@ export class ScrollLabel extends St.Widget {
                 return GLib.SOURCE_REMOVE;
             }
 
-            this._container.ease({
-                translationX: -distance,
+            ease(this._container).ease({
+                translation_x: -distance,
                 duration: scrollDuration,
                 mode: Clutter.AnimationMode.LINEAR,
                 onStopped: () => {
                     this._isScrolling = false;
                     this._lyricFinished = true;
-                }
+                },
             });
 
             return GLib.SOURCE_REMOVE;
@@ -534,26 +551,26 @@ export function _addBtnPressAnim(btn: St.Button) {
     btn.set_pivot_point(0.5, 0.5);
     btn.connect('button-press-event', () => {
         btn.remove_all_transitions();
-        btn.ease({
-            scaleX: 0.84, 
-            scaleY: 0.84, 
-            duration: 75, 
+        ease(btn).ease({
+            scaleX: 0.84,
+            scaleY: 0.84,
+            duration: 75,
             mode: Clutter.AnimationMode.EASE_OUT_QUAD
-        })
+        });
     });
 
     btn.connect('button-release-event', () => {
-        btn.ease({
+        ease(btn).ease({
             scaleX: 1.0, scaleY: 1.0,
             duration: 160, mode: Clutter.AnimationMode.EASE_OUT_BACK
         });
         return Clutter.EVENT_PROPAGATE;
-    })
+    });
     btn.connect('leave-event', () => {
-        btn.ease({
+        ease(btn).ease({
             scaleX: 1.0, scaleY: 1.0,
             duration: 100, mode: Clutter.AnimationMode.EASE_OUT_QUAD
         });
         return Clutter.EVENT_PROPAGATE;
-    })
+    });
 }
