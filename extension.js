@@ -2523,7 +2523,6 @@ var _MusicPill = class _MusicPill extends St7.Widget {
       y_align: Clutter7.ActorAlign.CENTER
     });
     this._body.set_pivot_point(0.5, 0.5);
-    this._applyStyle();
     this._artWidget = new CrossfadeArt();
     this._artBin = new St7.Bin({
       child: this._artWidget,
@@ -2538,6 +2537,7 @@ var _MusicPill = class _MusicPill extends St7.Widget {
     this._body.add_child(this.textBlock);
     this._body.add_child(this._visualizer);
     this.add_child(this._body);
+    this._applyStyle();
     this.connect("button-release-event", (_a, event) => this._onButton(event));
     this.connect("scroll-event", (_a, event) => this._onScroll(event));
   }
@@ -2598,6 +2598,10 @@ var _MusicPill = class _MusicPill extends St7.Widget {
     this._applyStyle();
   }
   _applyStyle() {
+    var _a, _b;
+    if (!this._body) {
+      return;
+    }
     applyPillBodyStyle(
       this._body,
       this._settings,
@@ -2606,8 +2610,8 @@ var _MusicPill = class _MusicPill extends St7.Widget {
       this.currentBgAlpha,
       this._currentStatus === "Playing"
     );
-    this._visualizer.setColor(this._state.displayedColor);
-    this._artWidget.setRadius(this._state.radius > 0 ? Math.min(this._state.radius, 16) : 8);
+    (_a = this._visualizer) == null ? void 0 : _a.setColor(this._state.displayedColor);
+    (_b = this._artWidget) == null ? void 0 : _b.setRadius(this._state.radius > 0 ? Math.min(this._state.radius, 16) : 8);
   }
   setTitle(title) {
     this.textBlock.setTitle(title);
