@@ -1,6 +1,6 @@
-import Clutter from '@girs/clutter-18/clutter-18';
-import GObject from 'gi://GObject';
-import GLib from 'gi://GLib';
+import Clutter from "gi://Clutter";
+import GObject from "gi://GObject";
+import GLib from "gi://GLib";
 
 const textFadeEffectShaderSource = `
     uniform sampler2D tex;
@@ -31,11 +31,11 @@ export class TextFadeEffect extends Clutter.ShaderEffect {
     private _enableRight: number = 1.0;
     private _animId: number | null = null;
 
-    constructor(fadePixels = 32, properties?: Partial<Clutter.ShaderEffect.ConstructorProps>, ...args: any[]) {
+    constructor(fadePixels = 32, properties?: Partial<Clutter.ShaderEffect.ConstructorProps>) {
         super({
             shader_type: 1,
             ...properties
-        }, args);
+        });
 
         this._fadePixels = fadePixels;
         this.set_shader_source(textFadeEffectShaderSource);

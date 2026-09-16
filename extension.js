@@ -1576,32 +1576,24 @@ function isBrowserBus(busName) {
 }
 
 // src/ui/music-pill/index.ts
-import GObject9 from "gi://GObject";
-import St5 from "gi://St";
-import Clutter5 from "gi://Clutter";
+import GObject10 from "gi://GObject";
+import St7 from "gi://St";
+import Clutter7 from "gi://Clutter";
 import GLib9 from "gi://GLib";
 
-// node_modules/.pnpm/@girs+st-18@18.0.0-4.0.4/node_modules/@girs/st-18/st-18.js
-import St from "gi://St?version=18";
-var st_18_default = St;
-
 // src/components/crossfade-art.ts
+import St from "gi://St";
 import GObject3 from "gi://GObject";
-
-// node_modules/.pnpm/@girs+clutter-18@18.0.0-4.0.4/node_modules/@girs/clutter-18/clutter-18.js
-import Clutter from "gi://Clutter?version=18";
-var clutter_18_default = Clutter;
-
-// src/components/crossfade-art.ts
-var _CrossfadeArt = class _CrossfadeArt extends st_18_default.Widget {
-  constructor(properties, ...args) {
-    super(properties, args);
+import Clutter from "gi://Clutter";
+var _CrossfadeArt = class _CrossfadeArt extends St.Widget {
+  constructor(properties) {
+    super(properties != null ? properties : {});
     __publicField(this, "_radius", crossfade_art_constants_exports.RADIUS);
     __publicField(this, "_shadowCSS", "box-shadow: none;");
     __publicField(this, "_lastCSS");
     __publicField(this, "_currentUrl");
     __publicField(this, "_bgUrl");
-    this.layoutManager = new clutter_18_default.BinLayout();
+    this.layout_manager = new Clutter.BinLayout();
     this.set_style_class_name("art-widget");
     this.set_clip_to_allocation(false);
     this.set_x_expand(false);
@@ -1616,7 +1608,7 @@ var _CrossfadeArt = class _CrossfadeArt extends st_18_default.Widget {
   }
   _refreshLayerStyle(layer) {
     if (!layer || !layer.get_parent()) return;
-    let bgCSS = layer._bgUrl ? `background-image: ("${layer._bgUrl}");` : "";
+    let bgCSS = layer._bgUrl ? `background-image: url("${layer._bgUrl}");` : "";
     let radius = this.getRadius();
     let radiusCSS = `border-radius: ${radius}px; background-size: cover; box-shadow: none; `;
     let fullCSS = bgCSS + radiusCSS;
@@ -1642,13 +1634,16 @@ var _CrossfadeArt = class _CrossfadeArt extends st_18_default.Widget {
     actors.forEach((a) => a._refreshLayerStyle(a));
   }
   setArt(newUrl, force = false) {
+    if (!newUrl) {
+      return;
+    }
     let children = this.get_children().filter((c) => c instanceof _CrossfadeArt && c._bgUrl === newUrl);
-    if (children.length > 0) {
+    if (children.length > 0 && !force) {
       return;
     }
     this._currentUrl = newUrl;
     this._updateContainerStyle();
-    children.forEach((c) => c.remove_all_transitions());
+    const easeActor = (actor) => actor;
     let newLayer = new _CrossfadeArt({
       x_expand: true,
       y_expand: true,
@@ -1657,10 +1652,10 @@ var _CrossfadeArt = class _CrossfadeArt extends st_18_default.Widget {
     newLayer._bgUrl = newUrl;
     this.add_child(newLayer);
     this._refreshLayerStyle(newLayer);
-    newLayer.ease({
+    easeActor(newLayer).ease({
       opacity: 255,
       duration: 1e3,
-      mode: clutter_18_default.AnimationMode.EASE_OUT_QUAD,
+      mode: Clutter.AnimationMode.EASE_OUT_QUAD,
       onStopped: (isFinished) => {
         if (!isFinished) return;
         newLayer.opacity = 255;
@@ -1669,10 +1664,10 @@ var _CrossfadeArt = class _CrossfadeArt extends st_18_default.Widget {
         if (layerIndex > 0) {
           for (let i = 0; i < layerIndex; i++) {
             let oldLayer = currentChildren[i];
-            oldLayer.ease({
+            easeActor(oldLayer).ease({
               opacity: 0,
               duration: 300,
-              mode: clutter_18_default.AnimationMode.EASE_OUT_QUAD,
+              mode: Clutter.AnimationMode.EASE_OUT_QUAD,
               onStopped: () => oldLayer.destroy()
             });
           }
@@ -1685,8 +1680,9 @@ GObject3.registerClass(_CrossfadeArt);
 var CrossfadeArt = _CrossfadeArt;
 
 // src/components/pixel-snapped-box.ts
+import St2 from "gi://St";
 import GObject4 from "gi://GObject";
-var _PixelSnappedBox = class _PixelSnappedBox extends st_18_default.BoxLayout {
+var _PixelSnappedBox = class _PixelSnappedBox extends St2.BoxLayout {
   vfunc_allocate(box) {
     box.x1 = Math.round(box.x1);
     box.x2 = Math.round(box.x2);
@@ -1699,19 +1695,20 @@ GObject4.registerClass(_PixelSnappedBox);
 var PixelSnappedBox = _PixelSnappedBox;
 
 // src/ui/music-pill/components/text-block/index.ts
-import St2 from "gi://St";
-import Clutter2 from "gi://Clutter";
-
-// node_modules/.pnpm/@girs+gobject-2.0@2.88.0-4.0.4/node_modules/@girs/gobject-2.0/gobject-2.0.js
-import GObject5 from "gi://GObject?version=2.0";
-var gobject_2_0_default = GObject5;
+import GObject7 from "gi://GObject";
+import St4 from "gi://St";
+import Clutter4 from "gi://Clutter";
 
 // src/components/scroll-label.ts
+import St3 from "gi://St";
+import Clutter3 from "gi://Clutter";
+import GObject6 from "gi://GObject";
 import Pango from "gi://Pango";
 import GLib7 from "gi://GLib";
 
 // src/components/effects/text-fade-effect.ts
-import GObject6 from "gi://GObject";
+import Clutter2 from "gi://Clutter";
+import GObject5 from "gi://GObject";
 import GLib6 from "gi://GLib";
 var textFadeEffectShaderSource = `
     uniform sampler2D tex;
@@ -1731,11 +1728,11 @@ var textFadeEffectShaderSource = `
         cogl_color_out = vec4(color.rgb * alpha, color.a * alpha) * cogl_color_in;
     }
 `;
-var _TextFadeEffect = class _TextFadeEffect extends clutter_18_default.ShaderEffect {
-  constructor(fadePixels = 32, properties, ...args) {
+var _TextFadeEffect = class _TextFadeEffect extends Clutter2.ShaderEffect {
+  constructor(fadePixels = 32, properties) {
     super(__spreadValues({
       shader_type: 1
-    }, properties), args);
+    }, properties));
     __publicField(this, "_fadePixels", 32);
     __publicField(this, "_enableLeft", 0);
     __publicField(this, "_enableRight", 1);
@@ -1790,32 +1787,33 @@ var _TextFadeEffect = class _TextFadeEffect extends clutter_18_default.ShaderEff
     if (!actor) {
       return;
     }
-    let widthVal = new GObject6.Value();
-    widthVal.init(GObject6.TYPE_FLOAT);
+    let widthVal = new GObject5.Value();
+    widthVal.init(GObject5.TYPE_FLOAT);
     widthVal.set_float(actor.get_width());
     this.set_uniform_value("width", widthVal);
-    let fadeVal = new GObject6.Value();
-    fadeVal.init(GObject6.TYPE_FLOAT);
+    let fadeVal = new GObject5.Value();
+    fadeVal.init(GObject5.TYPE_FLOAT);
     fadeVal.set_float(this._fadePixels);
     this.set_uniform_value("fade_pixels", fadeVal);
-    let leftVal = new GObject6.Value();
-    leftVal.init(GObject6.TYPE_FLOAT);
+    let leftVal = new GObject5.Value();
+    leftVal.init(GObject5.TYPE_FLOAT);
     leftVal.set_float(this._enableLeft);
     this.set_uniform_value("enable_left", leftVal);
-    let rightVal = new GObject6.Value();
-    rightVal.init(GObject6.TYPE_FLOAT);
+    let rightVal = new GObject5.Value();
+    rightVal.init(GObject5.TYPE_FLOAT);
     rightVal.set_float(this._enableRight);
     this.set_uniform_value("enable_right", rightVal);
     super.vfunc_paint_target(node, paint_context);
   }
 };
-GObject6.registerClass(_TextFadeEffect);
+GObject5.registerClass(_TextFadeEffect);
 var TextFadeEffect = _TextFadeEffect;
 
 // src/components/scroll-label.ts
-var _ScrollLabel = class _ScrollLabel extends st_18_default.Widget {
-  constructor(styleClass, properties, ...args) {
-    super(properties, args);
+var ease = (actor) => actor;
+var _ScrollLabel = class _ScrollLabel extends St3.Widget {
+  constructor(styleClass, properties) {
+    super(properties != null ? properties : {});
     __publicField(this, "_appContext");
     __publicField(this, "_text", "");
     __publicField(this, "_gameMode", false);
@@ -1840,7 +1838,7 @@ var _ScrollLabel = class _ScrollLabel extends st_18_default.Widget {
     __publicField(this, "_isFinalized", false);
     __publicField(this, "_lyricFinished", false);
     __publicField(this, "_scrollTimer", null);
-    this.layoutManager = new clutter_18_default.BinLayout();
+    this.layout_manager = new Clutter3.BinLayout();
     this.set_x_expand(true);
     this.set_y_expand(false);
     this.set_clip_to_allocation(true);
@@ -1850,24 +1848,24 @@ var _ScrollLabel = class _ScrollLabel extends st_18_default.Widget {
     this._container = new PixelSnappedBox({
       x_expand: true,
       y_expand: true,
-      x_align: clutter_18_default.ActorAlign.CENTER,
-      y_align: clutter_18_default.ActorAlign.CENTER,
-      orientation: clutter_18_default.Orientation.HORIZONTAL
+      x_align: Clutter3.ActorAlign.CENTER,
+      y_align: Clutter3.ActorAlign.CENTER,
+      orientation: Clutter3.Orientation.HORIZONTAL
     });
     this.add_child(this._container);
-    this._label1 = new st_18_default.Label({
-      style_class: styleClass,
-      y_align: clutter_18_default.ActorAlign.CENTER
+    this._label1 = new St3.Label({
+      style_class: styleClass || "music-label-title",
+      y_align: Clutter3.ActorAlign.CENTER
     });
     this._label1.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
     this._label1.clutter_text.line_wrap = false;
-    this._label2 = new st_18_default.Label({
-      style_class: styleClass,
-      y_align: clutter_18_default.ActorAlign.CENTER
+    this._label2 = new St3.Label({
+      style_class: styleClass || "music-label-title",
+      y_align: Clutter3.ActorAlign.CENTER
     });
     this._label2.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
     this._label2.clutter_text.line_wrap = false;
-    this._separator = new st_18_default.Widget({ width: 30 });
+    this._separator = new St3.Widget({ width: 30 });
     this._container.add_child(this._label1);
     this._container.add_child(this._separator);
     this._container.add_child(this._label2);
@@ -2006,7 +2004,7 @@ var _ScrollLabel = class _ScrollLabel extends st_18_default.Widget {
       this._pendingScrollStop = true;
     } else {
       this._stopAnimation(true);
-      this._container.x_align = clutter_18_default.ActorAlign.CENTER;
+      this._container.x_align = Clutter3.ActorAlign.CENTER;
       this._label2.hide();
       this._separator.hide();
     }
@@ -2051,7 +2049,7 @@ var _ScrollLabel = class _ScrollLabel extends st_18_default.Widget {
       let needsScroll = textWidth > boxWidth + 5 && this._appContext.settings.scrollControls.scrollText || this._lyricTime > 0;
       let isScrolling = this._scrollTimer != null || this._isScrolling;
       if (needsScroll && !isScrolling) {
-        this._container.x_align = clutter_18_default.ActorAlign.START;
+        this._container.x_align = Clutter3.ActorAlign.START;
         if (this._lyricTime > 0) {
           this._startLyricScroll(textWidth);
         } else if (!this._hoverOnly || this._hovered || this._forceScroll) {
@@ -2059,12 +2057,12 @@ var _ScrollLabel = class _ScrollLabel extends st_18_default.Widget {
         }
       } else if (!needsScroll && isScrolling) {
         this._stopAnimation(true);
-        this._container.x_align = clutter_18_default.ActorAlign.CENTER;
+        this._container.x_align = Clutter3.ActorAlign.CENTER;
         this._label2.hide();
         this._separator.hide();
       } else if (!needsScroll) {
         this._stopAnimation(true);
-        this._container.x_align = clutter_18_default.ActorAlign.CENTER;
+        this._container.x_align = Clutter3.ActorAlign.CENTER;
       }
       return GLib7.SOURCE_REMOVE;
     });
@@ -2078,7 +2076,7 @@ var _ScrollLabel = class _ScrollLabel extends st_18_default.Widget {
     this._lyricTime = lyricTime;
     this._lyricFinished = false;
     this._stopAnimation(true);
-    this._container.x_align = clutter_18_default.ActorAlign.CENTER;
+    this._container.x_align = Clutter3.ActorAlign.CENTER;
     this._label1.text = this._text;
     this._label2.text = this._text;
     this._label2.hide();
@@ -2090,10 +2088,10 @@ var _ScrollLabel = class _ScrollLabel extends st_18_default.Widget {
     if (!isLyric || isLyric && lyricFadeEnabled) {
       let duration = isLyric ? lyrics.fadeDuration : 300;
       this._label1.opacity = 0;
-      this._label1.ease({
+      ease(this._label1).ease({
         opacity: 255,
         duration,
-        mode: clutter_18_default.AnimationMode.EASE_OUT_QUAD
+        mode: Clutter3.AnimationMode.EASE_OUT_QUAD
       });
     } else {
       this._label1.opacity = 255;
@@ -2140,7 +2138,7 @@ var _ScrollLabel = class _ScrollLabel extends st_18_default.Widget {
     let textWidth = this._label1.get_preferred_width(-1)[1] || 0;
     let needsScroll = textWidth > boxWidth + 5;
     if (needsScroll) {
-      this._container.x_align = clutter_18_default.ActorAlign.START;
+      this._container.x_align = Clutter3.ActorAlign.START;
       if (this._lyricTime > 0) {
         this._startLyricScroll(textWidth);
       } else if (this._appContext.settings.scrollControls.scrollText) {
@@ -2150,7 +2148,7 @@ var _ScrollLabel = class _ScrollLabel extends st_18_default.Widget {
       }
     } else {
       this._stopAnimation(true);
-      this._container.x_align = clutter_18_default.ActorAlign.CENTER;
+      this._container.x_align = Clutter3.ActorAlign.CENTER;
     }
   }
   _startInfiniteScroll(textWidth) {
@@ -2168,16 +2166,16 @@ var _ScrollLabel = class _ScrollLabel extends st_18_default.Widget {
         this._pendingScrollStop = false;
         this._isScrolling = false;
         this._stopAnimation(true);
-        this._container.x_align = clutter_18_default.ActorAlign.CENTER;
+        this._container.x_align = Clutter3.ActorAlign.CENTER;
         this._label2.hide();
         this._separator.hide();
         return GLib7.SOURCE_REMOVE;
       }
       this._setFadeOutEffect(true, true, true);
-      this._container.ease({
+      ease(this._container).ease({
         translationX: -distance,
         duration,
-        mode: clutter_18_default.AnimationMode.LINEAR,
+        mode: Clutter3.AnimationMode.LINEAR,
         onStopped: (isFinished) => {
           if (!isFinished || this._gameMode || this._pendingScrollStop) {
             this._isScrolling = false;
@@ -2218,10 +2216,10 @@ var _ScrollLabel = class _ScrollLabel extends st_18_default.Widget {
       if (this._gameMode || !this.get_parent()) {
         return GLib7.SOURCE_REMOVE;
       }
-      this._container.ease({
+      ease(this._container).ease({
         translationX: -distance,
         duration: scrollDuration,
-        mode: clutter_18_default.AnimationMode.LINEAR,
+        mode: Clutter3.AnimationMode.LINEAR,
         onStopped: () => {
           this._isScrolling = false;
           this._lyricFinished = true;
@@ -2231,15 +2229,15 @@ var _ScrollLabel = class _ScrollLabel extends st_18_default.Widget {
     });
   }
 };
-gobject_2_0_default.registerClass(_ScrollLabel);
+GObject6.registerClass(_ScrollLabel);
 var ScrollLabel = _ScrollLabel;
 
 // src/ui/music-pill/components/text-block/index.ts
-var TextBlock = class extends St2.BoxLayout {
+var _TextBlock = class _TextBlock extends St4.BoxLayout {
   constructor() {
     super({
       x_expand: true,
-      y_align: Clutter2.ActorAlign.CENTER,
+      y_align: Clutter4.ActorAlign.CENTER,
       vertical: true
     });
     __publicField(this, "_titleScroll");
@@ -2250,33 +2248,35 @@ var TextBlock = class extends St2.BoxLayout {
     this.add_child(this._artistScroll);
   }
   setTitle(text) {
-    this._titleScroll.setText(text, true, 0);
+    this._titleScroll.setText(text != null ? text : "", true, 0);
   }
   setArtist(text) {
-    this._artistScroll.setText(text, true);
+    this._artistScroll.setText(text != null ? text : "", true);
   }
   setPlayerPaused(paused) {
     this._titleScroll.setPlayerPaused(paused);
     this._artistScroll.setPlayerPaused(paused);
   }
 };
+GObject7.registerClass(_TextBlock);
+var TextBlock = _TextBlock;
 
 // src/ui/visualizers/waveform.ts
-import GObject8 from "gi://GObject";
-import St4 from "gi://St";
-import Clutter4 from "gi://Clutter";
+import GObject9 from "gi://GObject";
+import St6 from "gi://St";
+import Clutter6 from "gi://Clutter";
 
 // src/ui/visualizers/simulated.ts
-import GObject7 from "gi://GObject";
+import GObject8 from "gi://GObject";
 import GLib8 from "gi://GLib";
-import St3 from "gi://St";
-import Clutter3 from "gi://Clutter";
-var _SimulatedVisualizer = class _SimulatedVisualizer extends St3.BoxLayout {
+import St5 from "gi://St";
+import Clutter5 from "gi://Clutter";
+var _SimulatedVisualizer = class _SimulatedVisualizer extends St5.BoxLayout {
   constructor(settings, isPopup = false) {
     super({
       style: "spacing: 2px;",
-      y_align: Clutter3.ActorAlign.CENTER,
-      x_align: Clutter3.ActorAlign.END
+      y_align: Clutter5.ActorAlign.CENTER,
+      x_align: Clutter5.ActorAlign.END
     });
     __publicField(this, "_settings");
     __publicField(this, "_isPopup");
@@ -2326,7 +2326,7 @@ var _SimulatedVisualizer = class _SimulatedVisualizer extends St3.BoxLayout {
     const count = this._barCount();
     const width = this._barWidth();
     for (let i = 0; i < count; i++) {
-      const bar = new St3.Widget({
+      const bar = new St5.Widget({
         width,
         height: 2,
         style: `background-color: rgb(${this._color.r},${this._color.g},${this._color.b}); border-radius: 2px;`
@@ -2368,15 +2368,15 @@ var _SimulatedVisualizer = class _SimulatedVisualizer extends St3.BoxLayout {
     super.destroy();
   }
 };
-GObject7.registerClass(_SimulatedVisualizer);
+GObject8.registerClass(_SimulatedVisualizer);
 var SimulatedVisualizer = _SimulatedVisualizer;
 
 // src/ui/visualizers/waveform.ts
-var _WaveformVisualizer = class _WaveformVisualizer extends St4.Bin {
+var _WaveformVisualizer = class _WaveformVisualizer extends St6.Bin {
   constructor(defaultHeight = 24, settings, isPopup = false) {
     super({
-      y_align: Clutter4.ActorAlign.CENTER,
-      x_align: Clutter4.ActorAlign.END,
+      y_align: Clutter6.ActorAlign.CENTER,
+      x_align: Clutter6.ActorAlign.END,
       y_expand: true,
       height: defaultHeight
     });
@@ -2419,19 +2419,19 @@ var _WaveformVisualizer = class _WaveformVisualizer extends St4.Bin {
     this._simulated.updateBarCount();
   }
 };
-GObject8.registerClass(_WaveformVisualizer);
+GObject9.registerClass(_WaveformVisualizer);
 var WaveformVisualizer = _WaveformVisualizer;
 
 // src/ui/music-pill/index.ts
-var _MusicPill = class _MusicPill extends St5.Widget {
+var _MusicPill = class _MusicPill extends St7.Widget {
   constructor(settings) {
     super({
       style_class: "music-pill-container",
       reactive: true,
-      layout_manager: new Clutter5.BinLayout(),
+      layout_manager: new Clutter7.BinLayout(),
       y_expand: true,
-      y_align: Clutter5.ActorAlign.FILL,
-      x_align: Clutter5.ActorAlign.CENTER,
+      y_align: Clutter7.ActorAlign.FILL,
+      x_align: Clutter7.ActorAlign.CENTER,
       opacity: 0,
       width: 0,
       visible: false,
@@ -2470,16 +2470,16 @@ var _MusicPill = class _MusicPill extends St5.Widget {
       lastLeftCss: null,
       lastRightCss: null
     };
-    this._body = new St5.BoxLayout({
+    this._body = new St7.BoxLayout({
       style_class: "pill-body",
       x_expand: false,
       y_expand: false,
-      y_align: Clutter5.ActorAlign.CENTER,
+      y_align: Clutter7.ActorAlign.CENTER,
       style: "spacing: 6px;"
     });
     this._body.set_pivot_point(0.5, 0.5);
     this._artWidget = new CrossfadeArt();
-    this._artBin = new St5.Bin({
+    this._artBin = new St7.Bin({
       child: this._artWidget,
       style: "margin-right: 4px;",
       x_expand: false,
@@ -2600,21 +2600,21 @@ var _MusicPill = class _MusicPill extends St5.Widget {
     const button = event.get_button();
     if (button === 2) {
       this._emit(this._settings.mouseActions.middleClick);
-      return Clutter5.EVENT_STOP;
+      return Clutter7.EVENT_STOP;
     }
     if (button === 3) {
       this._emit(this._settings.mouseActions.rightClick);
-      return Clutter5.EVENT_STOP;
+      return Clutter7.EVENT_STOP;
     }
     if (button !== 1) {
-      return Clutter5.EVENT_PROPAGATE;
+      return Clutter7.EVENT_PROPAGATE;
     }
     const now = Date.now();
     const doubleAction = this._settings.mouseActions.doubleClick;
     const singleAction = this._settings.mouseActions.leftClick;
     if (!doubleAction || doubleAction === "none") {
       this._emit(singleAction);
-      return Clutter5.EVENT_STOP;
+      return Clutter7.EVENT_STOP;
     }
     if (this._lastClick && now - this._lastClick <= 220) {
       this._lastClick = 0;
@@ -2635,22 +2635,22 @@ var _MusicPill = class _MusicPill extends St5.Widget {
         return GLib9.SOURCE_REMOVE;
       });
     }
-    return Clutter5.EVENT_STOP;
+    return Clutter7.EVENT_STOP;
   }
   _onScroll(event) {
     const dir = event.get_scroll_direction();
-    if (dir === Clutter5.ScrollDirection.UP) {
+    if (dir === Clutter7.ScrollDirection.UP) {
       this._emit("previous");
-      return Clutter5.EVENT_STOP;
+      return Clutter7.EVENT_STOP;
     }
-    if (dir === Clutter5.ScrollDirection.DOWN) {
+    if (dir === Clutter7.ScrollDirection.DOWN) {
       this._emit("next");
-      return Clutter5.EVENT_STOP;
+      return Clutter7.EVENT_STOP;
     }
-    return Clutter5.EVENT_PROPAGATE;
+    return Clutter7.EVENT_PROPAGATE;
   }
 };
-GObject9.registerClass(_MusicPill);
+GObject10.registerClass(_MusicPill);
 var MusicPill = _MusicPill;
 
 // src/ui/music-pill/positioning/inject.ts
@@ -2881,10 +2881,10 @@ function createPillInjector(pill, settings) {
 }
 
 // src/ui/expanded-player/index.ts
-import GObject14 from "gi://GObject";
+import GObject15 from "gi://GObject";
 import GLib11 from "gi://GLib";
-import St10 from "gi://St";
-import Clutter10 from "gi://Clutter";
+import St12 from "gi://St";
+import Clutter12 from "gi://Clutter";
 import * as Main3 from "resource:///org/gnome/shell/ui/main.js";
 
 // src/utils/dash-to-dock.ts
@@ -2962,15 +2962,15 @@ function restoreDashToDockAutohide() {
 }
 
 // src/ui/expanded-player/components/track-info.ts
-import GObject10 from "gi://GObject";
-import St6 from "gi://St";
-import Clutter6 from "gi://Clutter";
-var _TrackInfoBlock = class _TrackInfoBlock extends St6.BoxLayout {
+import GObject11 from "gi://GObject";
+import St8 from "gi://St";
+import Clutter8 from "gi://Clutter";
+var _TrackInfoBlock = class _TrackInfoBlock extends St8.BoxLayout {
   constructor() {
     super({
       vertical: true,
       x_expand: true,
-      y_align: Clutter6.ActorAlign.CENTER,
+      y_align: Clutter8.ActorAlign.CENTER,
       style: "spacing: 4px;"
     });
     __publicField(this, "_title");
@@ -2991,13 +2991,13 @@ var _TrackInfoBlock = class _TrackInfoBlock extends St6.BoxLayout {
     this._artist.setPlayerPaused(paused);
   }
 };
-GObject10.registerClass(_TrackInfoBlock);
+GObject11.registerClass(_TrackInfoBlock);
 var TrackInfoBlock = _TrackInfoBlock;
 
 // src/ui/expanded-player/components/progress-bar.ts
-import GObject11 from "gi://GObject";
-import St7 from "gi://St";
-import Clutter7 from "gi://Clutter";
+import GObject12 from "gi://GObject";
+import St9 from "gi://St";
+import Clutter9 from "gi://Clutter";
 
 // src/utils/time.ts
 function formatTime(microSeconds, forceHours = false) {
@@ -3016,13 +3016,13 @@ function formatTime(microSeconds, forceHours = false) {
 }
 
 // src/ui/expanded-player/components/progress-bar.ts
-var _ProgressBar = class _ProgressBar extends St7.BoxLayout {
+var _ProgressBar = class _ProgressBar extends St9.BoxLayout {
   constructor() {
     super({
       vertical: false,
       x_expand: true,
       style: "spacing: 8px;",
-      y_align: Clutter7.ActorAlign.CENTER
+      y_align: Clutter9.ActorAlign.CENTER
     });
     __publicField(this, "_current");
     __publicField(this, "_total");
@@ -3031,16 +3031,16 @@ var _ProgressBar = class _ProgressBar extends St7.BoxLayout {
     __publicField(this, "_onSeek", null);
     __publicField(this, "_length", 0);
     __publicField(this, "_forceHours", false);
-    this._current = new St7.Label({ text: "0:00", y_align: Clutter7.ActorAlign.CENTER });
-    this._total = new St7.Label({ text: "0:00", y_align: Clutter7.ActorAlign.CENTER });
-    this._track = new St7.Widget({
+    this._current = new St9.Label({ text: "0:00", y_align: Clutter9.ActorAlign.CENTER });
+    this._total = new St9.Label({ text: "0:00", y_align: Clutter9.ActorAlign.CENTER });
+    this._track = new St9.Widget({
       style_class: "music-pill-progress-track",
       style: "background-color: rgba(255,255,255,0.2); border-radius: 3px; height: 6px;",
       x_expand: true,
       reactive: true,
       height: 6
     });
-    this._fill = new St7.Widget({
+    this._fill = new St9.Widget({
       style: "background-color: rgba(255,255,255,0.85); border-radius: 3px; height: 6px;",
       height: 6,
       width: 0
@@ -3048,14 +3048,14 @@ var _ProgressBar = class _ProgressBar extends St7.BoxLayout {
     this._track.add_child(this._fill);
     this._track.connect("button-release-event", (_a, event) => {
       if (!this._onSeek) {
-        return Clutter7.EVENT_PROPAGATE;
+        return Clutter9.EVENT_PROPAGATE;
       }
       const [ex] = event.get_coords();
       const [tx] = this._track.get_transformed_position();
       const w = this._track.get_width() || 1;
       const ratio = Math.max(0, Math.min(1, (ex - tx) / w));
       this._onSeek(ratio);
-      return Clutter7.EVENT_STOP;
+      return Clutter9.EVENT_STOP;
     });
     this.add_child(this._current);
     this.add_child(this._track);
@@ -3076,18 +3076,18 @@ var _ProgressBar = class _ProgressBar extends St7.BoxLayout {
     this._fill.set_width(Math.floor(w * ratio));
   }
 };
-GObject11.registerClass(_ProgressBar);
+GObject12.registerClass(_ProgressBar);
 var ProgressBar = _ProgressBar;
 
 // src/ui/expanded-player/components/transport-controls.ts
-import GObject12 from "gi://GObject";
-import St8 from "gi://St";
-import Clutter8 from "gi://Clutter";
-var _TransportControls = class _TransportControls extends St8.BoxLayout {
+import GObject13 from "gi://GObject";
+import St10 from "gi://St";
+import Clutter10 from "gi://Clutter";
+var _TransportControls = class _TransportControls extends St10.BoxLayout {
   constructor(callbacks) {
     super({
       vertical: false,
-      x_align: Clutter8.ActorAlign.CENTER,
+      x_align: Clutter10.ActorAlign.CENTER,
       style: "spacing: 12px;"
     });
     __publicField(this, "_prev");
@@ -3095,8 +3095,8 @@ var _TransportControls = class _TransportControls extends St8.BoxLayout {
     __publicField(this, "_next");
     __publicField(this, "_playIcon");
     this._prev = this._iconButton("media-skip-backward-symbolic", () => callbacks.onPrevious());
-    this._playIcon = new St8.Icon({ icon_name: "media-playback-start-symbolic", icon_size: 28 });
-    this._play = new St8.Button({
+    this._playIcon = new St10.Icon({ icon_name: "media-playback-start-symbolic", icon_size: 28 });
+    this._play = new St10.Button({
       child: this._playIcon,
       reactive: true,
       can_focus: true,
@@ -3120,8 +3120,8 @@ var _TransportControls = class _TransportControls extends St8.BoxLayout {
     this._next.reactive = canNext;
   }
   _iconButton(iconName, onClick) {
-    const btn = new St8.Button({
-      child: new St8.Icon({ icon_name: iconName, icon_size: 22 }),
+    const btn = new St10.Button({
+      child: new St10.Icon({ icon_name: iconName, icon_size: 22 }),
       reactive: true,
       can_focus: true,
       style_class: "music-pill-transport-btn"
@@ -3130,26 +3130,26 @@ var _TransportControls = class _TransportControls extends St8.BoxLayout {
     return btn;
   }
 };
-GObject12.registerClass(_TransportControls);
+GObject13.registerClass(_TransportControls);
 var TransportControls = _TransportControls;
 
 // src/ui/expanded-player/components/vinyl-art.ts
-import GObject13 from "gi://GObject";
-import St9 from "gi://St";
-import Clutter9 from "gi://Clutter";
-var _VinylArt = class _VinylArt extends St9.Bin {
+import GObject14 from "gi://GObject";
+import St11 from "gi://St";
+import Clutter11 from "gi://Clutter";
+var _VinylArt = class _VinylArt extends St11.Bin {
   constructor() {
     super({
       width: 96,
       height: 96,
-      x_align: Clutter9.ActorAlign.CENTER,
-      y_align: Clutter9.ActorAlign.CENTER
+      x_align: Clutter11.ActorAlign.CENTER,
+      y_align: Clutter11.ActorAlign.CENTER
     });
     __publicField(this, "_art");
     __publicField(this, "_url", null);
     __publicField(this, "_spinning", false);
     __publicField(this, "_square", false);
-    this._art = new St9.Widget({
+    this._art = new St11.Widget({
       width: 96,
       height: 96,
       style: "border-radius: 48px; background-size: cover; background-color: rgba(40,40,40,0.8);"
@@ -3184,7 +3184,7 @@ var _VinylArt = class _VinylArt extends St9.Bin {
     this._art.ease({
       rotation_angle_z: this._art.rotation_angle_z + 360,
       duration: 8e3,
-      mode: Clutter9.AnimationMode.LINEAR,
+      mode: Clutter11.AnimationMode.LINEAR,
       onStopped: (finished) => {
         if (finished && this._spinning) {
           this._spinOnce();
@@ -3198,11 +3198,11 @@ var _VinylArt = class _VinylArt extends St9.Bin {
     this._art.set_style(`border-radius: ${radius}px; background-size: cover; ${bg}`);
   }
 };
-GObject13.registerClass(_VinylArt);
+GObject14.registerClass(_VinylArt);
 var VinylArt = _VinylArt;
 
 // src/ui/expanded-player/index.ts
-var _ExpandedPlayer = class _ExpandedPlayer extends St10.Widget {
+var _ExpandedPlayer = class _ExpandedPlayer extends St12.Widget {
   constructor(host) {
     const [bgW, bgH] = global.display.get_size();
     super({
@@ -3224,7 +3224,7 @@ var _ExpandedPlayer = class _ExpandedPlayer extends St10.Widget {
     __publicField(this, "_visualizer");
     __publicField(this, "_bgBtn");
     this._host = host;
-    this._bgBtn = new St10.Button({
+    this._bgBtn = new St12.Button({
       style: "background-color: transparent;",
       reactive: true,
       x_expand: true,
@@ -3239,16 +3239,16 @@ var _ExpandedPlayer = class _ExpandedPlayer extends St10.Widget {
       reactive: true,
       style: "padding: 16px; border-radius: 16px; background-color: rgba(30,30,30,0.95);"
     });
-    this.box.layout_manager.orientation = Clutter10.Orientation.VERTICAL;
+    this.box.layout_manager.orientation = Clutter12.Orientation.VERTICAL;
     this.add_child(this.box);
     this._vinyl = new VinylArt();
     this._vinyl.setSquare(host.settings.popup.squareVinyl);
     this._info = new TrackInfoBlock();
     this._visualizer = new WaveformVisualizer(80, host.settings, true);
     this._visualizer.setMode(host.settings.style.visualizerAnimation || 1);
-    const top = new St10.BoxLayout({ vertical: false, style: "spacing: 16px;", x_expand: true });
+    const top = new St12.BoxLayout({ vertical: false, style: "spacing: 16px;", x_expand: true });
     top.add_child(this._vinyl);
-    const mid = new St10.BoxLayout({ vertical: true, x_expand: true, style: "spacing: 8px;" });
+    const mid = new St12.BoxLayout({ vertical: true, x_expand: true, style: "spacing: 8px;" });
     mid.add_child(this._info);
     mid.add_child(this._visualizer);
     top.add_child(mid);
@@ -3264,11 +3264,11 @@ var _ExpandedPlayer = class _ExpandedPlayer extends St10.Widget {
     });
     this.box.add_child(this._transport);
     this.connect("key-press-event", (_a, event) => {
-      if (event.get_key_symbol() === Clutter10.KEY_Escape) {
+      if (event.get_key_symbol() === Clutter12.KEY_Escape) {
         this.hidePopup();
-        return Clutter10.EVENT_STOP;
+        return Clutter12.EVENT_STOP;
       }
-      return Clutter10.EVENT_PROPAGATE;
+      return Clutter12.EVENT_PROPAGATE;
     });
     this.connect("destroy", () => this._cleanup());
   }
@@ -3319,7 +3319,7 @@ var _ExpandedPlayer = class _ExpandedPlayer extends St10.Widget {
     this.ease({
       opacity: 255,
       duration: 180,
-      mode: Clutter10.AnimationMode.EASE_OUT_QUAD
+      mode: Clutter12.AnimationMode.EASE_OUT_QUAD
     });
     global.stage.set_key_focus(this);
   }
@@ -3329,7 +3329,7 @@ var _ExpandedPlayer = class _ExpandedPlayer extends St10.Widget {
     this.ease({
       opacity: 0,
       duration: 150,
-      mode: Clutter10.AnimationMode.EASE_OUT_QUAD,
+      mode: Clutter12.AnimationMode.EASE_OUT_QUAD,
       onStopped: () => {
         this.visible = false;
         this.destroy();
@@ -3402,13 +3402,13 @@ var _ExpandedPlayer = class _ExpandedPlayer extends St10.Widget {
     this._player = null;
   }
 };
-GObject14.registerClass(_ExpandedPlayer);
+GObject15.registerClass(_ExpandedPlayer);
 var ExpandedPlayer = _ExpandedPlayer;
 
 // src/ui/player-selector/index.ts
-import GObject15 from "gi://GObject";
-import St11 from "gi://St";
-import Clutter11 from "gi://Clutter";
+import GObject16 from "gi://GObject";
+import St13 from "gi://St";
+import Clutter13 from "gi://Clutter";
 import * as Main4 from "resource:///org/gnome/shell/ui/main.js";
 import { gettext as _ } from "resource:///org/gnome/shell/extensions/extension.js";
 
@@ -3445,7 +3445,7 @@ function getPlayerIcon(player, busName) {
 }
 
 // src/ui/player-selector/index.ts
-var _PlayerSelectorMenu = class _PlayerSelectorMenu extends St11.Widget {
+var _PlayerSelectorMenu = class _PlayerSelectorMenu extends St13.Widget {
   constructor(host) {
     const [bgW, bgH] = global.display.get_size();
     super({
@@ -3460,7 +3460,7 @@ var _PlayerSelectorMenu = class _PlayerSelectorMenu extends St11.Widget {
     __publicField(this, "_box");
     __publicField(this, "_bg");
     this._host = host;
-    this._bg = new St11.Button({
+    this._bg = new St13.Button({
       style: "background-color: transparent;",
       reactive: true,
       x_expand: true,
@@ -3470,26 +3470,26 @@ var _PlayerSelectorMenu = class _PlayerSelectorMenu extends St11.Widget {
     });
     this._bg.connect("clicked", () => this.hideMenu());
     this.add_child(this._bg);
-    this._box = new St11.BoxLayout({
+    this._box = new St13.BoxLayout({
       vertical: true,
       reactive: true,
       style: "padding: 12px; border-radius: 12px; background-color: rgba(30,30,30,0.95); spacing: 6px;"
     });
     this.add_child(this._box);
     this.connect("key-press-event", (_a, event) => {
-      if (event.get_key_symbol() === Clutter11.KEY_Escape) {
+      if (event.get_key_symbol() === Clutter13.KEY_Escape) {
         this.hideMenu();
-        return Clutter11.EVENT_STOP;
+        return Clutter13.EVENT_STOP;
       }
-      return Clutter11.EVENT_PROPAGATE;
+      return Clutter13.EVENT_PROPAGATE;
     });
   }
   populate() {
     this._box.destroy_all_children();
-    const title = new St11.Label({
+    const title = new St13.Label({
       text: _("Select Media Player"),
       style: "font-weight: bold; margin-bottom: 8px;",
-      x_align: Clutter11.ActorAlign.CENTER
+      x_align: Clutter13.ActorAlign.CENTER
     });
     this._box.add_child(title);
     const current = this._host.settings.popup.selectedPlayerBus;
@@ -3537,7 +3537,7 @@ var _PlayerSelectorMenu = class _PlayerSelectorMenu extends St11.Widget {
     this.ease({
       opacity: 255,
       duration: 150,
-      mode: Clutter11.AnimationMode.EASE_OUT_QUAD
+      mode: Clutter13.AnimationMode.EASE_OUT_QUAD
     });
     global.stage.set_key_focus(this);
   }
@@ -3545,7 +3545,7 @@ var _PlayerSelectorMenu = class _PlayerSelectorMenu extends St11.Widget {
     this.ease({
       opacity: 0,
       duration: 120,
-      mode: Clutter11.AnimationMode.EASE_OUT_QUAD,
+      mode: Clutter13.AnimationMode.EASE_OUT_QUAD,
       onStopped: () => {
         this.visible = false;
         this._host.closePlayerMenu();
@@ -3553,18 +3553,17 @@ var _PlayerSelectorMenu = class _PlayerSelectorMenu extends St11.Widget {
     });
   }
   _row(label, iconName, selected, onClick, player, busName) {
-    const content = new St11.BoxLayout({ vertical: false, style: "spacing: 10px;" });
-    const icon = new St11.Icon({
-      icon_size: 22,
-      gicon: iconName ? null : getPlayerIcon(player != null ? player : null, busName != null ? busName : ""),
-      icon_name: iconName != null ? iconName : void 0
-    });
+    const content = new St13.BoxLayout({ vertical: false, style: "spacing: 10px;" });
+    const iconProps = { icon_size: 22 };
     if (iconName) {
-      icon.icon_name = iconName;
+      iconProps.icon_name = iconName;
+    } else {
+      iconProps.gicon = getPlayerIcon(player != null ? player : null, busName != null ? busName : "");
     }
+    const icon = new St13.Icon(iconProps);
     content.add_child(icon);
-    content.add_child(new St11.Label({ text: label, y_align: Clutter11.ActorAlign.CENTER }));
-    const btn = new St11.Button({
+    content.add_child(new St13.Label({ text: label || "", y_align: Clutter13.ActorAlign.CENTER }));
+    const btn = new St13.Button({
       child: content,
       reactive: true,
       can_focus: true,
@@ -3578,7 +3577,7 @@ var _PlayerSelectorMenu = class _PlayerSelectorMenu extends St11.Widget {
     return btn;
   }
 };
-GObject15.registerClass(_PlayerSelectorMenu);
+GObject16.registerClass(_PlayerSelectorMenu);
 var PlayerSelectorMenu = _PlayerSelectorMenu;
 
 // src/controllers/music-controller.ts

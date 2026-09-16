@@ -1,9 +1,9 @@
-import St from "@girs/st-18/st-18"
-import GObject from "gi://GObject"
-import Clutter from "@girs/clutter-18/clutter-18"
+import St from "gi://St";
+import GObject from "gi://GObject";
+import Clutter from "gi://Clutter";
 import { CrossfadeArtConstants } from "@/constants";
 
-export class CrossfadeArt extends St.Widget<Clutter.BinLayout> {
+export class CrossfadeArt extends St.Widget {
     private _radius: number = CrossfadeArtConstants.RADIUS;
     private _shadowCSS: string = "box-shadow: none;";
     private _lastCSS?: string;
@@ -14,10 +14,10 @@ export class CrossfadeArt extends St.Widget<Clutter.BinLayout> {
         GObject.registerClass(this);
     }
 
-    constructor(properties?: Partial<St.Widget.ConstructorProps>, ...args: any[]) {
-        super(properties, args);
+    constructor(properties?: Partial<St.Widget.ConstructorProps>) {
+        super(properties ?? {});
 
-        this.layoutManager = new Clutter.BinLayout();
+        this.layout_manager = new Clutter.BinLayout();
         this.set_style_class_name("art-widget");
         this.set_clip_to_allocation(false);
         this.set_x_expand(false);
@@ -38,7 +38,7 @@ export class CrossfadeArt extends St.Widget<Clutter.BinLayout> {
 
     private _refreshLayerStyle(layer: CrossfadeArt) {
         if (!layer || !layer.get_parent()) return;
-        let bgCSS = layer._bgUrl ? `background-image: ("${layer._bgUrl}");` : '';
+        let bgCSS = layer._bgUrl ? `background-image: url("${layer._bgUrl}");` : "";
 
         let radius = this.getRadius();
         let radiusCSS = `border-radius: ${radius}px; background-size: cover; box-shadow: none; `;
@@ -74,14 +74,19 @@ export class CrossfadeArt extends St.Widget<Clutter.BinLayout> {
     }
 
     setArt(newUrl: string, force: boolean = false) {
-        let children = this.get_children().filter(c => c instanceof CrossfadeArt && c._bgUrl === newUrl);
-        if (children.length > 0) {
+        if (!newUrl) {
             return;
         }
-        
+
+        let children = this.get_children().filter(c => c instanceof CrossfadeArt && c._bgUrl === newUrl);
+        if (children.length > 0 && !force) {
+            return;
+        }
+
         this._currentUrl = newUrl;
         this._updateContainerStyle();
-        children.forEach(c => c.remove_all_transitions());
+
+        const easeActor = (actor: object) => actor as { ease: Function };
 
         let newLayer = new CrossfadeArt({
             x_expand: true,
@@ -93,7 +98,7 @@ export class CrossfadeArt extends St.Widget<Clutter.BinLayout> {
         this.add_child(newLayer);
         this._refreshLayerStyle(newLayer);
 
-        newLayer.ease({
+        easeActor(newLayer).ease({
             opacity: 255,
             duration: 1000,
             mode: Clutter.AnimationMode.EASE_OUT_QUAD,
@@ -109,15 +114,15 @@ export class CrossfadeArt extends St.Widget<Clutter.BinLayout> {
                     for (let i = 0; i < layerIndex; i++) {
                         let oldLayer = currentChildren[i];
 
-                        oldLayer.ease({
+                        easeActor(oldLayer).ease({
                             opacity: 0,
                             duration: 300,
                             mode: Clutter.AnimationMode.EASE_OUT_QUAD,
                             onStopped: () => oldLayer.destroy()
-                        })
+                        });
                     }
                 }
             }
-        })
+        });
     }
 }

@@ -150,18 +150,15 @@ export class PlayerSelectorMenu extends St.Widget {
         busName?: string
     ): St.Button {
         const content = new St.BoxLayout({ vertical: false, style: "spacing: 10px;" });
-        const icon = new St.Icon({
-            icon_size: 22,
-            gicon: iconName
-                ? null
-                : getPlayerIcon(player ?? null, busName ?? ""),
-            icon_name: iconName ?? undefined,
-        });
+        const iconProps: Partial<St.Icon.ConstructorProps> = { icon_size: 22 };
         if (iconName) {
-            icon.icon_name = iconName;
+            iconProps.icon_name = iconName;
+        } else {
+            iconProps.gicon = getPlayerIcon(player ?? null, busName ?? "");
         }
+        const icon = new St.Icon(iconProps);
         content.add_child(icon);
-        content.add_child(new St.Label({ text: label, y_align: Clutter.ActorAlign.CENTER }));
+        content.add_child(new St.Label({ text: label || "", y_align: Clutter.ActorAlign.CENTER }));
 
         const btn = new St.Button({
             child: content,
