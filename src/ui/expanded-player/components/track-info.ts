@@ -10,6 +10,8 @@ export class TrackInfoBlock extends St.BoxLayout {
 
     private _title: ScrollLabel;
     private _artist: ScrollLabel;
+    private _lastTitle = "";
+    private _lastArtist = "";
 
     constructor() {
         super({
@@ -25,11 +27,16 @@ export class TrackInfoBlock extends St.BoxLayout {
     }
 
     setTitle(text: string): void {
-        this._title.setText(text || "", true, 0);
+        const t = text || "";
+        // force=false — same text must not restart scroll (that flickers the popup)
+        this._title.setText(t, t !== this._lastTitle, 0);
+        this._lastTitle = t;
     }
 
     setArtist(text: string): void {
-        this._artist.setText(text || "", true);
+        const t = text || "";
+        this._artist.setText(t, t !== this._lastArtist);
+        this._lastArtist = t;
     }
 
     setPaused(paused: boolean): void {

@@ -5,6 +5,10 @@ import Clutter from "gi://Clutter";
 import { SettingsProvider } from "@/providers/settings-provider";
 import { Color } from "@/types/color";
 
+/**
+ * Faithful port of srcJS/uiVisualizers.js SimulatedVisualizer.
+ * Uses scale_y (not set_height) — the reinvented height timer was crashing Mutter.
+ */
 export class SimulatedVisualizer extends St.BoxLayout {
     static {
         GObject.registerClass(this);
@@ -13,114 +17,142 @@ export class SimulatedVisualizer extends St.BoxLayout {
     private _settings: SettingsProvider;
     private _isPopup: boolean;
     private _bars: St.Widget[] = [];
-    private _timer: number | null = null;
-    private _playing = false;
+    private _color = "255,255,255";
     private _mode = 1;
-    private _color: Color = { r: 255, g: 255, b: 255 };
+    private _isPlaying = false;
+    private _timerId: number | null = null;
 
     constructor(settings: SettingsProvider, isPopup = false) {
         super({
             style: "spacing: 2px;",
-            y_align: Clutter.ActorAlign.CENTER,
+            y_align: Clutter.ActorAlign.FILL,
             x_align: Clutter.ActorAlign.END,
         });
+        (this.layout_manager as Clutter.BoxLayout).orientation = Clutter.Orientation.HORIZONTAL;
         this._settings = settings;
         this._isPopup = isPopup;
-        this._rebuildBars();
+        this._updateBarCount();
+        this.connect("destroy", () => this._cleanup());
     }
 
-    setMode(mode: number): void {
-        this._mode = mode;
-        this.visible = mode !== 0;
-        if (mode === 0) {
-            this.setPlaying(false);
+    _updateBarCount(): void {
+        this.destroy_all_children();
+        this._bars = [];
+        const count = this._isPopup
+            ? (this._settings.popup.popupVisualizerBars || 10)
+            : (this._settings.style.visualizerBarCount || 4);
+        const barWidth = this._isPopup
+            ? (this._settings.popup.popupVisualizerBarWidth || 2)
+            : (this._settings.style.visualizerBarWidth || 2);
+
+        for (let i = 0; i < count; i++) {
+            const bar = new St.Widget({
+                style_class: "visualizer-bar",
+                y_expand: true,
+                y_align: Clutter.ActorAlign.FILL,
+            });
+            bar.set_width(barWidth);
+            bar.set_pivot_point(0.5, this._mode === 2 ? 0.5 : 1.0);
+            this.add_child(bar);
+            this._bars.push(bar);
+        }
+        this._updateBarsCss();
+    }
+
+    private _cleanup(): void {
+        if (this._timerId !== null) {
+            GLib.source_remove(this._timerId);
+            this._timerId = null;
+        }
+    }
+
+    setMode(m: number): void {
+        this._mode = m;
+        const pivotY = m === 2 ? 0.5 : 1.0;
+        for (const bar of this._bars) {
+            bar.set_pivot_point(0.5, pivotY);
         }
     }
 
     setColor(c: Color): void {
-        this._color = c;
-        this._applyBarStyles();
+        let r = 255, g = 255, b = 255;
+        if (c && typeof c.r === "number" && !Number.isNaN(c.r)) r = Math.min(255, c.r + 100);
+        if (c && typeof c.g === "number" && !Number.isNaN(c.g)) g = Math.min(255, c.g + 100);
+        if (c && typeof c.b === "number" && !Number.isNaN(c.b)) b = Math.min(255, c.b + 100);
+        this._color = `${Math.floor(r)},${Math.floor(g)},${Math.floor(b)}`;
+        this._updateBarsCss();
+        if (!this._isPlaying) {
+            this._updateVisuals(0);
+        }
     }
 
     setPlaying(playing: boolean): void {
-        this._playing = playing && this._mode !== 0;
-        if (this._playing) {
-            this._start();
-        } else {
-            this._stop();
-            for (const bar of this._bars) {
-                bar.set_height(2);
-            }
-        }
-    }
-
-    updateBarCount(): void {
-        this._rebuildBars();
-    }
-
-    private _barCount(): number {
-        return this._isPopup
-            ? (this._settings.popup.popupVisualizerBars || 10)
-            : (this._settings.style.visualizerBarCount || 10);
-    }
-
-    private _barWidth(): number {
-        return this._isPopup
-            ? (this._settings.popup.popupVisualizerBarWidth || 2)
-            : (this._settings.style.visualizerBarWidth || 2);
-    }
-
-    private _rebuildBars(): void {
-        this.destroy_all_children();
-        this._bars = [];
-        const count = this._barCount();
-        const width = this._barWidth();
-        for (let i = 0; i < count; i++) {
-            const bar = new St.Widget({
-                width,
-                height: 2,
-                style: `background-color: rgb(${this._color.r},${this._color.g},${this._color.b}); border-radius: 2px;`,
-            });
-            this._bars.push(bar);
-            this.add_child(bar);
-        }
-    }
-
-    private _applyBarStyles(): void {
-        for (const bar of this._bars) {
-            bar.set_style(`background-color: rgb(${this._color.r},${this._color.g},${this._color.b}); border-radius: 2px;`);
-        }
-    }
-
-    private _start(): void {
-        if (this._timer !== null) {
+        if (this._isPlaying === playing) {
             return;
         }
-        this._timer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 50, () => {
-            if (!this._playing) {
-                this._timer = null;
-                return GLib.SOURCE_REMOVE;
-            }
-            const maxH = Math.max(8, this.get_height() || 24);
+        this._isPlaying = playing;
+        this._updateBarsCss();
+        if (this._timerId !== null) {
+            GLib.source_remove(this._timerId);
+            this._timerId = null;
+        }
+
+        if (playing && this._mode !== 0) {
+            this._timerId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 16, () => {
+                if (!this.get_parent()) {
+                    this._timerId = null;
+                    return GLib.SOURCE_REMOVE;
+                }
+                if (!this.mapped) {
+                    return GLib.SOURCE_CONTINUE;
+                }
+                const t = Date.now() / 250;
+                this._updateVisuals(t);
+                return GLib.SOURCE_CONTINUE;
+            });
+        } else {
+            this._updateVisuals(0);
+        }
+    }
+
+    private _updateBarsCss(): void {
+        const opacity = this._isPlaying ? 1.0 : 0.4;
+        const barWidth = this._isPopup
+            ? (this._settings.popup.popupVisualizerBarWidth || 2)
+            : (this._settings.style.visualizerBarWidth || 2);
+        const bRad = barWidth >= 4 ? 2 : (barWidth > 1 ? 1 : 0);
+        const css = `background-color: rgba(${this._color}, ${opacity}); border-radius: ${bRad}px;`;
+        for (const bar of this._bars) {
+            bar.set_style(css);
+        }
+    }
+
+    private _updateVisuals(t: number): void {
+        if (!this.get_parent()) {
+            return;
+        }
+        if (!this._isPlaying) {
             for (const bar of this._bars) {
-                const h = this._mode === 2
-                    ? Math.max(2, Math.floor(maxH * (0.3 + Math.random() * 0.7)))
-                    : Math.max(2, Math.floor(maxH * Math.random()));
-                bar.set_height(h);
+                bar.scale_y = 0.2;
             }
-            return GLib.SOURCE_CONTINUE;
+            return;
+        }
+        const speeds = [1.1, 1.6, 1.3, 1.8, 1.5, 1.2, 1.7, 1.4];
+        this._bars.forEach((bar, idx) => {
+            let scaleY = 0.2;
+            if (this._mode === 1) {
+                const wave = (Math.sin(t - idx * 1.0) + 1) / 2;
+                scaleY = 0.3 + (wave * 0.7);
+            } else if (this._mode === 2) {
+                const pulse = (Math.sin(t * speeds[idx % speeds.length]) + 1) / 2;
+                scaleY = 0.3 + (pulse * 0.7);
+            }
+            bar.scale_y = scaleY;
         });
     }
 
-    private _stop(): void {
-        if (this._timer !== null) {
-            GLib.source_remove(this._timer);
-            this._timer = null;
-        }
-    }
-
     destroy(): void {
-        this._stop();
+        this._cleanup();
         super.destroy();
     }
 }

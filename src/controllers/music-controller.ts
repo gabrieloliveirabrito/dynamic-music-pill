@@ -248,6 +248,7 @@ export class MusicController {
         this._signalIds.push(
             mpris.connect("player-added", handler),
             mpris.connect("player-removed", handler),
+            // Position-only updates no longer emit this (see MediaPlayer._applyState)
             mpris.connect("player-state-changed", handler),
             mpris.connect("player-track-changed", handler),
             mpris.connect("player-status-changed", handler),

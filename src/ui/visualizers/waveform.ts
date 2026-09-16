@@ -1,11 +1,17 @@
 import GObject from "gi://GObject";
+import GLib from "gi://GLib";
 import St from "gi://St";
 import Clutter from "gi://Clutter";
+import * as Main from "resource:///org/gnome/shell/ui/main.js";
+import { gettext as _ } from "resource:///org/gnome/shell/extensions/extension.js";
 import { SettingsProvider } from "@/providers/settings-provider";
 import { Color } from "@/types/color";
 import { SimulatedVisualizer } from "./simulated";
 
-/** Waveform facade — modes 0 off / 1 wave / 2 pulse (cava deferred). */
+/**
+ * Faithful port of srcJS/uiVisualizers.js WaveformVisualizer.
+ * Cava (mode 3) falls back to pulse until visualizerEngine is ported.
+ */
 export class WaveformVisualizer extends St.Bin {
     static {
         GObject.registerClass(this);
@@ -15,43 +21,33 @@ export class WaveformVisualizer extends St.Bin {
     private _isPopup: boolean;
     private _simulated: SimulatedVisualizer;
     private _mode = 1;
-    private _playing = false;
+    private _isPlaying = false;
     private _maxHeight: number | null = null;
+    private _lastColor: Color | null = null;
 
     constructor(defaultHeight = 24, settings: SettingsProvider, isPopup = false) {
         super({
             y_align: Clutter.ActorAlign.CENTER,
             x_align: Clutter.ActorAlign.END,
             y_expand: true,
-            height: defaultHeight,
         });
         this._settings = settings;
         this._isPopup = isPopup;
         this._simulated = new SimulatedVisualizer(settings, isPopup);
         this.set_child(this._simulated as unknown as St.Widget);
+
+        if (this._isPopup) {
+            this._settings.popup.connect("changed::popup-visualizer-bars", () => this._updateSize());
+            this._settings.popup.connect("changed::popup-visualizer-bar-width", () => this._updateSize());
+            this._settings.popup.connect("changed::popup-visualizer-height", () => this._updateSize());
+        } else {
+            this._settings.style.connect("changed::visualizer-bars", () => this._updateSize());
+            this._settings.style.connect("changed::visualizer-bar-width", () => this._updateSize());
+            this._settings.style.connect("changed::visualizer-height", () => this._updateSize());
+        }
+
         this._updateSize();
-    }
-
-    setHeightClamped(maxH: number): void {
-        this._maxHeight = maxH;
-        this._updateSize();
-    }
-
-    setMode(mode: number): void {
-        // cava (3) falls back to pulse until engine is ported
-        this._mode = mode === 3 ? 2 : mode;
-        this._simulated.setMode(this._mode);
-        this._simulated.setPlaying(this._playing);
-        this.visible = this._mode !== 0;
-    }
-
-    setColor(c: Color): void {
-        this._simulated.setColor(c);
-    }
-
-    setPlaying(playing: boolean): void {
-        this._playing = playing;
-        this._simulated.setPlaying(playing);
+        void defaultHeight;
     }
 
     private _updateSize(): void {
@@ -61,8 +57,39 @@ export class WaveformVisualizer extends St.Bin {
         if (this._maxHeight && !this._isPopup) {
             h = Math.min(h, this._maxHeight);
         }
+
         this.set_height(h);
         this._simulated.set_height(h);
-        this._simulated.updateBarCount();
+        this._simulated._updateBarCount();
+    }
+
+    setHeightClamped(maxH: number): void {
+        this._maxHeight = maxH;
+        this._updateSize();
+    }
+
+    setMode(m: number): void {
+        if (m === 3 && !GLib.find_program_in_path("cava")) {
+            Main.notify("Dynamic Music Pill", _("Please install \"cava\" for real-time mode."));
+            m = 2;
+        }
+        // Cava engine not ported yet — fall back to pulse
+        if (m === 3) {
+            m = 2;
+        }
+
+        this._mode = m;
+        this._simulated.setMode(m);
+        this._simulated.setPlaying(this._isPlaying);
+    }
+
+    setColor(c: Color): void {
+        this._lastColor = c;
+        this._simulated.setColor(c);
+    }
+
+    setPlaying(playing: boolean): void {
+        this._isPlaying = playing;
+        this._simulated.setPlaying(playing);
     }
 }

@@ -46,6 +46,10 @@ export class MediaPlayer extends GObject.Object {
     private _lastPlayingTime = 0;
     private _lastSeen = Date.now();
     private _lastTrackId: string | null = null;
+    /** Cached MPRIS Position (µs) + wall-clock when it was sampled — for interpolation. */
+    private _lastPosition = 0;
+    private _lastPositionTime = Date.now();
+    private _seekedSignal: number | null = null;
 
     constructor(busName: string, owner: string, mpris: MPRISProvider) {
         super();
@@ -73,12 +77,28 @@ export class MediaPlayer extends GObject.Object {
             this._onPropertiesChanged.bind(this)
         );
 
+        this._seekedSignal = this._connection.signal_subscribe(
+            this._busName,
+            MPRIS_INTERFACE,
+            "Seeked",
+            MPRIS_OBJECT,
+            null,
+            Gio.DBusSignalFlags.NONE,
+            (_c, _s, _p, _i, _sig, parameters) => {
+                const [pos] = smartUnpack(parameters) as [number];
+                if (typeof pos === "number" && pos >= 0) {
+                    this.markPosition(pos);
+                }
+            }
+        );
+
         this._playerPropertiesTimer = GLib.timeout_add(
             GLib.PRIORITY_DEFAULT,
             5000,
             this._fallbackPoll.bind(this)
         );
 
+        this.syncPosition();
         this._mpris.emit("player-added", this._busName, this);
     }
 
@@ -101,7 +121,70 @@ export class MediaPlayer extends GObject.Object {
     }
 
     getPlayerInfo(): PlayerInfo {
-        return this._state.player;
+        return {
+            ...this._state.player,
+            position: this.getInterpolatedPosition(),
+        };
+    }
+
+    /** Wall-clock interpolation — MPRIS rarely pushes Position while playing. */
+    getInterpolatedPosition(): number {
+        let pos = this._lastPosition;
+        if (this._state.player.playbackStatus === "Playing") {
+            pos += (Date.now() - this._lastPositionTime) * 1000;
+        }
+        const length = this._state.trackInfo?.length || 0;
+        if (length > 0 && pos > length) {
+            pos = length;
+        }
+        return Math.max(0, pos);
+    }
+
+    markPosition(positionUs: number): void {
+        if (typeof positionUs !== "number" || positionUs < 0 || Number.isNaN(positionUs)) {
+            return;
+        }
+        this._lastPosition = positionUs;
+        this._lastPositionTime = Date.now();
+        this._state.player.position = positionUs;
+    }
+
+    getCachedPosition(): number {
+        return this._lastPosition;
+    }
+
+    getLastPositionTime(): number {
+        return this._lastPositionTime;
+    }
+
+    /** Async Get(Position) — same role as legacy controller._syncPosition. */
+    syncPosition(): void {
+        this._connection.call(
+            this._busName,
+            MPRIS_OBJECT,
+            DBUS_PROPERTIES_INTERFACE,
+            "Get",
+            new GLib.Variant("(ss)", [MPRIS_INTERFACE, "Position"]),
+            null,
+            Gio.DBusCallFlags.NONE,
+            -1,
+            null,
+            (conn, res) => {
+                try {
+                    const result = conn!.call_finish(res);
+                    const packed = result.deep_unpack() as unknown[];
+                    let val = packed[0];
+                    if (val instanceof GLib.Variant) {
+                        val = val.unpack();
+                    }
+                    if (typeof val === "number" && val >= 0) {
+                        this.markPosition(val);
+                    }
+                } catch {
+                    // player may vanish mid-call
+                }
+            }
+        );
     }
 
     getName(): string {
@@ -167,7 +250,7 @@ export class MediaPlayer extends GObject.Object {
             -1,
             null
         );
-        this._state.player.position = positionUs;
+        this.markPosition(positionUs);
     }
 
     raise(): void {
@@ -205,6 +288,11 @@ export class MediaPlayer extends GObject.Object {
         if (this._propertiesSignal !== null) {
             this._connection.signal_unsubscribe(this._propertiesSignal);
             this._propertiesSignal = null;
+        }
+
+        if (this._seekedSignal !== null) {
+            this._connection.signal_unsubscribe(this._seekedSignal);
+            this._seekedSignal = null;
         }
 
         if (this._playerPropertiesTimer !== null) {
@@ -310,16 +398,48 @@ export class MediaPlayer extends GObject.Object {
         const [trackChanged] = checkChanged(oldState.trackInfo, newState.trackInfo);
 
         if (playerChanged) {
-            this._state.player = newState.player;
-            this._mpris.emit("player-state-changed", this._busName, this);
+            // Anchor interpolation when Position actually changes — but Position-only
+            // must NOT emit player-state-changed (that redraws the whole pill → flick).
+            const posChanged = newState.player.position !== oldState.player.position
+                && typeof newState.player.position === "number"
+                && newState.player.position >= 0;
+            if (posChanged) {
+                this._lastPosition = newState.player.position;
+                this._lastPositionTime = Date.now();
+            }
 
-            if (newState.player.playbackStatus !== oldState.player.playbackStatus) {
+            const statusChanged = newState.player.playbackStatus !== oldState.player.playbackStatus;
+            const capsChanged =
+                newState.player.canGoNext !== oldState.player.canGoNext
+                || newState.player.canGoPrevious !== oldState.player.canGoPrevious
+                || newState.player.canPause !== oldState.player.canPause
+                || newState.player.canPlay !== oldState.player.canPlay
+                || newState.player.canSeek !== oldState.player.canSeek
+                || newState.player.canControl !== oldState.player.canControl
+                || newState.player.volume !== oldState.player.volume;
+
+            this._state.player = newState.player;
+
+            if (statusChanged || capsChanged) {
+                this._mpris.emit("player-state-changed", this._busName, this);
+            }
+
+            if (statusChanged) {
+                // Re-anchor when play/pause so interpolation doesn't jump
+                this._lastPositionTime = Date.now();
+                this.syncPosition();
                 this._mpris.emit("player-status-changed", this._busName, newState.player.playbackStatus);
             }
         }
 
         if (trackChanged) {
             this._state.trackInfo = newState.trackInfo;
+            // New track — reset seek cursor until Position arrives
+            if (newState.trackInfo?.trackId !== oldState.trackInfo?.trackId) {
+                this._lastPosition = 0;
+                this._lastPositionTime = Date.now();
+                this.syncPosition();
+            }
             this._mpris.emit("player-track-changed", this._busName, this);
         }
     }

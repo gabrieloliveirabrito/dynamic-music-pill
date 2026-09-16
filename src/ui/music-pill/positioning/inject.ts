@@ -92,8 +92,8 @@ export function createPillInjector(pill: MusicPill, settings: SettingsProvider):
 
         if (target === 0 && currentDock !== container) {
             currentDock = container;
-            container.connectObject?.("child-added", () => {
-                if (!isMovingItem) {
+            container.connectObject?.("child-added", (_c: unknown, actor: unknown) => {
+                if (actor !== pill && !isMovingItem) {
                     queueInject();
                 }
             }, pill);

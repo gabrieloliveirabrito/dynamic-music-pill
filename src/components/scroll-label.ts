@@ -139,7 +139,7 @@ export class ScrollLabel extends St.Widget {
         }
 
         let fontDesc = this._label1.get_theme_node().get_font();
-        let fadeWidth = (fontDesc.get_size() / Pango.SCALE) * 4;
+        let fadeWidth = (fontDesc.get_size() / Pango.SCALE) + 4;
 
         if (!this._fadeEffect) {
             this._fadeEffect = new TextFadeEffect(fadeWidth);
@@ -214,12 +214,12 @@ export class ScrollLabel extends St.Widget {
     private _updatePausedState() {
         let shouldPause = this._playerPaused && this._appContext.settings.scrollControls.freezeOnPause;
         if (shouldPause) {
-            if (this._paused) {
-                return;
+            if (!this._paused) {
+                this._paused = true;
+                // Cancel all pending timers so none of them can restart the scroll
+                this._cleanupTimers();
+                this._stopAnimation(true);
             }
-
-            this._cleanupTimers();
-            this._stopAnimation(true);
         } else if (this._paused) {
             this._paused = false;
             this._checkResize();
@@ -444,43 +444,58 @@ export class ScrollLabel extends St.Widget {
         const distance = textWidth + 30;
         const duration = (distance / 30) * 1000;
 
+        // Faithful to srcJS/uiWidgets.js: 2s pause between cycles.
+        // Never call loop() synchronously from onStopped — ease can finish
+        // sync and blow the stack ("too much recursion").
         const loop = () => {
             if (this._gameMode || !this.get_parent()) {
-                return GLib.SOURCE_REMOVE;
+                return;
             }
 
-            if (this._pendingScrollStop) {
-                this._pendingScrollStop = false;
-                this._isScrolling = false;
-                this._stopAnimation(true);
-                this._container.x_align = Clutter.ActorAlign.CENTER;
-                this._label2.hide();
-                this._separator.hide();
+            this._setFadeOutEffect(false, true, true);
 
-                return GLib.SOURCE_REMOVE;
+            if (this._scrollTimer) {
+                GLib.Source.remove(this._scrollTimer);
             }
-
-            this._setFadeOutEffect(true, true, true);
-
-            ease(this._container).ease({
-                translationX: -distance,
-                duration: duration,
-                mode: Clutter.AnimationMode.LINEAR,
-                onStopped: (isFinished: boolean) => {
-                    if (!isFinished || this._gameMode || this._pendingScrollStop) {
-                        this._isScrolling = false;
-                        this._pendingScrollStop = false;
-
-                        return;
-                    }
-
-                    this._container.translation_x = 0;
-                    loop();
+            this._scrollTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 2000, () => {
+                this._scrollTimer = null;
+                if (this._gameMode || !this.get_parent()) {
+                    return GLib.SOURCE_REMOVE;
                 }
-            });
 
-            return GLib.SOURCE_REMOVE;
-        }
+                if (this._pendingScrollStop) {
+                    this._pendingScrollStop = false;
+                    this._isScrolling = false;
+                    this._stopAnimation(true);
+                    this._container.x_align = Clutter.ActorAlign.CENTER;
+                    this._label2.hide();
+                    this._separator.hide();
+                    return GLib.SOURCE_REMOVE;
+                }
+
+                this._setFadeOutEffect(true, true, true);
+
+                ease(this._container).ease({
+                    translation_x: -distance,
+                    duration,
+                    mode: Clutter.AnimationMode.LINEAR,
+                    onStopped: (isFinished: boolean) => {
+                        if (!isFinished || this._gameMode || this._pendingScrollStop) {
+                            this._isScrolling = false;
+                            this._pendingScrollStop = false;
+                            return;
+                        }
+
+                        this._container.translation_x = 0;
+                        GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+                            loop();
+                            return GLib.SOURCE_REMOVE;
+                        });
+                    },
+                });
+                return GLib.SOURCE_REMOVE;
+            });
+        };
         loop();
     }
 
@@ -518,13 +533,13 @@ export class ScrollLabel extends St.Widget {
             }
 
             ease(this._container).ease({
-                translationX: -distance,
+                translation_x: -distance,
                 duration: scrollDuration,
                 mode: Clutter.AnimationMode.LINEAR,
                 onStopped: () => {
                     this._isScrolling = false;
                     this._lyricFinished = true;
-                }
+                },
             });
 
             return GLib.SOURCE_REMOVE;

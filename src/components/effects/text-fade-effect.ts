@@ -2,6 +2,7 @@ import Clutter from "gi://Clutter";
 import GObject from "gi://GObject";
 import GLib from "gi://GLib";
 
+/** Faithful port of srcJS/uiEffects.js TextFadeEffect (smoothstep edges). */
 const textFadeEffectShaderSource = `
     uniform sampler2D tex;
     uniform float width;
@@ -12,6 +13,11 @@ const textFadeEffectShaderSource = `
     void main(void) {
         vec2 uv = cogl_tex_coord_in[0].xy;
         vec4 color = texture2D(tex, uv);
+
+        float pos_x = uv.x * width;
+
+        float left_fade = smoothstep(0.0, fade_pixels, pos_x);
+        float right_fade = smoothstep(0.0, fade_pixels, width - pos_x);
 
         float left_alpha = mix(1.0, left_fade, enable_left);
         float right_alpha = mix(1.0, right_fade, enable_right);
@@ -26,15 +32,15 @@ export class TextFadeEffect extends Clutter.ShaderEffect {
         GObject.registerClass(this);
     }
 
-    private _fadePixels: number = 32;
-    private _enableLeft: number = 0.0;
-    private _enableRight: number = 1.0;
+    private _fadePixels = 32;
+    private _enableLeft = 0.0;
+    private _enableRight = 1.0;
     private _animId: number | null = null;
 
     constructor(fadePixels = 32, properties?: Partial<Clutter.ShaderEffect.ConstructorProps>) {
         super({
             shader_type: 1,
-            ...properties
+            ...properties,
         });
 
         this._fadePixels = fadePixels;
@@ -46,8 +52,8 @@ export class TextFadeEffect extends Clutter.ShaderEffect {
     }
 
     setEdges(left = true, right = true, animate = false) {
-        let targetLeft = left ? 1.0 : 0.0;
-        let targetRight = right ? 1.0 : 0.0;
+        const targetLeft = left ? 1.0 : 0.0;
+        const targetRight = right ? 1.0 : 0.0;
 
         if (this._animId) {
             GLib.Source.remove(this._animId);
@@ -57,71 +63,64 @@ export class TextFadeEffect extends Clutter.ShaderEffect {
         if (!animate) {
             this._enableLeft = targetLeft;
             this._enableRight = targetRight;
-
-            let actor = this.get_actor();
-            if (actor) { 
+            const actor = this.get_actor();
+            if (actor) {
                 actor.queue_redraw();
             }
-
             return;
         }
 
-        let startLeft = this._enableLeft;
-        let startRight = this._enableRight;
-        let startTime = Date.now();
-        let duration = 300;
+        const startLeft = this._enableLeft;
+        const startRight = this._enableRight;
+        const startTime = Date.now();
+        const duration = 300;
 
         this._animId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 16, () => {
-            let actor = this.get_actor();
+            const actor = this.get_actor();
             if (!actor) {
                 this._animId = null;
                 return GLib.SOURCE_REMOVE;
             }
 
-            let now = Date.now();
-            let p = Math.min(1.0, (now - startTime) / duration);
-            let t = p * (2 - p);
+            const now = Date.now();
+            const p = Math.min(1.0, (now - startTime) / duration);
+            const t = p * (2 - p);
 
             this._enableLeft = startLeft + (targetLeft - startLeft) * t;
             this._enableRight = startRight + (targetRight - startRight) * t;
-
             actor.queue_redraw();
 
             if (p >= 1.0) {
                 this._animId = null;
                 return GLib.SOURCE_REMOVE;
             }
-
             return GLib.SOURCE_CONTINUE;
         });
     }
 
     override vfunc_paint_target(node: Clutter.PaintNode, paint_context: Clutter.PaintContext): void {
-        let actor = this.get_actor();
-        if (!actor) {
-            return;
+        const actor = this.get_actor();
+        if (actor) {
+            const widthVal = new GObject.Value();
+            widthVal.init(GObject.TYPE_FLOAT);
+            widthVal.set_float(actor.get_width());
+            this.set_uniform_value("width", widthVal);
+
+            const fadeVal = new GObject.Value();
+            fadeVal.init(GObject.TYPE_FLOAT);
+            fadeVal.set_float(this._fadePixels);
+            this.set_uniform_value("fade_pixels", fadeVal);
+
+            const leftVal = new GObject.Value();
+            leftVal.init(GObject.TYPE_FLOAT);
+            leftVal.set_float(this._enableLeft);
+            this.set_uniform_value("enable_left", leftVal);
+
+            const rightVal = new GObject.Value();
+            rightVal.init(GObject.TYPE_FLOAT);
+            rightVal.set_float(this._enableRight);
+            this.set_uniform_value("enable_right", rightVal);
         }
-
-        let widthVal = new GObject.Value();
-        widthVal.init(GObject.TYPE_FLOAT);
-        widthVal.set_float(actor.get_width());
-        this.set_uniform_value('width', widthVal);
-
-        let fadeVal = new GObject.Value();
-        fadeVal.init(GObject.TYPE_FLOAT);
-        fadeVal.set_float(this._fadePixels);
-        this.set_uniform_value('fade_pixels', fadeVal);
-
-        let leftVal = new GObject.Value();
-        leftVal.init(GObject.TYPE_FLOAT);
-        leftVal.set_float(this._enableLeft);
-        this.set_uniform_value('enable_left', leftVal);
-
-        let rightVal = new GObject.Value();
-        rightVal.init(GObject.TYPE_FLOAT);
-        rightVal.set_float(this._enableRight);
-        this.set_uniform_value('enable_right', rightVal);
-
         super.vfunc_paint_target(node, paint_context);
     }
 }

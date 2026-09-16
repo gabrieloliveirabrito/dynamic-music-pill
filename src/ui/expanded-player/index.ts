@@ -37,6 +37,11 @@ export class ExpandedPlayer extends St.Widget {
     private _transport: TransportControls;
     private _visualizer: WaveformVisualizer;
     private _bgBtn: St.Button;
+    private _seekLockTime = 0;
+    private _lastPositionSync = 0;
+    private _lastTickPosition: number | undefined;
+    private _lastTickTime: number | undefined;
+    private _lastCapsKey = "";
 
     constructor(host: ExpandedPlayerHost) {
         const [bgW, bgH] = global.display.get_size();
@@ -75,9 +80,14 @@ export class ExpandedPlayer extends St.Widget {
         this._vinyl.setSpeed(host.settings.popup.vinylSpeed);
         this._info = new TrackInfoBlock();
         this._visualizer = new WaveformVisualizer(80, host.settings, true);
-        this._visualizer.setMode(host.settings.style.visualizerAnimation || 1);
+        this._visualizer.setMode(host.settings.style.visualizerAnimation);
 
-        const top = new St.BoxLayout({ vertical: false, style: "spacing: 16px;", x_expand: true });
+        const top = new St.BoxLayout({
+            style_class: "expanded-top-row",
+            vertical: false,
+            x_expand: true,
+            y_align: Clutter.ActorAlign.CENTER,
+        });
         top.add_child(this._vinyl as unknown as St.Widget);
         const mid = new St.BoxLayout({ vertical: true, x_expand: true, style: "spacing: 8px;" });
         mid.add_child(this._info as unknown as St.Widget);
@@ -86,6 +96,7 @@ export class ExpandedPlayer extends St.Widget {
         this.box.add_child(top);
 
         this._progress = new ProgressBar();
+        // Hours format only kicks in for tracks ≥1h (legacy); setting is a gate
         this._progress.setForceHours(host.settings.popup.showHoursFormat);
         this._progress.setSeekHandler(ratio => this._onSeek(ratio));
         this.box.add_child(this._progress as unknown as St.Widget);
@@ -119,7 +130,23 @@ export class ExpandedPlayer extends St.Widget {
         this._visualizer.setColor({ r, g, b });
     }
 
+    private _lastContentKey = "";
+
     updateContent(title: string | null, artist: string | null, artUrl: string | null, status: PlaybackStatus): void {
+        const key = `${title ?? ""}|${artist ?? ""}|${artUrl ?? ""}|${status}`;
+        if (key === this._lastContentKey) {
+            // Still refresh play icon / caps lightly
+            this._transport.setStatus(status);
+            this._visualizer.setPlaying(status === "Playing" && this._host.settings.popup.showVisualizer);
+            this._vinyl.setSpinning(
+                status === "Playing"
+                && this._host.settings.popup.showVinyl
+                && this._host.settings.popup.vinylRotate
+            );
+            return;
+        }
+        this._lastContentKey = key;
+
         this._info.setTitle(title || "");
         this._info.setArtist(artist || "");
         this._info.setPaused(status !== "Playing");
@@ -216,12 +243,21 @@ export class ExpandedPlayer extends St.Widget {
         if (length <= 0) {
             return;
         }
-        this._host.seekTo(this._player, Math.floor(length * ratio));
+        const targetPos = Math.floor(length * ratio);
+        this._seekLockTime = Date.now();
+        this._player.markPosition(targetPos);
+        this._progress.applySeekPreview(targetPos, length);
+        this._host.seekTo(this._player, targetPos);
     }
 
     private _startTimer(): void {
         this._stopTimer();
-        this._timer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 500, () => {
+        this._lastTickPosition = undefined;
+        this._lastTickTime = undefined;
+        this._lastPositionSync = 0;
+        this._player?.syncPosition();
+        // Legacy uses 100ms — smooth fill without thrashing labels (labels gate on change)
+        this._timer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 100, () => {
             this._tick();
             return GLib.SOURCE_CONTINUE;
         });
@@ -236,14 +272,65 @@ export class ExpandedPlayer extends St.Widget {
     }
 
     private _tick(): void {
-        if (!this._player) {
+        if (!this._player || !this.get_parent()) {
             return;
         }
-        const info = this._player.getPlayerInfo();
+
         const length = this._player.getTrackInfo()?.length || 0;
-        this._progress.update(info.position, length);
+        if (length <= 0) {
+            return;
+        }
+
+        const now = Date.now();
+        if (now - this._seekLockTime < 2000) {
+            return;
+        }
+
+        const info = this._player.getPlayerInfo();
+        const playing = info.playbackStatus === "Playing";
+
+        if (playing && (!this._lastPositionSync || now - this._lastPositionSync > 5000)) {
+            this._lastPositionSync = now;
+            this._player.syncPosition();
+        }
+
+        const cachedPos = this._player.getCachedPosition();
+        const lastUpdate = this._player.getLastPositionTime() || now;
+
+        let isStale = false;
+        if (playing) {
+            if (cachedPos === (this._lastTickPosition || 0)
+                && (now - lastUpdate) > 6000
+                && this._lastTickTime
+                && (now - this._lastTickTime) > 6000) {
+                isStale = true;
+            }
+            if (cachedPos !== (this._lastTickPosition || 0)) {
+                this._lastTickTime = now;
+            }
+            this._lastTickPosition = cachedPos;
+        }
+
+        let currentPos = cachedPos;
+        if (playing && !isStale) {
+            currentPos += (now - lastUpdate) * 1000;
+        }
+        if (currentPos > length) {
+            currentPos = length;
+        }
+
+        this._progress.update(currentPos, length, isStale && playing);
+
         this._transport.setStatus(info.playbackStatus);
-        this._transport.setCapabilities(info.canGoPrevious, info.canPlay || info.canPause, info.canGoNext);
+        const capsKey = `${info.canGoPrevious}|${info.canPlay || info.canPause}|${info.canGoNext}`;
+        if (capsKey !== this._lastCapsKey) {
+            this._lastCapsKey = capsKey;
+            this._transport.setCapabilities(
+                info.canGoPrevious,
+                info.canPlay || info.canPause,
+                info.canGoNext,
+            );
+        }
     }
 
     private _cleanup(): void {

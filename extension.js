@@ -50,21 +50,6 @@ __export(log_constants_exports, {
 });
 var LOG_PREFIX = "[DMP]";
 
-// src/constants/crossfade-art-constants.ts
-var crossfade_art_constants_exports = {};
-__export(crossfade_art_constants_exports, {
-  DEFAULT_COLOR: () => DEFAULT_COLOR,
-  EASE_DURATION: () => EASE_DURATION,
-  EASE_OPACITY: () => EASE_OPACITY,
-  EASE_OUT_DURATION: () => EASE_OUT_DURATION,
-  RADIUS: () => RADIUS
-});
-var RADIUS = 10;
-var DEFAULT_COLOR = "#000000";
-var EASE_OPACITY = 255;
-var EASE_DURATION = 1e3;
-var EASE_OUT_DURATION = 300;
-
 // node_modules/.pnpm/@girs+glib-2.0@2.88.0-4.0.4/node_modules/@girs/glib-2.0/glib-2.0.js
 import GLib from "gi://GLib?version=2.0";
 var glib_2_0_default = GLib;
@@ -227,7 +212,7 @@ function createSettingsGroup(settings, map9) {
           return settings.get_string(entry.key);
       }
     },
-    set(_2, prop, value) {
+    set(_3, prop, value) {
       const entry = map9[prop];
       const type = typeof entry.default;
       switch (type) {
@@ -980,6 +965,10 @@ var _MediaPlayer = class _MediaPlayer extends GObject.Object {
     __publicField(this, "_lastPlayingTime", 0);
     __publicField(this, "_lastSeen", Date.now());
     __publicField(this, "_lastTrackId", null);
+    /** Cached MPRIS Position (µs) + wall-clock when it was sampled — for interpolation. */
+    __publicField(this, "_lastPosition", 0);
+    __publicField(this, "_lastPositionTime", Date.now());
+    __publicField(this, "_seekedSignal", null);
     logDebug(`Creating MediaPlayer for ${busName}`);
     this._busName = busName;
     this._owner = owner;
@@ -1000,11 +989,26 @@ var _MediaPlayer = class _MediaPlayer extends GObject.Object {
       Gio3.DBusSignalFlags.NONE,
       this._onPropertiesChanged.bind(this)
     );
+    this._seekedSignal = this._connection.signal_subscribe(
+      this._busName,
+      MPRIS_INTERFACE,
+      "Seeked",
+      MPRIS_OBJECT,
+      null,
+      Gio3.DBusSignalFlags.NONE,
+      (_c, _s, _p, _i, _sig, parameters) => {
+        const [pos] = smartUnpack(parameters);
+        if (typeof pos === "number" && pos >= 0) {
+          this.markPosition(pos);
+        }
+      }
+    );
     this._playerPropertiesTimer = GLib4.timeout_add(
       GLib4.PRIORITY_DEFAULT,
       5e3,
       this._fallbackPoll.bind(this)
     );
+    this.syncPosition();
     this._mpris.emit("player-added", this._busName, this);
   }
   getDescriptor() {
@@ -1024,7 +1028,64 @@ var _MediaPlayer = class _MediaPlayer extends GObject.Object {
     return this._state.trackInfo;
   }
   getPlayerInfo() {
-    return this._state.player;
+    return __spreadProps(__spreadValues({}, this._state.player), {
+      position: this.getInterpolatedPosition()
+    });
+  }
+  /** Wall-clock interpolation — MPRIS rarely pushes Position while playing. */
+  getInterpolatedPosition() {
+    var _a;
+    let pos = this._lastPosition;
+    if (this._state.player.playbackStatus === "Playing") {
+      pos += (Date.now() - this._lastPositionTime) * 1e3;
+    }
+    const length = ((_a = this._state.trackInfo) == null ? void 0 : _a.length) || 0;
+    if (length > 0 && pos > length) {
+      pos = length;
+    }
+    return Math.max(0, pos);
+  }
+  markPosition(positionUs) {
+    if (typeof positionUs !== "number" || positionUs < 0 || Number.isNaN(positionUs)) {
+      return;
+    }
+    this._lastPosition = positionUs;
+    this._lastPositionTime = Date.now();
+    this._state.player.position = positionUs;
+  }
+  getCachedPosition() {
+    return this._lastPosition;
+  }
+  getLastPositionTime() {
+    return this._lastPositionTime;
+  }
+  /** Async Get(Position) — same role as legacy controller._syncPosition. */
+  syncPosition() {
+    this._connection.call(
+      this._busName,
+      MPRIS_OBJECT,
+      DBUS_PROPERTIES_INTERFACE,
+      "Get",
+      new GLib4.Variant("(ss)", [MPRIS_INTERFACE, "Position"]),
+      null,
+      Gio3.DBusCallFlags.NONE,
+      -1,
+      null,
+      (conn, res) => {
+        try {
+          const result = conn.call_finish(res);
+          const packed = result.deep_unpack();
+          let val = packed[0];
+          if (val instanceof GLib4.Variant) {
+            val = val.unpack();
+          }
+          if (typeof val === "number" && val >= 0) {
+            this.markPosition(val);
+          }
+        } catch (e) {
+        }
+      }
+    );
   }
   getName() {
     return this._busName;
@@ -1080,7 +1141,7 @@ var _MediaPlayer = class _MediaPlayer extends GObject.Object {
       -1,
       null
     );
-    this._state.player.position = positionUs;
+    this.markPosition(positionUs);
   }
   raise() {
     this._connection.call_sync(
@@ -1114,6 +1175,10 @@ var _MediaPlayer = class _MediaPlayer extends GObject.Object {
     if (this._propertiesSignal !== null) {
       this._connection.signal_unsubscribe(this._propertiesSignal);
       this._propertiesSignal = null;
+    }
+    if (this._seekedSignal !== null) {
+      this._connection.signal_unsubscribe(this._seekedSignal);
+      this._seekedSignal = null;
     }
     if (this._playerPropertiesTimer !== null) {
       GLib4.source_remove(this._playerPropertiesTimer);
@@ -1189,7 +1254,7 @@ var _MediaPlayer = class _MediaPlayer extends GObject.Object {
     return { player: playerState, trackInfo };
   }
   _applyState(newState) {
-    var _a, _b;
+    var _a, _b, _c, _d;
     const oldState = this._state;
     this._lastSeen = Date.now();
     if (newState.player.playbackStatus === "Playing") {
@@ -1202,14 +1267,30 @@ var _MediaPlayer = class _MediaPlayer extends GObject.Object {
     const [playerChanged] = checkChanged(oldState.player, newState.player);
     const [trackChanged] = checkChanged(oldState.trackInfo, newState.trackInfo);
     if (playerChanged) {
+      const posChanged = newState.player.position !== oldState.player.position && typeof newState.player.position === "number" && newState.player.position >= 0;
+      if (posChanged) {
+        this._lastPosition = newState.player.position;
+        this._lastPositionTime = Date.now();
+      }
+      const statusChanged = newState.player.playbackStatus !== oldState.player.playbackStatus;
+      const capsChanged = newState.player.canGoNext !== oldState.player.canGoNext || newState.player.canGoPrevious !== oldState.player.canGoPrevious || newState.player.canPause !== oldState.player.canPause || newState.player.canPlay !== oldState.player.canPlay || newState.player.canSeek !== oldState.player.canSeek || newState.player.canControl !== oldState.player.canControl || newState.player.volume !== oldState.player.volume;
       this._state.player = newState.player;
-      this._mpris.emit("player-state-changed", this._busName, this);
-      if (newState.player.playbackStatus !== oldState.player.playbackStatus) {
+      if (statusChanged || capsChanged) {
+        this._mpris.emit("player-state-changed", this._busName, this);
+      }
+      if (statusChanged) {
+        this._lastPositionTime = Date.now();
+        this.syncPosition();
         this._mpris.emit("player-status-changed", this._busName, newState.player.playbackStatus);
       }
     }
     if (trackChanged) {
       this._state.trackInfo = newState.trackInfo;
+      if (((_c = newState.trackInfo) == null ? void 0 : _c.trackId) !== ((_d = oldState.trackInfo) == null ? void 0 : _d.trackId)) {
+        this._lastPosition = 0;
+        this._lastPositionTime = Date.now();
+        this.syncPosition();
+      }
       this._mpris.emit("player-track-changed", this._busName, this);
     }
   }
@@ -1464,8 +1545,8 @@ GObject2.registerClass({
 var MPRISProvider = _MPRISProvider;
 
 // src/controllers/music-controller.ts
-import GLib13 from "gi://GLib";
-import * as Main5 from "resource:///org/gnome/shell/ui/main.js";
+import GLib15 from "gi://GLib";
+import * as Main6 from "resource:///org/gnome/shell/ui/main.js";
 
 // src/controllers/active-player.ts
 var BROWSER_PATTERN = /chrome|chromium|firefox|brave|edge|opera/;
@@ -1576,10 +1657,11 @@ function isBrowserBus(busName) {
 }
 
 // src/ui/music-pill/index.ts
-import GObject10 from "gi://GObject";
-import St7 from "gi://St";
-import Clutter7 from "gi://Clutter";
-import GLib9 from "gi://GLib";
+import GObject11 from "gi://GObject";
+import St8 from "gi://St";
+import Clutter9 from "gi://Clutter";
+import GLib11 from "gi://GLib";
+import Gio6 from "gi://Gio";
 
 // src/components/crossfade-art.ts
 import St from "gi://St";
@@ -1587,84 +1669,87 @@ import GObject3 from "gi://GObject";
 import Clutter from "gi://Clutter";
 var _CrossfadeArt = class _CrossfadeArt extends St.Widget {
   constructor(properties) {
-    super(properties != null ? properties : {});
-    __publicField(this, "_radius", crossfade_art_constants_exports.RADIUS);
+    super(__spreadValues({
+      layout_manager: new Clutter.BinLayout(),
+      style_class: "art-widget",
+      clip_to_allocation: false,
+      x_expand: false,
+      y_expand: false
+    }, properties));
+    __publicField(this, "_radius", 10);
     __publicField(this, "_shadowCSS", "box-shadow: none;");
-    __publicField(this, "_lastCSS");
     __publicField(this, "_currentUrl");
-    __publicField(this, "_bgUrl");
-    this.layout_manager = new Clutter.BinLayout();
-    this.set_style_class_name("art-widget");
-    this.set_clip_to_allocation(false);
-    this.set_x_expand(false);
-    this.set_y_expand(false);
   }
-  _updateContainerStyle() {
-    this.setRadius(this._radius);
-    let hasArt = !!this._currentUrl && this._currentUrl.length > 0;
-    let activeShadow = hasArt ? this._shadowCSS : "box-shadow: none;";
-    let bgColor = hasArt ? `background-color: ${crossfade_art_constants_exports.DEFAULT_COLOR};` : "background-color: transparent;";
-    this.set_style(`${activeShadow} ${bgColor}`);
-  }
-  _refreshLayerStyle(layer) {
-    if (!layer || !layer.get_parent()) return;
-    let bgCSS = layer._bgUrl ? `background-image: url("${layer._bgUrl}");` : "";
-    let radius = this.getRadius();
-    let radiusCSS = `border-radius: ${radius}px; background-size: cover; box-shadow: none; `;
-    let fullCSS = bgCSS + radiusCSS;
-    if (fullCSS === layer._lastCSS) {
-      return;
+  setRadius(r) {
+    this._radius = typeof r === "number" && !Number.isNaN(r) ? r : 10;
+    this._updateContainerStyle();
+    for (const c of this.get_children()) {
+      this._refreshLayerStyle(c);
     }
-    layer._lastCSS = fullCSS;
-    layer.set_style(fullCSS);
-  }
-  getRadius() {
-    return isNaN(this._radius) ? crossfade_art_constants_exports.RADIUS : this._radius;
-  }
-  setRadius(radius) {
-    this._radius = isNaN(radius) ? crossfade_art_constants_exports.RADIUS : radius;
-    this.set_style(`border-radius: ${radius}px; ${this._shadowCSS}`);
-    const actors = this.get_children().filter((c) => c instanceof _CrossfadeArt);
-    actors.forEach((c) => c._refreshLayerStyle(c));
   }
   setShadowStyle(cssString) {
-    this._shadowCSS = cssString;
+    this._shadowCSS = cssString || "box-shadow: none;";
     this._updateContainerStyle();
-    const actors = this.get_children().filter((c) => c instanceof _CrossfadeArt);
-    actors.forEach((a) => a._refreshLayerStyle(a));
+    for (const c of this.get_children()) {
+      this._refreshLayerStyle(c);
+    }
   }
-  setArt(newUrl, force = false) {
-    if (!newUrl) {
+  _updateContainerStyle() {
+    const safeR = typeof this._radius === "number" && !Number.isNaN(this._radius) ? this._radius : 10;
+    const hasArt = !!(this._currentUrl && this._currentUrl.length > 0);
+    const activeShadow = hasArt ? this._shadowCSS : "box-shadow: none;";
+    const bgColor = hasArt ? "background-color: #000000;" : "background-color: transparent;";
+    this.set_style(`border-radius: ${safeR}px; ${bgColor} ${activeShadow}`);
+  }
+  _refreshLayerStyle(layer) {
+    if (!layer || !layer.get_parent()) {
       return;
     }
-    let children = this.get_children().filter((c) => c instanceof _CrossfadeArt && c._bgUrl === newUrl);
-    if (children.length > 0 && !force) {
+    const url = layer._bgUrl;
+    const bgPart = url ? `background-image: url("${url}");` : "";
+    const safeR = typeof this._radius === "number" && !Number.isNaN(this._radius) ? this._radius : 10;
+    const newCss = `border-radius: ${safeR}px; background-size: cover; box-shadow: none; ${bgPart}`;
+    if (layer._lastCss === newCss) {
       return;
     }
-    this._currentUrl = newUrl;
+    layer._lastCss = newCss;
+    if (layer.get_parent()) {
+      layer.set_style(newCss);
+    }
+  }
+  setArt(newUrl, _force = false) {
+    const children = this.get_children();
+    if (children.length > 0 && children[children.length - 1]._bgUrl === newUrl) {
+      return;
+    }
+    this._currentUrl = newUrl != null ? newUrl : void 0;
     this._updateContainerStyle();
-    const easeActor = (actor) => actor;
-    let newLayer = new _CrossfadeArt({
+    for (const c of this.get_children()) {
+      c.remove_all_transitions();
+    }
+    const newLayer = new St.Widget({
       x_expand: true,
       y_expand: true,
       opacity: 0
     });
-    newLayer._bgUrl = newUrl;
+    newLayer._bgUrl = newUrl != null ? newUrl : void 0;
     this.add_child(newLayer);
     this._refreshLayerStyle(newLayer);
-    easeActor(newLayer).ease({
+    newLayer.ease({
       opacity: 255,
-      duration: 1e3,
+      duration: 1800,
       mode: Clutter.AnimationMode.EASE_OUT_QUAD,
       onStopped: (isFinished) => {
-        if (!isFinished) return;
+        if (!isFinished) {
+          return;
+        }
         newLayer.opacity = 255;
-        let currentChildren = this.get_children();
-        let layerIndex = currentChildren.indexOf(newLayer);
-        if (layerIndex > 0) {
-          for (let i = 0; i < layerIndex; i++) {
-            let oldLayer = currentChildren[i];
-            easeActor(oldLayer).ease({
+        const currentChildren = this.get_children();
+        const myIndex = currentChildren.indexOf(newLayer);
+        if (myIndex > 0) {
+          for (let i = 0; i < myIndex; i++) {
+            const oldLayer = currentChildren[i];
+            oldLayer.ease({
               opacity: 0,
               duration: 300,
               mode: Clutter.AnimationMode.EASE_OUT_QUAD,
@@ -1721,6 +1806,11 @@ var textFadeEffectShaderSource = `
         vec2 uv = cogl_tex_coord_in[0].xy;
         vec4 color = texture2D(tex, uv);
 
+        float pos_x = uv.x * width;
+
+        float left_fade = smoothstep(0.0, fade_pixels, pos_x);
+        float right_fade = smoothstep(0.0, fade_pixels, width - pos_x);
+
         float left_alpha = mix(1.0, left_fade, enable_left);
         float right_alpha = mix(1.0, right_fade, enable_right);
 
@@ -1744,8 +1834,8 @@ var _TextFadeEffect = class _TextFadeEffect extends Clutter2.ShaderEffect {
     this._fadePixels = pixels;
   }
   setEdges(left = true, right = true, animate = false) {
-    let targetLeft = left ? 1 : 0;
-    let targetRight = right ? 1 : 0;
+    const targetLeft = left ? 1 : 0;
+    const targetRight = right ? 1 : 0;
     if (this._animId) {
       GLib6.Source.remove(this._animId);
       this._animId = null;
@@ -1753,25 +1843,25 @@ var _TextFadeEffect = class _TextFadeEffect extends Clutter2.ShaderEffect {
     if (!animate) {
       this._enableLeft = targetLeft;
       this._enableRight = targetRight;
-      let actor = this.get_actor();
+      const actor = this.get_actor();
       if (actor) {
         actor.queue_redraw();
       }
       return;
     }
-    let startLeft = this._enableLeft;
-    let startRight = this._enableRight;
-    let startTime = Date.now();
-    let duration = 300;
+    const startLeft = this._enableLeft;
+    const startRight = this._enableRight;
+    const startTime = Date.now();
+    const duration = 300;
     this._animId = GLib6.timeout_add(GLib6.PRIORITY_DEFAULT, 16, () => {
-      let actor = this.get_actor();
+      const actor = this.get_actor();
       if (!actor) {
         this._animId = null;
         return GLib6.SOURCE_REMOVE;
       }
-      let now = Date.now();
-      let p = Math.min(1, (now - startTime) / duration);
-      let t = p * (2 - p);
+      const now = Date.now();
+      const p = Math.min(1, (now - startTime) / duration);
+      const t = p * (2 - p);
       this._enableLeft = startLeft + (targetLeft - startLeft) * t;
       this._enableRight = startRight + (targetRight - startRight) * t;
       actor.queue_redraw();
@@ -1783,26 +1873,25 @@ var _TextFadeEffect = class _TextFadeEffect extends Clutter2.ShaderEffect {
     });
   }
   vfunc_paint_target(node, paint_context) {
-    let actor = this.get_actor();
-    if (!actor) {
-      return;
+    const actor = this.get_actor();
+    if (actor) {
+      const widthVal = new GObject5.Value();
+      widthVal.init(GObject5.TYPE_FLOAT);
+      widthVal.set_float(actor.get_width());
+      this.set_uniform_value("width", widthVal);
+      const fadeVal = new GObject5.Value();
+      fadeVal.init(GObject5.TYPE_FLOAT);
+      fadeVal.set_float(this._fadePixels);
+      this.set_uniform_value("fade_pixels", fadeVal);
+      const leftVal = new GObject5.Value();
+      leftVal.init(GObject5.TYPE_FLOAT);
+      leftVal.set_float(this._enableLeft);
+      this.set_uniform_value("enable_left", leftVal);
+      const rightVal = new GObject5.Value();
+      rightVal.init(GObject5.TYPE_FLOAT);
+      rightVal.set_float(this._enableRight);
+      this.set_uniform_value("enable_right", rightVal);
     }
-    let widthVal = new GObject5.Value();
-    widthVal.init(GObject5.TYPE_FLOAT);
-    widthVal.set_float(actor.get_width());
-    this.set_uniform_value("width", widthVal);
-    let fadeVal = new GObject5.Value();
-    fadeVal.init(GObject5.TYPE_FLOAT);
-    fadeVal.set_float(this._fadePixels);
-    this.set_uniform_value("fade_pixels", fadeVal);
-    let leftVal = new GObject5.Value();
-    leftVal.init(GObject5.TYPE_FLOAT);
-    leftVal.set_float(this._enableLeft);
-    this.set_uniform_value("enable_left", leftVal);
-    let rightVal = new GObject5.Value();
-    rightVal.init(GObject5.TYPE_FLOAT);
-    rightVal.set_float(this._enableRight);
-    this.set_uniform_value("enable_right", rightVal);
     super.vfunc_paint_target(node, paint_context);
   }
 };
@@ -1916,7 +2005,7 @@ var _ScrollLabel = class _ScrollLabel extends St3.Widget {
       return;
     }
     let fontDesc = this._label1.get_theme_node().get_font();
-    let fadeWidth = fontDesc.get_size() / Pango.SCALE * 4;
+    let fadeWidth = fontDesc.get_size() / Pango.SCALE + 4;
     if (!this._fadeEffect) {
       this._fadeEffect = new TextFadeEffect(fadeWidth);
       this.add_effect(this._fadeEffect);
@@ -1975,11 +2064,11 @@ var _ScrollLabel = class _ScrollLabel extends St3.Widget {
   _updatePausedState() {
     let shouldPause = this._playerPaused && this._appContext.settings.scrollControls.freezeOnPause;
     if (shouldPause) {
-      if (this._paused) {
-        return;
+      if (!this._paused) {
+        this._paused = true;
+        this._cleanupTimers();
+        this._stopAnimation(true);
       }
-      this._cleanupTimers();
-      this._stopAnimation(true);
     } else if (this._paused) {
       this._paused = false;
       this._checkResize();
@@ -2160,33 +2249,46 @@ var _ScrollLabel = class _ScrollLabel extends St3.Widget {
     const duration = distance / 30 * 1e3;
     const loop = () => {
       if (this._gameMode || !this.get_parent()) {
-        return GLib7.SOURCE_REMOVE;
+        return;
       }
-      if (this._pendingScrollStop) {
-        this._pendingScrollStop = false;
-        this._isScrolling = false;
-        this._stopAnimation(true);
-        this._container.x_align = Clutter3.ActorAlign.CENTER;
-        this._label2.hide();
-        this._separator.hide();
-        return GLib7.SOURCE_REMOVE;
+      this._setFadeOutEffect(false, true, true);
+      if (this._scrollTimer) {
+        GLib7.Source.remove(this._scrollTimer);
       }
-      this._setFadeOutEffect(true, true, true);
-      ease(this._container).ease({
-        translationX: -distance,
-        duration,
-        mode: Clutter3.AnimationMode.LINEAR,
-        onStopped: (isFinished) => {
-          if (!isFinished || this._gameMode || this._pendingScrollStop) {
-            this._isScrolling = false;
-            this._pendingScrollStop = false;
-            return;
-          }
-          this._container.translation_x = 0;
-          loop();
+      this._scrollTimer = GLib7.timeout_add(GLib7.PRIORITY_DEFAULT, 2e3, () => {
+        this._scrollTimer = null;
+        if (this._gameMode || !this.get_parent()) {
+          return GLib7.SOURCE_REMOVE;
         }
+        if (this._pendingScrollStop) {
+          this._pendingScrollStop = false;
+          this._isScrolling = false;
+          this._stopAnimation(true);
+          this._container.x_align = Clutter3.ActorAlign.CENTER;
+          this._label2.hide();
+          this._separator.hide();
+          return GLib7.SOURCE_REMOVE;
+        }
+        this._setFadeOutEffect(true, true, true);
+        ease(this._container).ease({
+          translation_x: -distance,
+          duration,
+          mode: Clutter3.AnimationMode.LINEAR,
+          onStopped: (isFinished) => {
+            if (!isFinished || this._gameMode || this._pendingScrollStop) {
+              this._isScrolling = false;
+              this._pendingScrollStop = false;
+              return;
+            }
+            this._container.translation_x = 0;
+            GLib7.idle_add(GLib7.PRIORITY_DEFAULT_IDLE, () => {
+              loop();
+              return GLib7.SOURCE_REMOVE;
+            });
+          }
+        });
+        return GLib7.SOURCE_REMOVE;
       });
-      return GLib7.SOURCE_REMOVE;
     };
     loop();
   }
@@ -2217,7 +2319,7 @@ var _ScrollLabel = class _ScrollLabel extends St3.Widget {
         return GLib7.SOURCE_REMOVE;
       }
       ease(this._container).ease({
-        translationX: -distance,
+        translation_x: -distance,
         duration: scrollDuration,
         mode: Clutter3.AnimationMode.LINEAR,
         onStopped: () => {
@@ -2233,181 +2335,301 @@ GObject6.registerClass(_ScrollLabel);
 var ScrollLabel = _ScrollLabel;
 
 // src/ui/music-pill/components/text-block/index.ts
-var _TextBlock = class _TextBlock extends St4.BoxLayout {
+var _TextBlock = class _TextBlock extends St4.Widget {
   constructor() {
     super({
+      layout_manager: new Clutter4.BinLayout(),
+      x_expand: true,
+      y_expand: true,
+      clip_to_allocation: true,
+      style: "min-width: 10px; margin-right: 4px; margin-left: 2px;"
+    });
+    __publicField(this, "titleScroll");
+    __publicField(this, "artistScroll");
+    __publicField(this, "_textBox");
+    this._textBox = new St4.BoxLayout({
       x_expand: true,
       y_align: Clutter4.ActorAlign.CENTER,
-      vertical: true
+      x_align: Clutter4.ActorAlign.FILL,
+      style: "padding-left: 0px; padding-right: 0px; spacing: 0px;"
     });
-    __publicField(this, "_titleScroll");
-    __publicField(this, "_artistScroll");
-    this._titleScroll = new ScrollLabel("music-label-title");
-    this._artistScroll = new ScrollLabel("music-label-artist");
-    this.add_child(this._titleScroll);
-    this.add_child(this._artistScroll);
+    this._textBox.layout_manager.orientation = Clutter4.Orientation.VERTICAL;
+    this.titleScroll = new ScrollLabel("music-label-title");
+    this.artistScroll = new ScrollLabel("music-label-artist");
+    this._textBox.add_child(this.titleScroll);
+    this._textBox.add_child(this.artistScroll);
+    this.add_child(this._textBox);
   }
   setTitle(text) {
-    this._titleScroll.setText(text != null ? text : "", true, 0);
+    this.titleScroll.setText(text != null ? text : "", true, 0);
   }
   setArtist(text) {
-    this._artistScroll.setText(text != null ? text : "", true);
+    this.artistScroll.setText(text != null ? text : "", true);
   }
   setPlayerPaused(paused) {
-    this._titleScroll.setPlayerPaused(paused);
-    this._artistScroll.setPlayerPaused(paused);
+    this.titleScroll.setPlayerPaused(paused);
+    this.artistScroll.setPlayerPaused(paused);
+  }
+  setLabelStyles(titleCss, artistCss) {
+    this.titleScroll.setLabelStyle(titleCss);
+    this.artistScroll.setLabelStyle(artistCss);
+  }
+  setArtistVisible(visible) {
+    this.artistScroll.visible = visible;
+  }
+  setTextOpacity(opacity) {
+    this._textBox.set_opacity(opacity);
   }
 };
 GObject7.registerClass(_TextBlock);
 var TextBlock = _TextBlock;
 
-// src/ui/visualizers/waveform.ts
-import GObject9 from "gi://GObject";
-import St6 from "gi://St";
-import Clutter6 from "gi://Clutter";
-
-// src/ui/visualizers/simulated.ts
+// src/ui/music-pill/components/tablet-controls.ts
 import GObject8 from "gi://GObject";
-import GLib8 from "gi://GLib";
 import St5 from "gi://St";
 import Clutter5 from "gi://Clutter";
-var _SimulatedVisualizer = class _SimulatedVisualizer extends St5.BoxLayout {
+var _TabletControls = class _TabletControls extends St5.BoxLayout {
+  constructor() {
+    super({
+      vertical: false,
+      y_align: Clutter5.ActorAlign.CENTER,
+      style: "margin-left: 6px;",
+      visible: false
+    });
+    __publicField(this, "prevBtn");
+    __publicField(this, "playPauseBtn");
+    __publicField(this, "nextBtn");
+    __publicField(this, "_onAction", null);
+    this.prevBtn = new St5.Button({
+      style_class: "tablet-skip-btn",
+      child: new St5.Icon({ icon_name: "media-skip-backward-symbolic", icon_size: 20 }),
+      reactive: true
+    });
+    this.playPauseBtn = new St5.Button({
+      style_class: "tablet-skip-btn",
+      child: new St5.Icon({ icon_name: "media-playback-start-symbolic", icon_size: 20 }),
+      reactive: true
+    });
+    this.nextBtn = new St5.Button({
+      style_class: "tablet-skip-btn",
+      child: new St5.Icon({ icon_name: "media-skip-forward-symbolic", icon_size: 20 }),
+      reactive: true
+    });
+    this.add_child(this.prevBtn);
+    this.add_child(this.playPauseBtn);
+    this.add_child(this.nextBtn);
+    this.prevBtn.connect("button-press-event", () => Clutter5.EVENT_STOP);
+    this.playPauseBtn.connect("button-press-event", () => Clutter5.EVENT_STOP);
+    this.nextBtn.connect("button-press-event", () => Clutter5.EVENT_STOP);
+    this.prevBtn.connect("button-release-event", () => {
+      var _a;
+      (_a = this._onAction) == null ? void 0 : _a.call(this, "previous");
+      return Clutter5.EVENT_STOP;
+    });
+    this.playPauseBtn.connect("button-release-event", () => {
+      var _a;
+      (_a = this._onAction) == null ? void 0 : _a.call(this, "toggle");
+      return Clutter5.EVENT_STOP;
+    });
+    this.nextBtn.connect("button-release-event", () => {
+      var _a;
+      (_a = this._onAction) == null ? void 0 : _a.call(this, "next");
+      return Clutter5.EVENT_STOP;
+    });
+  }
+  setActionHandler(handler) {
+    this._onAction = handler;
+  }
+  setPlaying(playing) {
+    const icon = this.playPauseBtn.child;
+    icon.icon_name = playing ? "media-playback-pause-symbolic" : "media-playback-start-symbolic";
+  }
+  applyMode(tabletSetting, gameMode) {
+    if (tabletSetting > 0 && !gameMode) {
+      this.show();
+      this.prevBtn.visible = tabletSetting === 1 || tabletSetting === 3;
+      this.nextBtn.visible = tabletSetting === 1 || tabletSetting === 3;
+      this.playPauseBtn.visible = tabletSetting === 2 || tabletSetting === 3;
+    } else {
+      this.hide();
+    }
+  }
+};
+GObject8.registerClass(_TabletControls);
+var TabletControls = _TabletControls;
+
+// src/ui/visualizers/waveform.ts
+import GObject10 from "gi://GObject";
+import GLib9 from "gi://GLib";
+import St7 from "gi://St";
+import Clutter7 from "gi://Clutter";
+import * as Main from "resource:///org/gnome/shell/ui/main.js";
+import { gettext as _ } from "resource:///org/gnome/shell/extensions/extension.js";
+
+// src/ui/visualizers/simulated.ts
+import GObject9 from "gi://GObject";
+import GLib8 from "gi://GLib";
+import St6 from "gi://St";
+import Clutter6 from "gi://Clutter";
+var _SimulatedVisualizer = class _SimulatedVisualizer extends St6.BoxLayout {
   constructor(settings, isPopup = false) {
     super({
       style: "spacing: 2px;",
-      y_align: Clutter5.ActorAlign.CENTER,
-      x_align: Clutter5.ActorAlign.END
+      y_align: Clutter6.ActorAlign.FILL,
+      x_align: Clutter6.ActorAlign.END
     });
     __publicField(this, "_settings");
     __publicField(this, "_isPopup");
     __publicField(this, "_bars", []);
-    __publicField(this, "_timer", null);
-    __publicField(this, "_playing", false);
+    __publicField(this, "_color", "255,255,255");
     __publicField(this, "_mode", 1);
-    __publicField(this, "_color", { r: 255, g: 255, b: 255 });
+    __publicField(this, "_isPlaying", false);
+    __publicField(this, "_timerId", null);
+    this.layout_manager.orientation = Clutter6.Orientation.HORIZONTAL;
     this._settings = settings;
     this._isPopup = isPopup;
-    this._rebuildBars();
+    this._updateBarCount();
+    this.connect("destroy", () => this._cleanup());
   }
-  setMode(mode) {
-    this._mode = mode;
-    this.visible = mode !== 0;
-    if (mode === 0) {
-      this.setPlaying(false);
+  _updateBarCount() {
+    this.destroy_all_children();
+    this._bars = [];
+    const count = this._isPopup ? this._settings.popup.popupVisualizerBars || 10 : this._settings.style.visualizerBarCount || 4;
+    const barWidth = this._isPopup ? this._settings.popup.popupVisualizerBarWidth || 2 : this._settings.style.visualizerBarWidth || 2;
+    for (let i = 0; i < count; i++) {
+      const bar = new St6.Widget({
+        style_class: "visualizer-bar",
+        y_expand: true,
+        y_align: Clutter6.ActorAlign.FILL
+      });
+      bar.set_width(barWidth);
+      bar.set_pivot_point(0.5, this._mode === 2 ? 0.5 : 1);
+      this.add_child(bar);
+      this._bars.push(bar);
+    }
+    this._updateBarsCss();
+  }
+  _cleanup() {
+    if (this._timerId !== null) {
+      GLib8.source_remove(this._timerId);
+      this._timerId = null;
+    }
+  }
+  setMode(m) {
+    this._mode = m;
+    const pivotY = m === 2 ? 0.5 : 1;
+    for (const bar of this._bars) {
+      bar.set_pivot_point(0.5, pivotY);
     }
   }
   setColor(c) {
-    this._color = c;
-    this._applyBarStyles();
+    let r = 255, g = 255, b = 255;
+    if (c && typeof c.r === "number" && !Number.isNaN(c.r)) r = Math.min(255, c.r + 100);
+    if (c && typeof c.g === "number" && !Number.isNaN(c.g)) g = Math.min(255, c.g + 100);
+    if (c && typeof c.b === "number" && !Number.isNaN(c.b)) b = Math.min(255, c.b + 100);
+    this._color = `${Math.floor(r)},${Math.floor(g)},${Math.floor(b)}`;
+    this._updateBarsCss();
+    if (!this._isPlaying) {
+      this._updateVisuals(0);
+    }
   }
   setPlaying(playing) {
-    this._playing = playing && this._mode !== 0;
-    if (this._playing) {
-      this._start();
-    } else {
-      this._stop();
-      for (const bar of this._bars) {
-        bar.set_height(2);
-      }
-    }
-  }
-  updateBarCount() {
-    this._rebuildBars();
-  }
-  _barCount() {
-    return this._isPopup ? this._settings.popup.popupVisualizerBars || 10 : this._settings.style.visualizerBarCount || 10;
-  }
-  _barWidth() {
-    return this._isPopup ? this._settings.popup.popupVisualizerBarWidth || 2 : this._settings.style.visualizerBarWidth || 2;
-  }
-  _rebuildBars() {
-    this.destroy_all_children();
-    this._bars = [];
-    const count = this._barCount();
-    const width = this._barWidth();
-    for (let i = 0; i < count; i++) {
-      const bar = new St5.Widget({
-        width,
-        height: 2,
-        style: `background-color: rgb(${this._color.r},${this._color.g},${this._color.b}); border-radius: 2px;`
-      });
-      this._bars.push(bar);
-      this.add_child(bar);
-    }
-  }
-  _applyBarStyles() {
-    for (const bar of this._bars) {
-      bar.set_style(`background-color: rgb(${this._color.r},${this._color.g},${this._color.b}); border-radius: 2px;`);
-    }
-  }
-  _start() {
-    if (this._timer !== null) {
+    if (this._isPlaying === playing) {
       return;
     }
-    this._timer = GLib8.timeout_add(GLib8.PRIORITY_DEFAULT, 50, () => {
-      if (!this._playing) {
-        this._timer = null;
-        return GLib8.SOURCE_REMOVE;
-      }
-      const maxH = Math.max(8, this.get_height() || 24);
-      for (const bar of this._bars) {
-        const h = this._mode === 2 ? Math.max(2, Math.floor(maxH * (0.3 + Math.random() * 0.7))) : Math.max(2, Math.floor(maxH * Math.random()));
-        bar.set_height(h);
-      }
-      return GLib8.SOURCE_CONTINUE;
-    });
-  }
-  _stop() {
-    if (this._timer !== null) {
-      GLib8.source_remove(this._timer);
-      this._timer = null;
+    this._isPlaying = playing;
+    this._updateBarsCss();
+    if (this._timerId !== null) {
+      GLib8.source_remove(this._timerId);
+      this._timerId = null;
+    }
+    if (playing && this._mode !== 0) {
+      this._timerId = GLib8.timeout_add(GLib8.PRIORITY_DEFAULT, 16, () => {
+        if (!this.get_parent()) {
+          this._timerId = null;
+          return GLib8.SOURCE_REMOVE;
+        }
+        if (!this.mapped) {
+          return GLib8.SOURCE_CONTINUE;
+        }
+        const t = Date.now() / 250;
+        this._updateVisuals(t);
+        return GLib8.SOURCE_CONTINUE;
+      });
+    } else {
+      this._updateVisuals(0);
     }
   }
+  _updateBarsCss() {
+    const opacity = this._isPlaying ? 1 : 0.4;
+    const barWidth = this._isPopup ? this._settings.popup.popupVisualizerBarWidth || 2 : this._settings.style.visualizerBarWidth || 2;
+    const bRad = barWidth >= 4 ? 2 : barWidth > 1 ? 1 : 0;
+    const css = `background-color: rgba(${this._color}, ${opacity}); border-radius: ${bRad}px;`;
+    for (const bar of this._bars) {
+      bar.set_style(css);
+    }
+  }
+  _updateVisuals(t) {
+    if (!this.get_parent()) {
+      return;
+    }
+    if (!this._isPlaying) {
+      for (const bar of this._bars) {
+        bar.scale_y = 0.2;
+      }
+      return;
+    }
+    const speeds = [1.1, 1.6, 1.3, 1.8, 1.5, 1.2, 1.7, 1.4];
+    this._bars.forEach((bar, idx) => {
+      let scaleY = 0.2;
+      if (this._mode === 1) {
+        const wave = (Math.sin(t - idx * 1) + 1) / 2;
+        scaleY = 0.3 + wave * 0.7;
+      } else if (this._mode === 2) {
+        const pulse = (Math.sin(t * speeds[idx % speeds.length]) + 1) / 2;
+        scaleY = 0.3 + pulse * 0.7;
+      }
+      bar.scale_y = scaleY;
+    });
+  }
   destroy() {
-    this._stop();
+    this._cleanup();
     super.destroy();
   }
 };
-GObject8.registerClass(_SimulatedVisualizer);
+GObject9.registerClass(_SimulatedVisualizer);
 var SimulatedVisualizer = _SimulatedVisualizer;
 
 // src/ui/visualizers/waveform.ts
-var _WaveformVisualizer = class _WaveformVisualizer extends St6.Bin {
+var _WaveformVisualizer = class _WaveformVisualizer extends St7.Bin {
   constructor(defaultHeight = 24, settings, isPopup = false) {
     super({
-      y_align: Clutter6.ActorAlign.CENTER,
-      x_align: Clutter6.ActorAlign.END,
-      y_expand: true,
-      height: defaultHeight
+      y_align: Clutter7.ActorAlign.CENTER,
+      x_align: Clutter7.ActorAlign.END,
+      y_expand: true
     });
     __publicField(this, "_settings");
     __publicField(this, "_isPopup");
     __publicField(this, "_simulated");
     __publicField(this, "_mode", 1);
-    __publicField(this, "_playing", false);
+    __publicField(this, "_isPlaying", false);
     __publicField(this, "_maxHeight", null);
+    __publicField(this, "_lastColor", null);
     this._settings = settings;
     this._isPopup = isPopup;
     this._simulated = new SimulatedVisualizer(settings, isPopup);
     this.set_child(this._simulated);
+    if (this._isPopup) {
+      this._settings.popup.connect("changed::popup-visualizer-bars", () => this._updateSize());
+      this._settings.popup.connect("changed::popup-visualizer-bar-width", () => this._updateSize());
+      this._settings.popup.connect("changed::popup-visualizer-height", () => this._updateSize());
+    } else {
+      this._settings.style.connect("changed::visualizer-bars", () => this._updateSize());
+      this._settings.style.connect("changed::visualizer-bar-width", () => this._updateSize());
+      this._settings.style.connect("changed::visualizer-height", () => this._updateSize());
+    }
     this._updateSize();
-  }
-  setHeightClamped(maxH) {
-    this._maxHeight = maxH;
-    this._updateSize();
-  }
-  setMode(mode) {
-    this._mode = mode === 3 ? 2 : mode;
-    this._simulated.setMode(this._mode);
-    this._simulated.setPlaying(this._playing);
-    this.visible = this._mode !== 0;
-  }
-  setColor(c) {
-    this._simulated.setColor(c);
-  }
-  setPlaying(playing) {
-    this._playing = playing;
-    this._simulated.setPlaying(playing);
+    void defaultHeight;
   }
   _updateSize() {
     let h = this._isPopup ? this._settings.popup.popupVisualizerHeight || 80 : this._settings.style.visualizerHeight || 24;
@@ -2416,18 +2638,49 @@ var _WaveformVisualizer = class _WaveformVisualizer extends St6.Bin {
     }
     this.set_height(h);
     this._simulated.set_height(h);
-    this._simulated.updateBarCount();
+    this._simulated._updateBarCount();
+  }
+  setHeightClamped(maxH) {
+    this._maxHeight = maxH;
+    this._updateSize();
+  }
+  setMode(m) {
+    if (m === 3 && !GLib9.find_program_in_path("cava")) {
+      Main.notify("Dynamic Music Pill", _('Please install "cava" for real-time mode.'));
+      m = 2;
+    }
+    if (m === 3) {
+      m = 2;
+    }
+    this._mode = m;
+    this._simulated.setMode(m);
+    this._simulated.setPlaying(this._isPlaying);
+  }
+  setColor(c) {
+    this._lastColor = c;
+    this._simulated.setColor(c);
+  }
+  setPlaying(playing) {
+    this._isPlaying = playing;
+    this._simulated.setPlaying(playing);
   }
 };
-GObject9.registerClass(_WaveformVisualizer);
+GObject10.registerClass(_WaveformVisualizer);
 var WaveformVisualizer = _WaveformVisualizer;
 
 // src/ui/music-pill/handlers/style.ts
 function applyPillBodyStyle(body, settings, state, color, alpha = 1, playing = false) {
   var _a;
-  const r = Number.isFinite(color.r) ? Math.floor(color.r) : 40;
-  const g = Number.isFinite(color.g) ? Math.floor(color.g) : 40;
-  const b = Number.isFinite(color.b) ? Math.floor(color.b) : 40;
+  const dynR = Number.isFinite(color.r) ? Math.floor(color.r) : 40;
+  const dynG = Number.isFinite(color.g) ? Math.floor(color.g) : 40;
+  const dynB = Number.isFinite(color.b) ? Math.floor(color.b) : 40;
+  let r = dynR, g = dynG, b = dynB;
+  if (settings.style.useCustomColors) {
+    const parts = (settings.style.customBgColor || "40,40,40").split(",").map((s) => parseInt(s.trim(), 10));
+    r = Number.isFinite(parts[0]) ? parts[0] : 40;
+    g = Number.isFinite(parts[1]) ? parts[1] : 40;
+    b = Number.isFinite(parts[2]) ? parts[2] : 40;
+  }
   let radius = settings.style.corderRadius;
   if (!Number.isFinite(radius) || radius <= 0) {
     radius = 28;
@@ -2435,17 +2688,7 @@ function applyPillBodyStyle(body, settings, state, color, alpha = 1, playing = f
   state.radius = radius;
   const padX = Number.isFinite(state.paddingX) ? Math.floor(state.paddingX) : 14;
   const padY = Number.isFinite(state.paddingY) ? Math.floor(state.paddingY) : 6;
-  let bg = `background-color: rgba(${r}, ${g}, ${b}, ${alpha});`;
-  if (settings.style.useCustomColors) {
-    const parts = (settings.style.customBgColor || "40,40,40").split(",").map((s) => parseInt(s.trim(), 10));
-    const cr = Number.isFinite(parts[0]) ? parts[0] : 40;
-    const cg = Number.isFinite(parts[1]) ? parts[1] : 40;
-    const cb = Number.isFinite(parts[2]) ? parts[2] : 40;
-    bg = `background-color: rgba(${cr}, ${cg}, ${cb}, ${alpha});`;
-    state.displayedColor = { r: cr, g: cg, b: cb };
-  } else {
-    state.displayedColor = { r, g, b };
-  }
+  const bg = `background-color: rgba(${r}, ${g}, ${b}, ${alpha});`;
   let border = "border-width: 0px; border-color: transparent;";
   if (settings.style.showPillOutline) {
     const borderOp = playing ? 0.2 : 0.1;
@@ -2455,7 +2698,7 @@ function applyPillBodyStyle(body, settings, state, color, alpha = 1, playing = f
   if (settings.pill.enableShadow) {
     const blur = settings.pill.shadowBlur || 8;
     const opacity = ((_a = settings.pill.shadowOpacity) != null ? _a : 50) / 100;
-    shadow = `box-shadow: 0 2px ${blur}px rgba(0,0,0,${opacity});`;
+    shadow = `box-shadow: 0px 2px ${blur}px rgba(0, 0, 0, ${opacity});`;
     state.shadowCSS = shadow;
   } else {
     shadow = "box-shadow: none;";
@@ -2466,18 +2709,368 @@ function applyPillBodyStyle(body, settings, state, color, alpha = 1, playing = f
     state.lastBodyCss = css;
     body.set_style(css);
   }
+  state.displayedColor = { r: dynR, g: dynG, b: dynB };
+}
+
+// src/ui/music-pill/handlers/dimensions.ts
+import Clutter8 from "gi://Clutter";
+function updatePillDimensions(settings, state, actors, currentStatus, isPopupOpen = false) {
+  const { pill, body, artWidget, artBin, textBlock, visualizer, visBin, tabletControls } = actors;
+  if (!pill.get_parent()) {
+    return;
+  }
+  const target = settings.style.targetContainer;
+  state.inPanel = target > 0;
+  const parent = pill.get_parent();
+  let isSidePanel = false;
+  if (parent && !state.inPanel) {
+    const [pw, ph] = parent.get_size();
+    if (pw > 0 && ph > 0 && pw < ph) {
+      isSidePanel = true;
+    }
+  }
+  pill.set_width(-1);
+  const confWidth = state.inPanel ? settings.style.panelWidth : settings.pill.dockWidth;
+  const width = confWidth;
+  const height = state.inPanel ? settings.style.panelHeight : settings.pill.dockHeight;
+  const prefArtSize = state.inPanel ? settings.style.panelArtSize : settings.pill.albumArtSize;
+  const vOffset = settings.pill.verticalOffset;
+  const hOffset = settings.pill.horizontalOffset;
+  const visStyle = settings.style.visualizerAnimation;
+  state.radius = settings.style.corderRadius;
+  const shadowEnabled = settings.pill.enableShadow;
+  const shadowBlur = settings.pill.shadowBlur;
+  const shadowOpacity = settings.pill.shadowOpacity / 100;
+  let fontSizeTitle = "11pt";
+  let fontSizeArtist = "9pt";
+  if (state.inPanel) {
+    state.paddingY = 0;
+    fontSizeTitle = "10pt";
+    fontSizeArtist = "8pt";
+  } else {
+    const rawPadY = Math.floor(height / 10);
+    state.paddingY = Math.max(2, Math.min(8, rawPadY));
+  }
+  state.paddingX = settings.style.outerEdgeMargin;
+  if (isSidePanel) {
+    const temp = state.paddingX;
+    state.paddingX = state.paddingY;
+    state.paddingY = temp;
+  }
+  let hideText = settings.pill.hideText;
+  if (isSidePanel) {
+    hideText = true;
+    body.layout_manager.orientation = Clutter8.Orientation.VERTICAL;
+  } else {
+    body.layout_manager.orientation = Clutter8.Orientation.HORIZONTAL;
+  }
+  textBlock.visible = !hideText;
+  body.translation_y = vOffset;
+  body.translation_x = hOffset;
+  if (shadowEnabled) {
+    state.shadowCSS = `box-shadow: 0px 2px ${shadowBlur}px rgba(0, 0, 0, ${shadowOpacity});`;
+  } else {
+    state.shadowCSS = "box-shadow: none;";
+  }
+  const artRadius = Math.max(4, state.radius - (isSidePanel ? state.paddingX : state.paddingY));
+  let maxArtHeight = (isSidePanel ? width : height) - 2 * (isSidePanel ? state.paddingX : state.paddingY);
+  if (maxArtHeight < 10) {
+    maxArtHeight = 10;
+  }
+  const finalArtSize = Math.min(prefArtSize, maxArtHeight);
+  artWidget.set_width(finalArtSize);
+  artWidget.set_height(finalArtSize);
+  artBin.set_width(finalArtSize);
+  artBin.set_height(finalArtSize);
+  artWidget.setRadius(artRadius);
+  artWidget.setShadowStyle(state.shadowCSS);
+  visualizer.setMode(visStyle);
+  visualizer.setHeightClamped(maxArtHeight);
+  const tabletSetting = settings.pill.tabletMode;
+  tabletControls.applyMode(tabletSetting, state.gameMode);
+  repositionTabletControls(body, tabletControls, settings.pill.controlsPosition);
+  if (isSidePanel) {
+    tabletControls.layout_manager.orientation = Clutter8.Orientation.VERTICAL;
+    tabletControls.set_style("margin: 0px;");
+  } else {
+    tabletControls.layout_manager.orientation = Clutter8.Orientation.HORIZONTAL;
+    const controlsPos = settings.pill.controlsPosition;
+    tabletControls.set_style(
+      controlsPos === 0 ? "margin-left: 6px; margin-top: 0px;" : "margin-left: 6px; margin-right: 4px; margin-top: 0px;"
+    );
+  }
+  let forceHideVis = isPopupOpen && settings.popup.hidePillVisualizer && settings.popup.showVisualizer;
+  if (currentStatus === "Stopped") {
+    forceHideVis = forceHideVis || false;
+  }
+  const isDynamic = settings.pill.dynamicWidth;
+  if (width < 220 && !hideText && !isDynamic || visStyle === 0 || forceHideVis) {
+    visBin.hide();
+    visBin.set_width(0);
+    visBin.set_height(0);
+    visBin.set_style("margin: 0px;");
+    if (!tabletSetting || state.gameMode) {
+      const artMargin = hideText ? 0 : width < 180 ? 4 : 8;
+      artBin.set_style(isSidePanel ? `margin-bottom: ${artMargin}px; margin-right: 0px;` : `margin-right: ${artMargin}px; margin-bottom: 0px;`);
+    } else {
+      const artMargin = hideText ? 0 : 2;
+      artBin.set_style(isSidePanel ? `margin-bottom: ${artMargin}px; margin-right: 0px;` : `margin-right: ${artMargin}px; margin-bottom: 0px;`);
+    }
+  } else {
+    visBin.show();
+    const sideMargin = hideText ? 6 : settings.style.visualizerMargin;
+    if (isSidePanel) {
+      visBin.set_style(`margin-top: ${sideMargin}px; margin-left: 0px;`);
+      visBin.set_height(-1);
+      visBin.set_width(finalArtSize);
+      artBin.set_style(`margin-bottom: ${sideMargin}px; margin-right: 0px;`);
+    } else {
+      visBin.set_style(`margin-left: ${sideMargin}px; margin-top: 0px;`);
+      visBin.set_width(-1);
+      visBin.set_height(-1);
+      artBin.set_style(`margin-right: ${sideMargin}px; margin-bottom: 0px;`);
+    }
+  }
+  const customTextStr = settings.style.useCustomColors ? `rgb(${settings.style.customTextColor})` : "white";
+  const customTextAlpha = settings.style.useCustomColors ? `rgba(${settings.style.customTextColor}, 0.7)` : "rgba(255,255,255,0.7)";
+  const borderOffset = settings.style.showPillOutline ? 2 : 0;
+  const effectiveHeight = height - borderOffset;
+  const showArtist = settings.pill.showArtist;
+  if (!showArtist) {
+    textBlock.setArtistVisible(false);
+  } else if (effectiveHeight < 46 && !state.inPanel) {
+    textBlock.setArtistVisible(false);
+  } else if (state.inPanel && effectiveHeight < 30) {
+    textBlock.setArtistVisible(false);
+  } else {
+    textBlock.setArtistVisible(true);
+  }
+  textBlock.setLabelStyles(
+    `font-size: ${fontSizeTitle}; font-weight: 800; color: ${customTextStr}; margin: 0px; padding: 0px;`,
+    `font-size: ${fontSizeArtist}; font-weight: 500; color: ${customTextAlpha}; margin: 0px; padding: 0px;`
+  );
+  state.targetWidth = confWidth;
+  body.set_height(height);
+  if (!settings.pill.dynamicWidth && !hideText && confWidth > 0) {
+    body.set_width(confWidth);
+  }
+  pill.set_height(height);
+}
+function repositionTabletControls(body, tabletControls, pos) {
+  if (tabletControls.get_parent() === body) {
+    body.remove_child(tabletControls);
+  }
+  switch (pos) {
+    case 1:
+      body.insert_child_at_index(tabletControls, 2);
+      break;
+    case 2:
+      body.add_child(tabletControls);
+      break;
+    default:
+      body.insert_child_at_index(tabletControls, 1);
+      break;
+  }
+}
+
+// src/ui/music-pill/handlers/color-from-art.ts
+import Gio5 from "gi://Gio";
+import GdkPixbuf from "gi://GdkPixbuf";
+
+// src/utils/color.ts
+function getAverageColor(pixbuf) {
+  const w = pixbuf.get_width();
+  const h = pixbuf.get_height();
+  const pixels = pixbuf.get_pixels();
+  const rowstride = pixbuf.get_rowstride();
+  const nChannels = pixbuf.get_n_channels();
+  let r = 0, g = 0, b = 0, count = 0;
+  for (let y = 0; y < h; y += 20) {
+    for (let x = 0; x < w; x += 20) {
+      const idx = y * rowstride + x * nChannels;
+      r += pixels[idx];
+      g += pixels[idx + 1];
+      b += pixels[idx + 2];
+      count++;
+    }
+  }
+  if (count === 0) {
+    return { r: 40, g: 40, b: 40 };
+  }
+  return {
+    r: Math.floor(r / count),
+    g: Math.floor(g / count),
+    b: Math.floor(b / count)
+  };
+}
+function getClosestGnomeAccent(r, g, b) {
+  const rNorm = r / 255, gNorm = g / 255, bNorm = b / 255;
+  const max = Math.max(rNorm, gNorm, bNorm);
+  const min = Math.min(rNorm, gNorm, bNorm);
+  let h = 0, s = 0;
+  const l = (max + min) / 2;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case rNorm:
+        h = (gNorm - bNorm) / d + (gNorm < bNorm ? 6 : 0);
+        break;
+      case gNorm:
+        h = (bNorm - rNorm) / d + 2;
+        break;
+      case bNorm:
+        h = (rNorm - gNorm) / d + 4;
+        break;
+    }
+    h *= 60;
+  }
+  s *= 100;
+  const lPct = l * 100;
+  if (s < 15 || lPct < 15 || lPct > 90) {
+    return "slate";
+  }
+  const presets = {
+    red: 0,
+    orange: 30,
+    yellow: 50,
+    green: 120,
+    teal: 170,
+    blue: 210,
+    purple: 280,
+    pink: 330
+  };
+  let closest = "blue";
+  let minDistance = Infinity;
+  for (const [name, targetHue] of Object.entries(presets)) {
+    const diff = Math.abs(h - targetHue);
+    const distance = Math.min(diff, 360 - diff);
+    if (distance < minDistance) {
+      minDistance = distance;
+      closest = name;
+    }
+  }
+  if (Math.abs(h - 360) < minDistance) {
+    closest = "red";
+  }
+  return closest;
+}
+
+// src/ui/music-pill/handlers/color-from-art.ts
+var ArtColorLoader = class {
+  constructor() {
+    __publicField(this, "_cancellable", null);
+  }
+  load(artUrl, cb) {
+    if (!artUrl) {
+      return;
+    }
+    if (this._cancellable) {
+      this._cancellable.cancel();
+    }
+    this._cancellable = new Gio5.Cancellable();
+    const cancellable = this._cancellable;
+    const file = Gio5.File.new_for_uri(artUrl);
+    file.load_contents_async(cancellable, (f, res) => {
+      try {
+        const [ok, bytes] = f.load_contents_finish(res);
+        if (!ok) {
+          return;
+        }
+        const stream = Gio5.MemoryInputStream.new_from_bytes(bytes);
+        GdkPixbuf.Pixbuf.new_from_stream_async(stream, cancellable, (_source, pixRes) => {
+          try {
+            const pixbuf = GdkPixbuf.Pixbuf.new_from_stream_finish(pixRes);
+            if (!pixbuf) {
+              return;
+            }
+            const color = getAverageColor(pixbuf);
+            if (cb.syncAccent && cb.setAccent) {
+              try {
+                cb.setAccent(getClosestGnomeAccent(color.r, color.g, color.b));
+              } catch (err) {
+                logDebug(`Native accent sync failed: ${err}`);
+              }
+            }
+            cb.onColor(color);
+          } catch (pixErr) {
+            const e = pixErr;
+            if (!e.matches || !e.matches(Gio5.IOErrorEnum, Gio5.IOErrorEnum.CANCELLED)) {
+              logDebug(`Failed to decode art pixbuf: ${e.message}`);
+            }
+          }
+        });
+      } catch (err) {
+        const e = err;
+        if (!e.matches || !e.matches(Gio5.IOErrorEnum, Gio5.IOErrorEnum.CANCELLED)) {
+          logDebug(`Failed to load art color: ${e.message}`);
+        }
+      }
+    });
+  }
+  cancel() {
+    if (this._cancellable) {
+      this._cancellable.cancel();
+      this._cancellable = null;
+    }
+  }
+};
+
+// src/ui/music-pill/handlers/color-transition.ts
+import GLib10 from "gi://GLib";
+function startColorTransition(state, apply, playing, hasParent) {
+  if (state.colorAnimId !== null) {
+    GLib10.source_remove(state.colorAnimId);
+    state.colorAnimId = null;
+  }
+  const base = state.targetColor;
+  const factor = playing ? 0.6 : 0.4;
+  const targetR = Math.floor(base.r * factor);
+  const targetG = Math.floor(base.g * factor);
+  const targetB = Math.floor(base.b * factor);
+  const startR = state.displayedColor.r;
+  const startG = state.displayedColor.g;
+  const startB = state.displayedColor.b;
+  const steps = 60;
+  let count = 0;
+  state.colorAnimId = GLib10.timeout_add(GLib10.PRIORITY_DEFAULT, 33, () => {
+    if (!hasParent()) {
+      state.colorAnimId = null;
+      return GLib10.SOURCE_REMOVE;
+    }
+    count++;
+    const progress = count / steps;
+    const t = progress * progress * (3 - 2 * progress);
+    const r = Math.floor(startR + (targetR - startR) * t);
+    const g = Math.floor(startG + (targetG - startG) * t);
+    const b = Math.floor(startB + (targetB - startB) * t);
+    apply(r, g, b);
+    if (count >= steps) {
+      state.displayedColor = { r: targetR, g: targetG, b: targetB };
+      state.colorAnimId = null;
+      return GLib10.SOURCE_REMOVE;
+    }
+    return GLib10.SOURCE_CONTINUE;
+  });
+}
+function setTargetColor(state, color) {
+  state.targetColor = {
+    r: Math.round(color.r),
+    g: Math.round(color.g),
+    b: Math.round(color.b)
+  };
 }
 
 // src/ui/music-pill/index.ts
-var _MusicPill = class _MusicPill extends St7.Widget {
+var _MusicPill = class _MusicPill extends St8.Widget {
   constructor(settings) {
     super({
       style_class: "music-pill-container",
       reactive: true,
-      layout_manager: new Clutter7.BinLayout(),
+      layout_manager: new Clutter9.BinLayout(),
       y_expand: true,
-      y_align: Clutter7.ActorAlign.FILL,
-      x_align: Clutter7.ActorAlign.CENTER,
+      y_align: Clutter9.ActorAlign.FILL,
+      x_align: Clutter9.ActorAlign.CENTER,
       opacity: 0,
       width: 0,
       visible: false,
@@ -2490,12 +3083,23 @@ var _MusicPill = class _MusicPill extends St7.Widget {
     __publicField(this, "_body");
     __publicField(this, "_artWidget");
     __publicField(this, "_artBin");
+    __publicField(this, "_tabletControls");
     __publicField(this, "_visualizer");
+    __publicField(this, "_visBin");
     __publicField(this, "_currentStatus", "Stopped");
     __publicField(this, "_lastArtUrl", null);
     __publicField(this, "_onAction", null);
     __publicField(this, "_clickTimer", null);
     __publicField(this, "_lastClick", 0);
+    __publicField(this, "_isPopupOpen", false);
+    __publicField(this, "_colorLoader", new ArtColorLoader());
+    __publicField(this, "_currentBgAlpha", 1);
+    __publicField(this, "_interfaceSettings", null);
+    __publicField(this, "_originalAccent", null);
+    __publicField(this, "_lastTitle", "");
+    __publicField(this, "_lastArtist", "");
+    __publicField(this, "_lastArtUrlSeen");
+    __publicField(this, "_lastDisplayStatus", null);
     this._settings = settings;
     this._state = {
       lastScrollTime: 0,
@@ -2504,7 +3108,7 @@ var _MusicPill = class _MusicPill extends St7.Widget {
       paddingX: 14,
       paddingY: 6,
       radius: 28,
-      shadowCSS: "box-shadow: none",
+      shadowCSS: "box-shadow: none;",
       inPanel: false,
       gameMode: false,
       currentBusName: null,
@@ -2516,33 +3120,93 @@ var _MusicPill = class _MusicPill extends St7.Widget {
       lastLeftCss: null,
       lastRightCss: null
     };
-    this._body = new St7.BoxLayout({
+    try {
+      this._interfaceSettings = new Gio6.Settings({ schema_id: "org.gnome.desktop.interface" });
+      this._originalAccent = this._interfaceSettings.get_string("accent-color");
+    } catch (e) {
+      this._interfaceSettings = null;
+    }
+    this._body = new St8.BoxLayout({
       style_class: "pill-body",
       x_expand: false,
       y_expand: false,
-      y_align: Clutter7.ActorAlign.CENTER
+      y_align: Clutter9.ActorAlign.CENTER
     });
     this._body.set_pivot_point(0.5, 0.5);
     this._artWidget = new CrossfadeArt();
-    this._artBin = new St7.Bin({
+    this._artBin = new St8.Bin({
       child: this._artWidget,
-      style: "margin-right: 4px;",
+      style: "margin-right: 8px;",
       x_expand: false,
       y_expand: false
     });
+    this._tabletControls = new TabletControls();
+    this._tabletControls.setActionHandler((action) => this._emit(action === "toggle" ? "play_pause" : action));
     this.textBlock = new TextBlock();
     this._visualizer = new WaveformVisualizer(24, settings, false);
-    this._visualizer.setMode(settings.style.visualizerAnimation || 1);
+    this._visBin = new St8.Bin({
+      child: this._visualizer,
+      style: "margin-left: 8px;",
+      x_align: Clutter9.ActorAlign.END
+    });
     this._body.add_child(this._artBin);
+    this._body.insert_child_at_index(this._tabletControls, 1);
     this._body.add_child(this.textBlock);
-    this._body.add_child(this._visualizer);
+    this._body.add_child(this._visBin);
     this.add_child(this._body);
+    this._updateTransparencyConfig();
     this._applyStyle();
+    this.connect("enter-event", () => {
+      this.textBlock.titleScroll.setHoverMode(true);
+      this.textBlock.artistScroll.setHoverMode(true);
+      return Clutter9.EVENT_PROPAGATE;
+    });
+    this.connect("leave-event", () => {
+      this.textBlock.titleScroll.setHoverMode(false);
+      this.textBlock.artistScroll.setHoverMode(false);
+      return Clutter9.EVENT_PROPAGATE;
+    });
+    this.connect("button-press-event", () => {
+      if (!this._body) return Clutter9.EVENT_STOP;
+      this._body.ease({
+        scale_x: 0.96,
+        scale_y: 0.96,
+        duration: 80,
+        mode: Clutter9.AnimationMode.EASE_OUT_QUAD
+      });
+      return Clutter9.EVENT_STOP;
+    });
     this.connect("button-release-event", (_a, event) => this._onButton(event));
     this.connect("scroll-event", (_a, event) => this._onScroll(event));
+    this.connect("destroy", () => this._cleanup());
+  }
+  _cleanup() {
+    this._colorLoader.cancel();
+    if (this._state.colorAnimId !== null) {
+      GLib11.source_remove(this._state.colorAnimId);
+      this._state.colorAnimId = null;
+    }
+    if (this._state.hideGraceTimer !== null) {
+      GLib11.source_remove(this._state.hideGraceTimer);
+      this._state.hideGraceTimer = null;
+    }
+    if (this._clickTimer !== null) {
+      GLib11.source_remove(this._clickTimer);
+      this._clickTimer = null;
+    }
+    if (this._interfaceSettings && this._settings.style.syncAccentColor) {
+      try {
+        this._interfaceSettings.set_string("accent-color", this._originalAccent || "blue");
+      } catch (e) {
+      }
+    }
   }
   setActionHandler(handler) {
     this._onAction = handler;
+  }
+  setPopupOpen(isOpen) {
+    this._isPopupOpen = isOpen;
+    this.updateDimensions();
   }
   get displayedColor() {
     return this._state.displayedColor;
@@ -2551,67 +3215,118 @@ var _MusicPill = class _MusicPill extends St7.Widget {
     return this._lastArtUrl;
   }
   get currentBgAlpha() {
-    return 0.95;
+    return this._currentBgAlpha;
+  }
+  _updateTransparencyConfig() {
+    const enableTrans = this._settings.style.enableTransparency;
+    const strength = this._settings.style.transparencyStrength;
+    this._currentBgAlpha = enableTrans ? strength / 100 : 1;
+    const targetOpacity = Math.floor(this._currentBgAlpha * 255);
+    const setOp = (actor, enabled) => {
+      actor.set_opacity(enabled && enableTrans ? targetOpacity : 255);
+    };
+    setOp(this._artBin, this._settings.style.artTransparency);
+    this.textBlock.setTextOpacity(
+      this._settings.style.textTransparency && enableTrans ? targetOpacity : 255
+    );
+    setOp(this._visBin, this._settings.style.visualizerTransparency);
   }
   updateDimensions() {
-    const height = this._settings.pill.dockHeight;
-    const width = this._settings.pill.dynamicWidth ? -1 : this._settings.pill.dockWidth;
-    this._state.targetWidth = width === -1 ? 250 : width;
-    this._state.paddingX = this._settings.style.outerEdgeMargin || 14;
-    const rawPadY = Math.floor(height / 10);
-    this._state.paddingY = Math.max(2, Math.min(8, rawPadY));
-    const artSize = this._settings.pill.albumArtSize || 16;
-    this._artWidget.set_size(artSize, artSize);
-    this._artWidget.setRadius(Math.floor(artSize / 2));
-    this._artBin.set_size(artSize, artSize);
-    this._body.set_height(height);
-    if (width > 0) {
-      this._body.set_width(width);
-    }
-    this.set_height(height);
-    this._visualizer.setHeightClamped(Math.max(8, height - 8));
+    updatePillDimensions(
+      this._settings,
+      this._state,
+      {
+        pill: this,
+        body: this._body,
+        artWidget: this._artWidget,
+        artBin: this._artBin,
+        textBlock: this.textBlock,
+        visualizer: this._visualizer,
+        visBin: this._visBin,
+        tabletControls: this._tabletControls
+      },
+      this._currentStatus,
+      this._isPopupOpen
+    );
+    this._updateTransparencyConfig();
     this._applyStyle();
   }
   updateDisplay(payload) {
+    var _a, _b;
     if (!this.get_parent()) {
       return;
     }
-    const hasContent = !!(payload.title || payload.status === "Playing" || payload.status === "Paused");
-    this._currentStatus = payload.status;
+    const title = (_a = payload.title) != null ? _a : "";
+    const artist = (_b = payload.artist) != null ? _b : "";
+    const artUrl = payload.artUrl;
+    const status = payload.status;
+    const sameText = title === this._lastTitle && artist === this._lastArtist;
+    const sameArt = artUrl === this._lastArtUrlSeen;
+    const sameStatus = status === this._lastDisplayStatus;
+    const sameBus = payload.busName === this._state.currentBusName;
+    if (sameText && sameArt && sameStatus && sameBus && this._state.isActive) {
+      this.textBlock.setPlayerPaused(status !== "Playing");
+      this._tabletControls.setPlaying(status === "Playing");
+      this._visualizer.setPlaying(status === "Playing");
+      return;
+    }
+    const hasContent = !!(payload.title || status === "Playing" || status === "Paused");
+    this._currentStatus = status;
     this._state.currentBusName = payload.busName;
-    if (payload.title) {
-      this.textBlock.setTitle(payload.title);
+    this._lastDisplayStatus = status;
+    if (!sameText) {
+      if (payload.title) {
+        this.textBlock.setTitle(payload.title);
+        this._lastTitle = title;
+      }
+      if (payload.artist !== void 0) {
+        this.textBlock.setArtist(payload.artist);
+        this._lastArtist = artist;
+      }
     }
-    if (payload.artist !== void 0) {
-      this.textBlock.setArtist(payload.artist);
-    }
-    if (payload.artUrl !== void 0) {
+    if (payload.artUrl !== void 0 && !sameArt) {
       this.setArtUrl(payload.artUrl);
+      this._lastArtUrlSeen = artUrl;
     }
-    this.textBlock.setPlayerPaused(payload.status !== "Playing");
-    this._visualizer.setPlaying(payload.status === "Playing" && !this._settings.popup.hidePillVisualizer);
+    this.textBlock.setPlayerPaused(status !== "Playing");
+    this._tabletControls.setPlaying(status === "Playing");
+    this._visualizer.setPlaying(status === "Playing");
     if (hasContent) {
       this.showActive();
     } else {
       this.hideInactive();
     }
-    this._applyStyle();
+    if (!sameArt || !sameStatus) {
+      this._startColorTransition();
+    }
   }
-  _applyStyle() {
-    var _a, _b;
+  _applyStyle(r, g, b) {
+    var _a;
     if (!this._body) {
       return;
     }
+    const color = {
+      r: r != null ? r : this._state.displayedColor.r,
+      g: g != null ? g : this._state.displayedColor.g,
+      b: b != null ? b : this._state.displayedColor.b
+    };
     applyPillBodyStyle(
       this._body,
       this._settings,
       this._state,
-      this._state.targetColor,
-      this.currentBgAlpha,
+      color,
+      this._currentBgAlpha,
       this._currentStatus === "Playing"
     );
     (_a = this._visualizer) == null ? void 0 : _a.setColor(this._state.displayedColor);
-    (_b = this._artWidget) == null ? void 0 : _b.setRadius(this._state.radius > 0 ? Math.min(this._state.radius, 16) : 8);
+  }
+  _startColorTransition() {
+    startColorTransition(
+      this._state,
+      (r, g, b) => this._applyStyle(r, g, b),
+      this._currentStatus === "Playing",
+      () => !!this.get_parent()
+    );
   }
   setTitle(title) {
     this.textBlock.setTitle(title);
@@ -2626,11 +3341,29 @@ var _MusicPill = class _MusicPill extends St7.Widget {
     }
     if (url) {
       this._artBin.show();
-      this._artWidget.setArt(url, true);
-      this._lastArtUrl = url;
+      this._artWidget.setArt(url, false);
+      if (url !== this._lastArtUrl) {
+        this._lastArtUrl = url;
+        this._colorLoader.load(url, {
+          syncAccent: this._settings.style.syncAccentColor,
+          setAccent: (name) => {
+            var _a;
+            try {
+              (_a = this._interfaceSettings) == null ? void 0 : _a.set_string("accent-color", name);
+            } catch (e) {
+            }
+          },
+          onColor: (color) => {
+            setTargetColor(this._state, color);
+            this._visualizer.setColor(color);
+            this._startColorTransition();
+          }
+        });
+      }
     } else {
       this._artBin.hide();
       this._lastArtUrl = null;
+      this._startColorTransition();
     }
   }
   setStatus(status) {
@@ -2640,12 +3373,36 @@ var _MusicPill = class _MusicPill extends St7.Widget {
     this._state.currentBusName = busName;
   }
   showActive() {
+    if (this._state.hideGraceTimer !== null) {
+      GLib11.source_remove(this._state.hideGraceTimer);
+      this._state.hideGraceTimer = null;
+    }
+    const wasInactive = !this._state.isActive || this.opacity === 0 || this.width <= 1;
     this._state.isActive = true;
     this.visible = true;
     this.reactive = true;
     this.set_width(-1);
-    this.opacity = 255;
+    if (!wasInactive) {
+      this.opacity = 255;
+      return;
+    }
     this.updateDimensions();
+    const finalWidth = this._state.targetWidth > 0 ? this._state.targetWidth : this._body.width || 200;
+    const finalHeight = this._settings.pill.dockHeight;
+    this._body.set_width(0);
+    this._body.set_height(finalHeight);
+    this.opacity = 0;
+    this.ease({
+      opacity: 255,
+      duration: 500,
+      mode: Clutter9.AnimationMode.EASE_OUT_QUAD
+    });
+    this._body.ease({
+      width: finalWidth,
+      height: finalHeight,
+      duration: 500,
+      mode: Clutter9.AnimationMode.EASE_OUT_QUAD
+    });
   }
   hideInactive() {
     if (this._settings.pill.alwaysShow && this._state.currentBusName) {
@@ -2654,12 +3411,36 @@ var _MusicPill = class _MusicPill extends St7.Widget {
       this.showActive();
       return;
     }
-    this._state.isActive = false;
-    this.reactive = false;
-    this.opacity = 0;
-    this.visible = false;
-    this.set_width(0);
-    this._visualizer.setPlaying(false);
+    if (this._state.hideGraceTimer !== null || !this._state.isActive) {
+      return;
+    }
+    this._state.hideGraceTimer = GLib11.timeout_add(GLib11.PRIORITY_DEFAULT, 5e3, () => {
+      this._state.hideGraceTimer = null;
+      if (!this.get_parent()) {
+        return GLib11.SOURCE_REMOVE;
+      }
+      this._state.isActive = false;
+      this.reactive = false;
+      this._visualizer.setPlaying(false);
+      const targetH = this._body.height;
+      this.ease({
+        opacity: 0,
+        duration: 500,
+        mode: Clutter9.AnimationMode.EASE_OUT_QUAD
+      });
+      this._body.ease({
+        width: 0,
+        height: targetH,
+        duration: 500,
+        mode: Clutter9.AnimationMode.EASE_OUT_QUAD,
+        onStopped: (finished) => {
+          if (!finished) return;
+          this.set_width(0);
+          this.visible = false;
+        }
+      });
+      return GLib11.SOURCE_REMOVE;
+    });
   }
   _emit(action) {
     var _a;
@@ -2668,75 +3449,83 @@ var _MusicPill = class _MusicPill extends St7.Widget {
     }
   }
   _onButton(event) {
+    if (this._body) {
+      this._body.ease({
+        scale_x: 1,
+        scale_y: 1,
+        duration: 150,
+        mode: Clutter9.AnimationMode.EASE_OUT_BACK
+      });
+    }
     const button = event.get_button();
     if (button === 2) {
       this._emit(this._settings.mouseActions.middleClick);
-      return Clutter7.EVENT_STOP;
+      return Clutter9.EVENT_STOP;
     }
     if (button === 3) {
       this._emit(this._settings.mouseActions.rightClick);
-      return Clutter7.EVENT_STOP;
+      return Clutter9.EVENT_STOP;
     }
     if (button !== 1) {
-      return Clutter7.EVENT_PROPAGATE;
+      return Clutter9.EVENT_PROPAGATE;
     }
     const now = Date.now();
     const doubleAction = this._settings.mouseActions.doubleClick;
     const singleAction = this._settings.mouseActions.leftClick;
     if (!doubleAction || doubleAction === "none") {
       this._emit(singleAction);
-      return Clutter7.EVENT_STOP;
+      return Clutter9.EVENT_STOP;
     }
     if (this._lastClick && now - this._lastClick <= 220) {
       this._lastClick = 0;
       if (this._clickTimer !== null) {
-        GLib9.source_remove(this._clickTimer);
+        GLib11.source_remove(this._clickTimer);
         this._clickTimer = null;
       }
       this._emit(doubleAction);
     } else {
       this._lastClick = now;
       if (this._clickTimer !== null) {
-        GLib9.source_remove(this._clickTimer);
+        GLib11.source_remove(this._clickTimer);
       }
-      this._clickTimer = GLib9.timeout_add(GLib9.PRIORITY_DEFAULT, 220, () => {
+      this._clickTimer = GLib11.timeout_add(GLib11.PRIORITY_DEFAULT, 220, () => {
         this._clickTimer = null;
         this._lastClick = 0;
         this._emit(singleAction);
-        return GLib9.SOURCE_REMOVE;
+        return GLib11.SOURCE_REMOVE;
       });
     }
-    return Clutter7.EVENT_STOP;
+    return Clutter9.EVENT_STOP;
   }
   _onScroll(event) {
     const dir = event.get_scroll_direction();
-    if (dir === Clutter7.ScrollDirection.UP) {
+    if (dir === Clutter9.ScrollDirection.UP) {
       this._emit("previous");
-      return Clutter7.EVENT_STOP;
+      return Clutter9.EVENT_STOP;
     }
-    if (dir === Clutter7.ScrollDirection.DOWN) {
+    if (dir === Clutter9.ScrollDirection.DOWN) {
       this._emit("next");
-      return Clutter7.EVENT_STOP;
+      return Clutter9.EVENT_STOP;
     }
-    return Clutter7.EVENT_PROPAGATE;
+    return Clutter9.EVENT_PROPAGATE;
   }
 };
-GObject10.registerClass(_MusicPill);
+GObject11.registerClass(_MusicPill);
 var MusicPill = _MusicPill;
 
 // src/ui/music-pill/positioning/inject.ts
-import GLib10 from "gi://GLib";
+import GLib12 from "gi://GLib";
 
 // src/ui/music-pill/positioning/container-resolver.ts
-import * as Main from "resource:///org/gnome/shell/ui/main.js";
+import * as Main2 from "resource:///org/gnome/shell/ui/main.js";
 function resolveTargetContainer(targetContainer) {
   var _a;
-  const panel2 = Main.panel;
+  const panel2 = Main2.panel;
   const statusArea = panel2.statusArea;
   if (targetContainer === 0) {
     const dtd = (_a = statusArea["dash-to-dock"]) != null ? _a : statusArea["ubuntu-dock"];
     const dashBox = dtd == null ? void 0 : dtd._box;
-    return dashBox != null ? dashBox : Main.overview.dash._box;
+    return dashBox != null ? dashBox : Main2.overview.dash._box;
   }
   if (targetContainer === 1) {
     return panel2._leftBox;
@@ -2751,13 +3540,13 @@ function resolveTargetContainer(targetContainer) {
 }
 function isDockContainer(container) {
   var _a;
-  const panel2 = Main.panel;
+  const panel2 = Main2.panel;
   const statusArea = panel2.statusArea;
   const dtd = (_a = statusArea["dash-to-dock"]) != null ? _a : statusArea["ubuntu-dock"];
   if (dtd && dtd._box === container) {
     return true;
   }
-  return Main.overview.dash._box === container;
+  return Main2.overview.dash._box === container;
 }
 
 // src/ui/music-pill/positioning/drag-fix.ts
@@ -2883,7 +3672,7 @@ function createPillInjector(pill, settings) {
   function inject() {
     var _a, _b;
     if (injectTimeout !== null) {
-      GLib10.source_remove(injectTimeout);
+      GLib12.source_remove(injectTimeout);
       injectTimeout = null;
     }
     const target = settings.style.targetContainer;
@@ -2903,8 +3692,8 @@ function createPillInjector(pill, settings) {
     }
     if (target === 0 && currentDock !== container) {
       currentDock = container;
-      (_a = container.connectObject) == null ? void 0 : _a.call(container, "child-added", () => {
-        if (!isMovingItem) {
+      (_a = container.connectObject) == null ? void 0 : _a.call(container, "child-added", (_c, actor) => {
+        if (actor !== pill && !isMovingItem) {
           queueInject();
         }
       }, pill);
@@ -2926,17 +3715,17 @@ function createPillInjector(pill, settings) {
   }
   function queueInject() {
     if (injectTimeout !== null) {
-      GLib10.source_remove(injectTimeout);
+      GLib12.source_remove(injectTimeout);
     }
-    injectTimeout = GLib10.timeout_add(GLib10.PRIORITY_DEFAULT, 100, () => {
+    injectTimeout = GLib12.timeout_add(GLib12.PRIORITY_DEFAULT, 100, () => {
       inject();
       injectTimeout = null;
-      return GLib10.SOURCE_REMOVE;
+      return GLib12.SOURCE_REMOVE;
     });
   }
   function destroy() {
     if (injectTimeout !== null) {
-      GLib10.source_remove(injectTimeout);
+      GLib12.source_remove(injectTimeout);
       injectTimeout = null;
     }
     if (currentDock == null ? void 0 : currentDock.disconnectObject) {
@@ -2952,21 +3741,21 @@ function createPillInjector(pill, settings) {
 }
 
 // src/ui/expanded-player/index.ts
-import GObject15 from "gi://GObject";
-import GLib12 from "gi://GLib";
-import St12 from "gi://St";
-import Clutter12 from "gi://Clutter";
-import * as Main3 from "resource:///org/gnome/shell/ui/main.js";
+import GObject16 from "gi://GObject";
+import GLib14 from "gi://GLib";
+import St13 from "gi://St";
+import Clutter14 from "gi://Clutter";
+import * as Main4 from "resource:///org/gnome/shell/ui/main.js";
 
 // src/utils/dash-to-dock.ts
-import * as Main2 from "resource:///org/gnome/shell/ui/main.js";
+import * as Main3 from "resource:///org/gnome/shell/ui/main.js";
 var disableRequests = 0;
 var dockManager = null;
 var importPromise = null;
 function initDTDModule() {
-  let ext = Main2.extensionManager.lookup("dash-to-dock@micxgx.gmail.com");
+  let ext = Main3.extensionManager.lookup("dash-to-dock@micxgx.gmail.com");
   if (!ext || ext.state !== 1) {
-    ext = Main2.extensionManager.lookup("ubuntu-dock@ubuntu.com");
+    ext = Main3.extensionManager.lookup("ubuntu-dock@ubuntu.com");
   }
   if (!ext || ext.state !== 1) {
     return null;
@@ -3033,42 +3822,48 @@ function restoreDashToDockAutohide() {
 }
 
 // src/ui/expanded-player/components/track-info.ts
-import GObject11 from "gi://GObject";
-import St8 from "gi://St";
-import Clutter8 from "gi://Clutter";
-var _TrackInfoBlock = class _TrackInfoBlock extends St8.BoxLayout {
+import GObject12 from "gi://GObject";
+import St9 from "gi://St";
+import Clutter10 from "gi://Clutter";
+var _TrackInfoBlock = class _TrackInfoBlock extends St9.BoxLayout {
   constructor() {
     super({
       vertical: true,
       x_expand: true,
-      y_align: Clutter8.ActorAlign.CENTER,
+      y_align: Clutter10.ActorAlign.CENTER,
       style: "spacing: 4px;"
     });
     __publicField(this, "_title");
     __publicField(this, "_artist");
+    __publicField(this, "_lastTitle", "");
+    __publicField(this, "_lastArtist", "");
     this._title = new ScrollLabel("music-label-title");
     this._artist = new ScrollLabel("music-label-artist");
     this.add_child(this._title);
     this.add_child(this._artist);
   }
   setTitle(text) {
-    this._title.setText(text || "", true, 0);
+    const t = text || "";
+    this._title.setText(t, t !== this._lastTitle, 0);
+    this._lastTitle = t;
   }
   setArtist(text) {
-    this._artist.setText(text || "", true);
+    const t = text || "";
+    this._artist.setText(t, t !== this._lastArtist);
+    this._lastArtist = t;
   }
   setPaused(paused) {
     this._title.setPlayerPaused(paused);
     this._artist.setPlayerPaused(paused);
   }
 };
-GObject11.registerClass(_TrackInfoBlock);
+GObject12.registerClass(_TrackInfoBlock);
 var TrackInfoBlock = _TrackInfoBlock;
 
 // src/ui/expanded-player/components/progress-bar.ts
-import GObject12 from "gi://GObject";
-import St9 from "gi://St";
-import Clutter9 from "gi://Clutter";
+import GObject13 from "gi://GObject";
+import St10 from "gi://St";
+import Clutter11 from "gi://Clutter";
 
 // src/utils/time.ts
 function formatTime(microSeconds, forceHours = false) {
@@ -3087,46 +3882,60 @@ function formatTime(microSeconds, forceHours = false) {
 }
 
 // src/ui/expanded-player/components/progress-bar.ts
-var _ProgressBar = class _ProgressBar extends St9.BoxLayout {
+var _ProgressBar = class _ProgressBar extends St10.BoxLayout {
   constructor() {
     super({
+      style_class: "progress-container",
       vertical: false,
-      x_expand: true,
-      style: "spacing: 8px;",
-      y_align: Clutter9.ActorAlign.CENTER
+      y_align: Clutter11.ActorAlign.CENTER,
+      x_expand: true
     });
     __publicField(this, "_current");
     __publicField(this, "_total");
     __publicField(this, "_fill");
     __publicField(this, "_track");
     __publicField(this, "_onSeek", null);
-    __publicField(this, "_length", 0);
     __publicField(this, "_forceHours", false);
-    this._current = new St9.Label({ text: "0:00", y_align: Clutter9.ActorAlign.CENTER });
-    this._total = new St9.Label({ text: "0:00", y_align: Clutter9.ActorAlign.CENTER });
-    this._track = new St9.Widget({
-      style_class: "music-pill-progress-track",
-      style: "background-color: rgba(255,255,255,0.2); border-radius: 3px; height: 6px;",
+    __publicField(this, "_lastCurrentText", "");
+    __publicField(this, "_lastTotalText", "");
+    __publicField(this, "_lastFillW", -1);
+    this._current = new St10.Label({
+      style_class: "progress-time",
+      text: "0:00",
+      y_align: Clutter11.ActorAlign.CENTER,
+      x_align: Clutter11.ActorAlign.START,
+      style: "text-align: left; margin-right: 0px;"
+    });
+    this._total = new St10.Label({
+      style_class: "progress-time",
+      text: "0:00",
+      y_align: Clutter11.ActorAlign.CENTER,
+      x_align: Clutter11.ActorAlign.END,
+      style: "text-align: right;"
+    });
+    this._track = new St10.Widget({
+      style_class: "progress-slider-bg",
       x_expand: true,
       reactive: true,
-      height: 6
+      y_align: Clutter11.ActorAlign.CENTER,
+      style: "margin: 0; padding: 0;"
     });
-    this._fill = new St9.Widget({
-      style: "background-color: rgba(255,255,255,0.85); border-radius: 3px; height: 6px;",
-      height: 6,
-      width: 0
-    });
+    this._fill = new St10.Widget({ style_class: "progress-slider-fill" });
+    this._fill.set_position(0, 0);
     this._track.add_child(this._fill);
     this._track.connect("button-release-event", (_a, event) => {
-      if (!this._onSeek) {
-        return Clutter9.EVENT_PROPAGATE;
+      if (!this._onSeek || event.get_button() === 8) {
+        return Clutter11.EVENT_PROPAGATE;
       }
-      const [ex] = event.get_coords();
-      const [tx] = this._track.get_transformed_position();
-      const w = this._track.get_width() || 1;
-      const ratio = Math.max(0, Math.min(1, (ex - tx) / w));
-      this._onSeek(ratio);
-      return Clutter9.EVENT_STOP;
+      this._handleSeek(event);
+      return Clutter11.EVENT_STOP;
+    });
+    this._track.connect("touch-event", (_a, event) => {
+      if (event.type() === Clutter11.EventType.TOUCH_END && this._onSeek) {
+        this._handleSeek(event);
+        return Clutter11.EVENT_STOP;
+      }
+      return Clutter11.EVENT_PROPAGATE;
     });
     this.add_child(this._current);
     this.add_child(this._track);
@@ -3138,84 +3947,179 @@ var _ProgressBar = class _ProgressBar extends St9.BoxLayout {
   setForceHours(force) {
     this._forceHours = force;
   }
-  update(position, length) {
-    this._length = length;
-    this._current.text = formatTime(position, this._forceHours);
-    this._total.text = formatTime(length, this._forceHours);
-    const w = this._track.get_width() || 0;
-    const ratio = length > 0 ? Math.max(0, Math.min(1, position / length)) : 0;
-    this._fill.set_width(Math.floor(w * ratio));
+  /** Immediate UI after seek (optimistic), matching legacy _handleSeek. */
+  applySeekPreview(positionUs, lengthUs) {
+    const useHours = lengthUs >= 36e8 && this._forceHours;
+    this._setCurrentText(formatTime(positionUs, useHours));
+    this._setTotalText(formatTime(lengthUs, useHours));
+    const totalW = Math.round(this._track.get_width());
+    if (totalW > 0 && lengthUs > 0) {
+      const percent = Math.min(1, Math.max(0, positionUs / lengthUs));
+      this._setFillWidth(Math.max(6, Math.min(totalW, Math.round(totalW * percent))));
+    }
+  }
+  update(positionUs, lengthUs, stale = false) {
+    if (lengthUs <= 0) {
+      return;
+    }
+    const useHours = lengthUs >= 36e8 && this._forceHours;
+    const currentText = stale ? "--:--" : formatTime(positionUs, useHours);
+    const totalText = stale ? "--:--" : formatTime(lengthUs, useHours);
+    this._setCurrentText(currentText);
+    this._setTotalText(totalText);
+    if (stale) {
+      return;
+    }
+    const percent = Math.min(1, Math.max(0, positionUs / lengthUs));
+    const totalW = Math.round(this._track.get_width());
+    if (totalW > 0) {
+      const targetWidth = Math.max(6, Math.min(totalW, Math.round(totalW * percent)));
+      this._setFillWidth(targetWidth);
+    }
+  }
+  _setCurrentText(text) {
+    if (this._lastCurrentText === text) {
+      return;
+    }
+    this._lastCurrentText = text;
+    this._current.text = text;
+    this._current.set_width(-1);
+    const [, natW] = this._current.get_preferred_width(-1);
+    this._current.set_width(Math.ceil(natW) + 2);
+  }
+  _setTotalText(text) {
+    if (this._lastTotalText === text) {
+      return;
+    }
+    this._lastTotalText = text;
+    this._total.text = text;
+    this._total.set_width(-1);
+    const [, natW] = this._total.get_preferred_width(-1);
+    this._total.set_width(Math.ceil(natW) + 2);
+  }
+  _setFillWidth(w) {
+    if (Math.abs(this._lastFillW - w) < 1) {
+      return;
+    }
+    this._lastFillW = w;
+    this._fill.width = w;
+  }
+  _handleSeek(event) {
+    if (!this._onSeek) {
+      return;
+    }
+    const [x] = event.get_coords();
+    const [ok, relX] = this._track.transform_stage_point(x, 0);
+    if (!ok) {
+      return;
+    }
+    const width = this._track.get_width();
+    if (width <= 0) {
+      return;
+    }
+    const ratio = Math.min(1, Math.max(0, relX / width));
+    this._onSeek(ratio);
   }
 };
-GObject12.registerClass(_ProgressBar);
+GObject13.registerClass(_ProgressBar);
 var ProgressBar = _ProgressBar;
 
 // src/ui/expanded-player/components/transport-controls.ts
-import GObject13 from "gi://GObject";
-import St10 from "gi://St";
-import Clutter10 from "gi://Clutter";
-var _TransportControls = class _TransportControls extends St10.BoxLayout {
+import GObject14 from "gi://GObject";
+import St11 from "gi://St";
+import Clutter12 from "gi://Clutter";
+var _TransportControls = class _TransportControls extends St11.BoxLayout {
   constructor(callbacks) {
     super({
+      style_class: "controls-row",
       vertical: false,
-      x_align: Clutter10.ActorAlign.CENTER,
-      style: "spacing: 12px;"
+      x_align: Clutter12.ActorAlign.CENTER,
+      reactive: true
     });
     __publicField(this, "_prev");
     __publicField(this, "_play");
     __publicField(this, "_next");
     __publicField(this, "_playIcon");
-    this._prev = this._iconButton("media-skip-backward-symbolic", () => callbacks.onPrevious());
-    this._playIcon = new St10.Icon({ icon_name: "media-playback-start-symbolic", icon_size: 28 });
-    this._play = new St10.Button({
+    __publicField(this, "_lastStatus", null);
+    this._prev = this._iconButton("media-skip-backward-symbolic", 24, () => callbacks.onPrevious());
+    this._playIcon = new St11.Icon({ icon_name: "media-playback-start-symbolic", icon_size: 24 });
+    this._play = new St11.Button({
+      style_class: "control-btn",
       child: this._playIcon,
       reactive: true,
-      can_focus: true,
-      style_class: "music-pill-transport-btn"
+      can_focus: true
     });
-    this._play.connect("clicked", () => callbacks.onPlayPause());
-    this._next = this._iconButton("media-skip-forward-symbolic", () => callbacks.onNext());
+    this._play.connect("button-press-event", () => Clutter12.EVENT_STOP);
+    this._play.connect("clicked", () => {
+      callbacks.onPlayPause();
+    });
+    this._play.connect("touch-event", (_a, event) => {
+      if (event.type() === Clutter12.EventType.TOUCH_END) {
+        callbacks.onPlayPause();
+        return Clutter12.EVENT_STOP;
+      }
+      if (event.type() === Clutter12.EventType.TOUCH_BEGIN) {
+        return Clutter12.EVENT_STOP;
+      }
+      return Clutter12.EVENT_PROPAGATE;
+    });
+    this._next = this._iconButton("media-skip-forward-symbolic", 24, () => callbacks.onNext());
     this.add_child(this._prev);
     this.add_child(this._play);
     this.add_child(this._next);
   }
   setStatus(status) {
+    if (this._lastStatus === status) {
+      return;
+    }
+    this._lastStatus = status;
     this._playIcon.icon_name = status === "Playing" ? "media-playback-pause-symbolic" : "media-playback-start-symbolic";
   }
-  setCapabilities(canPrev, canPlay, canNext) {
+  setCapabilities(canPrev, _canPlay, canNext) {
     this._prev.opacity = canPrev ? 255 : 80;
-    this._play.opacity = canPlay ? 255 : 80;
     this._next.opacity = canNext ? 255 : 80;
     this._prev.reactive = canPrev;
-    this._play.reactive = canPlay;
     this._next.reactive = canNext;
+    this._play.reactive = true;
+    this._play.opacity = 255;
   }
-  _iconButton(iconName, onClick) {
-    const btn = new St10.Button({
-      child: new St10.Icon({ icon_name: iconName, icon_size: 22 }),
+  _iconButton(iconName, size, onClick) {
+    const btn = new St11.Button({
+      style_class: "control-btn",
+      child: new St11.Icon({ icon_name: iconName, icon_size: size }),
       reactive: true,
-      can_focus: true,
-      style_class: "music-pill-transport-btn"
+      can_focus: true
     });
-    btn.connect("clicked", onClick);
+    btn.connect("button-press-event", () => Clutter12.EVENT_STOP);
+    btn.connect("clicked", () => onClick());
+    btn.connect("touch-event", (_a, event) => {
+      if (event.type() === Clutter12.EventType.TOUCH_END) {
+        onClick();
+        return Clutter12.EVENT_STOP;
+      }
+      if (event.type() === Clutter12.EventType.TOUCH_BEGIN) {
+        return Clutter12.EVENT_STOP;
+      }
+      return Clutter12.EVENT_PROPAGATE;
+    });
     return btn;
   }
 };
-GObject13.registerClass(_TransportControls);
+GObject14.registerClass(_TransportControls);
 var TransportControls = _TransportControls;
 
 // src/ui/expanded-player/components/vinyl-art.ts
-import GObject14 from "gi://GObject";
-import GLib11 from "gi://GLib";
-import St11 from "gi://St";
-import Clutter11 from "gi://Clutter";
-var _VinylArt = class _VinylArt extends St11.Bin {
+import GObject15 from "gi://GObject";
+import GLib13 from "gi://GLib";
+import St12 from "gi://St";
+import Clutter13 from "gi://Clutter";
+var _VinylArt = class _VinylArt extends St12.Bin {
   constructor() {
     super({
       width: 96,
       height: 96,
-      x_align: Clutter11.ActorAlign.CENTER,
-      y_align: Clutter11.ActorAlign.CENTER,
+      x_align: Clutter13.ActorAlign.CENTER,
+      y_align: Clutter13.ActorAlign.CENTER,
       style_class: "vinyl-container"
     });
     __publicField(this, "_art");
@@ -3224,7 +4128,7 @@ var _VinylArt = class _VinylArt extends St11.Bin {
     __publicField(this, "_square", false);
     __publicField(this, "_speed", 10);
     __publicField(this, "_idleId", null);
-    this._art = new St11.Widget({
+    this._art = new St12.Widget({
       width: 96,
       height: 96,
       style_class: "vinyl-container",
@@ -3278,23 +4182,23 @@ var _VinylArt = class _VinylArt extends St11.Bin {
     this._art.ease({
       rotation_angle_z: currentAngle + 90,
       duration: initialDuration,
-      mode: Clutter11.AnimationMode.EASE_IN_QUAD,
+      mode: Clutter13.AnimationMode.EASE_IN_QUAD,
       onStopped: (finished) => {
         if (!finished || !this._spinning) {
           return;
         }
-        this._idleId = GLib11.idle_add(GLib11.PRIORITY_DEFAULT_IDLE, () => {
+        this._idleId = GLib13.idle_add(GLib13.PRIORITY_DEFAULT_IDLE, () => {
           this._idleId = null;
           if (!this._spinning) {
-            return GLib11.SOURCE_REMOVE;
+            return GLib13.SOURCE_REMOVE;
           }
           const next = this._art.rotation_angle_z || 0;
           this._art.ease({
             rotation_angle_z: next + 36e3,
             duration: loopDuration,
-            mode: Clutter11.AnimationMode.LINEAR
+            mode: Clutter13.AnimationMode.LINEAR
           });
-          return GLib11.SOURCE_REMOVE;
+          return GLib13.SOURCE_REMOVE;
         });
       }
     });
@@ -3309,7 +4213,7 @@ var _VinylArt = class _VinylArt extends St11.Bin {
     this._art.ease({
       rotation_angle_z: currentAngle + 90,
       duration: stopDuration,
-      mode: Clutter11.AnimationMode.EASE_OUT_QUAD,
+      mode: Clutter13.AnimationMode.EASE_OUT_QUAD,
       onStopped: (finished) => {
         if (finished) {
           this._art.rotation_angle_z = (this._art.rotation_angle_z || 0) % 360;
@@ -3319,7 +4223,7 @@ var _VinylArt = class _VinylArt extends St11.Bin {
   }
   _clearIdle() {
     if (this._idleId !== null) {
-      GLib11.source_remove(this._idleId);
+      GLib13.source_remove(this._idleId);
       this._idleId = null;
     }
   }
@@ -3331,11 +4235,11 @@ var _VinylArt = class _VinylArt extends St11.Bin {
     this._art.set_style(`border-radius: ${radius}px; background-size: cover; ${bg}`);
   }
 };
-GObject14.registerClass(_VinylArt);
+GObject15.registerClass(_VinylArt);
 var VinylArt = _VinylArt;
 
 // src/ui/expanded-player/index.ts
-var _ExpandedPlayer = class _ExpandedPlayer extends St12.Widget {
+var _ExpandedPlayer = class _ExpandedPlayer extends St13.Widget {
   constructor(host) {
     const [bgW, bgH] = global.display.get_size();
     super({
@@ -3356,8 +4260,14 @@ var _ExpandedPlayer = class _ExpandedPlayer extends St12.Widget {
     __publicField(this, "_transport");
     __publicField(this, "_visualizer");
     __publicField(this, "_bgBtn");
+    __publicField(this, "_seekLockTime", 0);
+    __publicField(this, "_lastPositionSync", 0);
+    __publicField(this, "_lastTickPosition");
+    __publicField(this, "_lastTickTime");
+    __publicField(this, "_lastCapsKey", "");
+    __publicField(this, "_lastContentKey", "");
     this._host = host;
-    this._bgBtn = new St12.Button({
+    this._bgBtn = new St13.Button({
       style: "background-color: transparent;",
       reactive: true,
       x_expand: true,
@@ -3372,17 +4282,22 @@ var _ExpandedPlayer = class _ExpandedPlayer extends St12.Widget {
       reactive: true,
       style: "padding: 16px; border-radius: 16px; background-color: rgba(30,30,30,0.95);"
     });
-    this.box.layout_manager.orientation = Clutter12.Orientation.VERTICAL;
+    this.box.layout_manager.orientation = Clutter14.Orientation.VERTICAL;
     this.add_child(this.box);
     this._vinyl = new VinylArt();
     this._vinyl.setSquare(host.settings.popup.squareVinyl);
     this._vinyl.setSpeed(host.settings.popup.vinylSpeed);
     this._info = new TrackInfoBlock();
     this._visualizer = new WaveformVisualizer(80, host.settings, true);
-    this._visualizer.setMode(host.settings.style.visualizerAnimation || 1);
-    const top = new St12.BoxLayout({ vertical: false, style: "spacing: 16px;", x_expand: true });
+    this._visualizer.setMode(host.settings.style.visualizerAnimation);
+    const top = new St13.BoxLayout({
+      style_class: "expanded-top-row",
+      vertical: false,
+      x_expand: true,
+      y_align: Clutter14.ActorAlign.CENTER
+    });
     top.add_child(this._vinyl);
-    const mid = new St12.BoxLayout({ vertical: true, x_expand: true, style: "spacing: 8px;" });
+    const mid = new St13.BoxLayout({ vertical: true, x_expand: true, style: "spacing: 8px;" });
     mid.add_child(this._info);
     mid.add_child(this._visualizer);
     top.add_child(mid);
@@ -3398,11 +4313,11 @@ var _ExpandedPlayer = class _ExpandedPlayer extends St12.Widget {
     });
     this.box.add_child(this._transport);
     this.connect("key-press-event", (_a, event) => {
-      if (event.get_key_symbol() === Clutter12.KEY_Escape) {
+      if (event.get_key_symbol() === Clutter14.KEY_Escape) {
         this.hidePopup();
-        return Clutter12.EVENT_STOP;
+        return Clutter14.EVENT_STOP;
       }
-      return Clutter12.EVENT_PROPAGATE;
+      return Clutter14.EVENT_PROPAGATE;
     });
     this.connect("destroy", () => this._cleanup());
   }
@@ -3416,6 +4331,16 @@ var _ExpandedPlayer = class _ExpandedPlayer extends St12.Widget {
     this._visualizer.setColor({ r, g, b });
   }
   updateContent(title, artist, artUrl, status) {
+    const key = `${title != null ? title : ""}|${artist != null ? artist : ""}|${artUrl != null ? artUrl : ""}|${status}`;
+    if (key === this._lastContentKey) {
+      this._transport.setStatus(status);
+      this._visualizer.setPlaying(status === "Playing" && this._host.settings.popup.showVisualizer);
+      this._vinyl.setSpinning(
+        status === "Playing" && this._host.settings.popup.showVinyl && this._host.settings.popup.vinylRotate
+      );
+      return;
+    }
+    this._lastContentKey = key;
     this._info.setTitle(title || "");
     this._info.setArtist(artist || "");
     this._info.setPaused(status !== "Playing");
@@ -3453,7 +4378,7 @@ var _ExpandedPlayer = class _ExpandedPlayer extends St12.Widget {
     this.ease({
       opacity: 255,
       duration: 180,
-      mode: Clutter12.AnimationMode.EASE_OUT_QUAD
+      mode: Clutter14.AnimationMode.EASE_OUT_QUAD
     });
     global.stage.set_key_focus(this);
   }
@@ -3463,7 +4388,7 @@ var _ExpandedPlayer = class _ExpandedPlayer extends St12.Widget {
     this.ease({
       opacity: 0,
       duration: 150,
-      mode: Clutter12.AnimationMode.EASE_OUT_QUAD,
+      mode: Clutter14.AnimationMode.EASE_OUT_QUAD,
       onStopped: () => {
         this.visible = false;
         this.destroy();
@@ -3476,7 +4401,7 @@ var _ExpandedPlayer = class _ExpandedPlayer extends St12.Widget {
   }
   setPositionNearPill(px, py, pw, ph) {
     var _a;
-    const monitor = (_a = Main3.layoutManager.findMonitorForActor(this)) != null ? _a : Main3.layoutManager.primaryMonitor;
+    const monitor = (_a = Main4.layoutManager.findMonitorForActor(this)) != null ? _a : Main4.layoutManager.primaryMonitor;
     if (!monitor) {
       return;
     }
@@ -3503,32 +4428,80 @@ var _ExpandedPlayer = class _ExpandedPlayer extends St12.Widget {
     if (length <= 0) {
       return;
     }
-    this._host.seekTo(this._player, Math.floor(length * ratio));
+    const targetPos = Math.floor(length * ratio);
+    this._seekLockTime = Date.now();
+    this._player.markPosition(targetPos);
+    this._progress.applySeekPreview(targetPos, length);
+    this._host.seekTo(this._player, targetPos);
   }
   _startTimer() {
+    var _a;
     this._stopTimer();
-    this._timer = GLib12.timeout_add(GLib12.PRIORITY_DEFAULT, 500, () => {
+    this._lastTickPosition = void 0;
+    this._lastTickTime = void 0;
+    this._lastPositionSync = 0;
+    (_a = this._player) == null ? void 0 : _a.syncPosition();
+    this._timer = GLib14.timeout_add(GLib14.PRIORITY_DEFAULT, 100, () => {
       this._tick();
-      return GLib12.SOURCE_CONTINUE;
+      return GLib14.SOURCE_CONTINUE;
     });
     this._tick();
   }
   _stopTimer() {
     if (this._timer !== null) {
-      GLib12.source_remove(this._timer);
+      GLib14.source_remove(this._timer);
       this._timer = null;
     }
   }
   _tick() {
     var _a;
-    if (!this._player) {
+    if (!this._player || !this.get_parent()) {
+      return;
+    }
+    const length = ((_a = this._player.getTrackInfo()) == null ? void 0 : _a.length) || 0;
+    if (length <= 0) {
+      return;
+    }
+    const now = Date.now();
+    if (now - this._seekLockTime < 2e3) {
       return;
     }
     const info = this._player.getPlayerInfo();
-    const length = ((_a = this._player.getTrackInfo()) == null ? void 0 : _a.length) || 0;
-    this._progress.update(info.position, length);
+    const playing = info.playbackStatus === "Playing";
+    if (playing && (!this._lastPositionSync || now - this._lastPositionSync > 5e3)) {
+      this._lastPositionSync = now;
+      this._player.syncPosition();
+    }
+    const cachedPos = this._player.getCachedPosition();
+    const lastUpdate = this._player.getLastPositionTime() || now;
+    let isStale = false;
+    if (playing) {
+      if (cachedPos === (this._lastTickPosition || 0) && now - lastUpdate > 6e3 && this._lastTickTime && now - this._lastTickTime > 6e3) {
+        isStale = true;
+      }
+      if (cachedPos !== (this._lastTickPosition || 0)) {
+        this._lastTickTime = now;
+      }
+      this._lastTickPosition = cachedPos;
+    }
+    let currentPos = cachedPos;
+    if (playing && !isStale) {
+      currentPos += (now - lastUpdate) * 1e3;
+    }
+    if (currentPos > length) {
+      currentPos = length;
+    }
+    this._progress.update(currentPos, length, isStale && playing);
     this._transport.setStatus(info.playbackStatus);
-    this._transport.setCapabilities(info.canGoPrevious, info.canPlay || info.canPause, info.canGoNext);
+    const capsKey = `${info.canGoPrevious}|${info.canPlay || info.canPause}|${info.canGoNext}`;
+    if (capsKey !== this._lastCapsKey) {
+      this._lastCapsKey = capsKey;
+      this._transport.setCapabilities(
+        info.canGoPrevious,
+        info.canPlay || info.canPause,
+        info.canGoNext
+      );
+    }
   }
   _cleanup() {
     this._stopTimer();
@@ -3536,18 +4509,18 @@ var _ExpandedPlayer = class _ExpandedPlayer extends St12.Widget {
     this._player = null;
   }
 };
-GObject15.registerClass(_ExpandedPlayer);
+GObject16.registerClass(_ExpandedPlayer);
 var ExpandedPlayer = _ExpandedPlayer;
 
 // src/ui/player-selector/index.ts
-import GObject16 from "gi://GObject";
-import St13 from "gi://St";
-import Clutter13 from "gi://Clutter";
-import * as Main4 from "resource:///org/gnome/shell/ui/main.js";
-import { gettext as _ } from "resource:///org/gnome/shell/extensions/extension.js";
+import GObject17 from "gi://GObject";
+import St14 from "gi://St";
+import Clutter15 from "gi://Clutter";
+import * as Main5 from "resource:///org/gnome/shell/ui/main.js";
+import { gettext as _2 } from "resource:///org/gnome/shell/extensions/extension.js";
 
 // src/utils/player-icon.ts
-import Gio5 from "gi://Gio";
+import Gio7 from "gi://Gio";
 function getPlayerIcon(player, busName) {
   var _a, _b;
   const names = [];
@@ -3570,16 +4543,16 @@ function getPlayerIcon(player, busName) {
     if (!name) {
       continue;
     }
-    const icon = Gio5.ThemedIcon.new(name);
+    const icon = Gio7.ThemedIcon.new(name);
     if (icon) {
       return icon;
     }
   }
-  return Gio5.ThemedIcon.new("audio-x-generic");
+  return Gio7.ThemedIcon.new("audio-x-generic");
 }
 
 // src/ui/player-selector/index.ts
-var _PlayerSelectorMenu = class _PlayerSelectorMenu extends St13.Widget {
+var _PlayerSelectorMenu = class _PlayerSelectorMenu extends St14.Widget {
   constructor(host) {
     const [bgW, bgH] = global.display.get_size();
     super({
@@ -3594,7 +4567,7 @@ var _PlayerSelectorMenu = class _PlayerSelectorMenu extends St13.Widget {
     __publicField(this, "_box");
     __publicField(this, "_bg");
     this._host = host;
-    this._bg = new St13.Button({
+    this._bg = new St14.Button({
       style: "background-color: transparent;",
       reactive: true,
       x_expand: true,
@@ -3604,32 +4577,32 @@ var _PlayerSelectorMenu = class _PlayerSelectorMenu extends St13.Widget {
     });
     this._bg.connect("clicked", () => this.hideMenu());
     this.add_child(this._bg);
-    this._box = new St13.BoxLayout({
+    this._box = new St14.BoxLayout({
       vertical: true,
       reactive: true,
       style: "padding: 12px; border-radius: 12px; background-color: rgba(30,30,30,0.95); spacing: 6px;"
     });
     this.add_child(this._box);
     this.connect("key-press-event", (_a, event) => {
-      if (event.get_key_symbol() === Clutter13.KEY_Escape) {
+      if (event.get_key_symbol() === Clutter15.KEY_Escape) {
         this.hideMenu();
-        return Clutter13.EVENT_STOP;
+        return Clutter15.EVENT_STOP;
       }
-      return Clutter13.EVENT_PROPAGATE;
+      return Clutter15.EVENT_PROPAGATE;
     });
   }
   populate() {
     this._box.destroy_all_children();
-    const title = new St13.Label({
-      text: _("Select Media Player"),
+    const title = new St14.Label({
+      text: _2("Select Media Player"),
       style: "font-weight: bold; margin-bottom: 8px;",
-      x_align: Clutter13.ActorAlign.CENTER
+      x_align: Clutter15.ActorAlign.CENTER
     });
     this._box.add_child(title);
     const current = this._host.settings.popup.selectedPlayerBus;
     if (!this._host.settings.popup.autoHidePlayer) {
       this._box.add_child(this._row(
-        _("Auto (Smart Selection)"),
+        _2("Auto (Smart Selection)"),
         "emblem-system-symbolic",
         current === "",
         () => this._host.selectPlayer("")
@@ -3658,7 +4631,7 @@ var _PlayerSelectorMenu = class _PlayerSelectorMenu extends St13.Widget {
     const h = natH || 120;
     let x = anchorX + (anchorW - w) / 2;
     let y = anchorY - h - 10;
-    const monitor = Main4.layoutManager.primaryMonitor;
+    const monitor = Main5.layoutManager.primaryMonitor;
     if (!monitor) {
       return;
     }
@@ -3671,7 +4644,7 @@ var _PlayerSelectorMenu = class _PlayerSelectorMenu extends St13.Widget {
     this.ease({
       opacity: 255,
       duration: 150,
-      mode: Clutter13.AnimationMode.EASE_OUT_QUAD
+      mode: Clutter15.AnimationMode.EASE_OUT_QUAD
     });
     global.stage.set_key_focus(this);
   }
@@ -3679,7 +4652,7 @@ var _PlayerSelectorMenu = class _PlayerSelectorMenu extends St13.Widget {
     this.ease({
       opacity: 0,
       duration: 120,
-      mode: Clutter13.AnimationMode.EASE_OUT_QUAD,
+      mode: Clutter15.AnimationMode.EASE_OUT_QUAD,
       onStopped: () => {
         this.visible = false;
         this._host.closePlayerMenu();
@@ -3687,17 +4660,17 @@ var _PlayerSelectorMenu = class _PlayerSelectorMenu extends St13.Widget {
     });
   }
   _row(label, iconName, selected, onClick, player, busName) {
-    const content = new St13.BoxLayout({ vertical: false, style: "spacing: 10px;" });
+    const content = new St14.BoxLayout({ vertical: false, style: "spacing: 10px;" });
     const iconProps = { icon_size: 22 };
     if (iconName) {
       iconProps.icon_name = iconName;
     } else {
       iconProps.gicon = getPlayerIcon(player != null ? player : null, busName != null ? busName : "");
     }
-    const icon = new St13.Icon(iconProps);
+    const icon = new St14.Icon(iconProps);
     content.add_child(icon);
-    content.add_child(new St13.Label({ text: label || "", y_align: Clutter13.ActorAlign.CENTER }));
-    const btn = new St13.Button({
+    content.add_child(new St14.Label({ text: label || "", y_align: Clutter15.ActorAlign.CENTER }));
+    const btn = new St14.Button({
       child: content,
       reactive: true,
       can_focus: true,
@@ -3711,7 +4684,7 @@ var _PlayerSelectorMenu = class _PlayerSelectorMenu extends St13.Widget {
     return btn;
   }
 };
-GObject16.registerClass(_PlayerSelectorMenu);
+GObject17.registerClass(_PlayerSelectorMenu);
 var PlayerSelectorMenu = _PlayerSelectorMenu;
 
 // src/controllers/music-controller.ts
@@ -3741,9 +4714,9 @@ var MusicController = class {
     this._context.mpris.setSystemSettings(this._context.settings.system);
     this._bindMprisSignals(this._context.mpris);
     this._bindSettingsSignals();
-    if (Main5.layoutManager._startingUp) {
-      const startupId = Main5.layoutManager.connect("startup-complete", () => {
-        Main5.layoutManager.disconnect(startupId);
+    if (Main6.layoutManager._startingUp) {
+      const startupId = Main6.layoutManager.connect("startup-complete", () => {
+        Main6.layoutManager.disconnect(startupId);
         this._doEnable();
       });
     } else {
@@ -3847,7 +4820,7 @@ var MusicController = class {
     this._expanded.connect("destroy", () => {
       this._expanded = null;
     });
-    Main5.layoutManager.addChrome(this._expanded);
+    Main6.layoutManager.addChrome(this._expanded);
     const color = this._pill.displayedColor;
     this._expanded.updateStyle(color.r, color.g, color.b, this._pill.currentBgAlpha);
     const [px, py] = this._pill.get_transformed_position();
@@ -3872,7 +4845,7 @@ var MusicController = class {
     this._playerMenu.connect("destroy", () => {
       this._playerMenu = null;
     });
-    Main5.layoutManager.addChrome(this._playerMenu);
+    Main6.layoutManager.addChrome(this._playerMenu);
     const [px, py] = this._pill.get_transformed_position();
     const [pw, ph] = this._pill.get_transformed_size();
     this._playerMenu.showMenu(px, py, pw, ph);
@@ -3881,7 +4854,7 @@ var MusicController = class {
     if (!this._playerMenu) {
       return;
     }
-    Main5.layoutManager.removeChrome(this._playerMenu);
+    Main6.layoutManager.removeChrome(this._playerMenu);
     this._playerMenu.destroy();
     this._playerMenu = null;
   }
@@ -3890,29 +4863,29 @@ var MusicController = class {
       return;
     }
     const delay = this._context.settings.system.compatibilityDelay ? 800 : 150;
-    this._updateTimeoutId = GLib13.timeout_add(GLib13.PRIORITY_DEFAULT, delay, () => {
+    this._updateTimeoutId = GLib15.timeout_add(GLib15.PRIORITY_DEFAULT, delay, () => {
       this._updateTimeoutId = null;
       this._updateUI();
-      return GLib13.SOURCE_REMOVE;
+      return GLib15.SOURCE_REMOVE;
     });
   }
   _doEnable() {
     var _a;
     this._context.mpris.start(this._context.settings.system);
     (_a = this._injector) == null ? void 0 : _a.inject();
-    this._watchdogId = GLib13.timeout_add_seconds(GLib13.PRIORITY_DEFAULT, 5, () => {
+    this._watchdogId = GLib15.timeout_add_seconds(GLib15.PRIORITY_DEFAULT, 5, () => {
       var _a2, _b;
       if (this._isShuttingDown) {
-        return GLib13.SOURCE_REMOVE;
+        return GLib15.SOURCE_REMOVE;
       }
       if (!((_a2 = this._pill) == null ? void 0 : _a2.get_parent())) {
         (_b = this._injector) == null ? void 0 : _b.queueInject();
       }
-      return GLib13.SOURCE_CONTINUE;
+      return GLib15.SOURCE_CONTINUE;
     });
-    this._overviewDragBegin = Main5.overview.connect("item-drag-begin", () => {
+    this._overviewDragBegin = Main6.overview.connect("item-drag-begin", () => {
     });
-    this._overviewDragEnd = Main5.overview.connect("item-drag-end", () => {
+    this._overviewDragEnd = Main6.overview.connect("item-drag-end", () => {
       var _a2;
       (_a2 = this._injector) == null ? void 0 : _a2.queueInject();
     });
@@ -3939,6 +4912,7 @@ var MusicController = class {
     this._signalIds.push(
       mpris.connect("player-added", handler),
       mpris.connect("player-removed", handler),
+      // Position-only updates no longer emit this (see MediaPlayer._applyState)
       mpris.connect("player-state-changed", handler),
       mpris.connect("player-track-changed", handler),
       mpris.connect("player-status-changed", handler)
@@ -4020,11 +4994,11 @@ var MusicController = class {
   }
   _clearTimers() {
     if (this._updateTimeoutId !== null) {
-      GLib13.source_remove(this._updateTimeoutId);
+      GLib15.source_remove(this._updateTimeoutId);
       this._updateTimeoutId = null;
     }
     if (this._watchdogId !== null) {
-      GLib13.source_remove(this._watchdogId);
+      GLib15.source_remove(this._watchdogId);
       this._watchdogId = null;
     }
   }
@@ -4038,11 +5012,11 @@ var MusicController = class {
     }
     this._settingsSignalIds = [];
     if (this._overviewDragBegin) {
-      Main5.overview.disconnect(this._overviewDragBegin);
+      Main6.overview.disconnect(this._overviewDragBegin);
       this._overviewDragBegin = 0;
     }
     if (this._overviewDragEnd) {
-      Main5.overview.disconnect(this._overviewDragEnd);
+      Main6.overview.disconnect(this._overviewDragEnd);
       this._overviewDragEnd = 0;
     }
   }
