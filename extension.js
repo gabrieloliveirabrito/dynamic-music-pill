@@ -41,6 +41,7 @@ import GLib2 from "gi://GLib";
 var PLAYER_INTERFACE = "org.mpris.MediaPlayer2";
 var MPRIS_INTERFACE = `${PLAYER_INTERFACE}.Player`;
 var MPRIS_OBJECT = "/org/mpris/MediaPlayer2";
+var DBUS_PROPERTIES_INTERFACE = "org.freedesktop.DBus.Properties";
 
 // src/constants/log-constants.ts
 var log_constants_exports = {};
@@ -48,6 +49,21 @@ __export(log_constants_exports, {
   LOG_PREFIX: () => LOG_PREFIX
 });
 var LOG_PREFIX = "[DMP]";
+
+// src/constants/crossfade-art-constants.ts
+var crossfade_art_constants_exports = {};
+__export(crossfade_art_constants_exports, {
+  DEFAULT_COLOR: () => DEFAULT_COLOR,
+  EASE_DURATION: () => EASE_DURATION,
+  EASE_OPACITY: () => EASE_OPACITY,
+  EASE_OUT_DURATION: () => EASE_OUT_DURATION,
+  RADIUS: () => RADIUS
+});
+var RADIUS = 10;
+var DEFAULT_COLOR = "#000000";
+var EASE_OPACITY = 255;
+var EASE_DURATION = 1e3;
+var EASE_OUT_DURATION = 300;
 
 // node_modules/.pnpm/@girs+glib-2.0@2.88.0-4.0.4/node_modules/@girs/glib-2.0/glib-2.0.js
 import GLib from "gi://GLib?version=2.0";
@@ -483,6 +499,10 @@ var map6 = createSettingsMap({
   autoHidePlayer: {
     key: "hide-auto-smart-selection",
     default: false
+  },
+  selectedPlayerBus: {
+    key: "selected-player-bus",
+    default: ""
   },
   showAlbumTitle: {
     key: "popup-show-album-title",
@@ -927,6 +947,7 @@ var TrackInfoMap = {
   "mpris:artUrl": (t, v) => t.artUrl = v,
   "mpris:length": (t, v) => t.length = v,
   "mpris:trackid": (t, v) => t.trackId = v,
+  "xesam:url": (t, v) => t.url = v,
   "rate": (t, v) => t.rate = v
 };
 
@@ -945,16 +966,22 @@ var DEFAULT_PLAYER_STATE = {
   position: 0
 };
 var _MediaPlayer = class _MediaPlayer extends GObject.Object {
-  constructor(name, owner, mpris) {
+  constructor(busName, owner, mpris) {
     super();
-    __publicField(this, "_name");
+    __publicField(this, "_busName");
     __publicField(this, "_owner");
     __publicField(this, "_mpris");
     __publicField(this, "_connection");
     __publicField(this, "_playerPropertiesTimer", null);
+    __publicField(this, "_propertiesSignal", null);
     __publicField(this, "_state");
-    logDebug(`Creating MediaPlayer for ${name}`);
-    this._name = name;
+    __publicField(this, "_identity", null);
+    __publicField(this, "_desktopEntry", null);
+    __publicField(this, "_lastPlayingTime", 0);
+    __publicField(this, "_lastSeen", Date.now());
+    __publicField(this, "_lastTrackId", null);
+    logDebug(`Creating MediaPlayer for ${busName}`);
+    this._busName = busName;
     this._owner = owner;
     this._mpris = mpris;
     this._connection = mpris.getConnection();
@@ -962,17 +989,149 @@ var _MediaPlayer = class _MediaPlayer extends GObject.Object {
       player: __spreadValues({}, DEFAULT_PLAYER_STATE),
       trackInfo: void 0
     };
-    this._playerPropertiesTimer = GLib4.timeout_add(GLib4.PRIORITY_DEFAULT, 1e3, this._playerTimerCallback.bind(this));
-    this._mpris.emit("player-added", this._name, this);
+    this._fetchRootProperties();
+    this._refreshState();
+    this._propertiesSignal = this._connection.signal_subscribe(
+      this._busName,
+      DBUS_PROPERTIES_INTERFACE,
+      "PropertiesChanged",
+      MPRIS_OBJECT,
+      null,
+      Gio3.DBusSignalFlags.NONE,
+      this._onPropertiesChanged.bind(this)
+    );
+    this._playerPropertiesTimer = GLib4.timeout_add(
+      GLib4.PRIORITY_DEFAULT,
+      5e3,
+      this._fallbackPoll.bind(this)
+    );
+    this._mpris.emit("player-added", this._busName, this);
+  }
+  getDescriptor() {
+    var _a, _b;
+    return {
+      busName: this._busName,
+      identity: (_a = this._identity) != null ? _a : void 0,
+      desktopEntry: (_b = this._desktopEntry) != null ? _b : void 0,
+      lastPlayingTime: this._lastPlayingTime,
+      lastSeen: this._lastSeen
+    };
   }
   getPlayerState() {
-    if (this._connection === null) {
-      return this._state;
-    }
-    const [result] = smartUnpack(this._connection.call_sync(
-      this._name,
+    return this._state;
+  }
+  getTrackInfo() {
+    return this._state.trackInfo;
+  }
+  getPlayerInfo() {
+    return this._state.player;
+  }
+  getName() {
+    return this._busName;
+  }
+  getBusName() {
+    return this._busName;
+  }
+  getOwner() {
+    return this._owner;
+  }
+  getIdentity() {
+    return this._identity;
+  }
+  getDesktopEntry() {
+    return this._desktopEntry;
+  }
+  getLastPlayingTime() {
+    return this._lastPlayingTime;
+  }
+  playPause() {
+    this._callPlayerMethod("PlayPause");
+  }
+  next() {
+    this._callPlayerMethod("Next");
+  }
+  previous() {
+    this._callPlayerMethod("Previous");
+  }
+  seek(offsetMicros) {
+    this._connection.call_sync(
+      this._busName,
       MPRIS_OBJECT,
-      "org.freedesktop.DBus.Properties",
+      MPRIS_INTERFACE,
+      "Seek",
+      new GLib4.Variant("(x)", [offsetMicros]),
+      null,
+      Gio3.DBusCallFlags.NONE,
+      -1,
+      null
+    );
+  }
+  removePlayer() {
+    logDebug(`Removing MediaPlayer for ${this._busName}`);
+    this._mpris.emit("player-removed", this._busName, this);
+    if (this._propertiesSignal !== null) {
+      this._connection.signal_unsubscribe(this._propertiesSignal);
+      this._propertiesSignal = null;
+    }
+    if (this._playerPropertiesTimer !== null) {
+      GLib4.source_remove(this._playerPropertiesTimer);
+      this._playerPropertiesTimer = null;
+    }
+    this._state = {
+      player: __spreadValues({}, DEFAULT_PLAYER_STATE),
+      trackInfo: void 0
+    };
+  }
+  _callPlayerMethod(method) {
+    this._connection.call_sync(
+      this._busName,
+      MPRIS_OBJECT,
+      MPRIS_INTERFACE,
+      method,
+      null,
+      null,
+      Gio3.DBusCallFlags.NONE,
+      -1,
+      null
+    );
+  }
+  _fetchRootProperties() {
+    try {
+      const [result] = smartUnpack(this._connection.call_sync(
+        this._busName,
+        MPRIS_OBJECT,
+        DBUS_PROPERTIES_INTERFACE,
+        "GetAll",
+        new GLib4.Variant("(s)", [PLAYER_INTERFACE]),
+        null,
+        Gio3.DBusCallFlags.NONE,
+        -1,
+        null
+      ));
+      if (!result) {
+        return;
+      }
+      if (result["Identity"]) {
+        this._identity = String(smartUnpack(result["Identity"]));
+      }
+      if (result["DesktopEntry"]) {
+        this._desktopEntry = String(smartUnpack(result["DesktopEntry"]));
+      }
+    } catch (e) {
+    }
+  }
+  _refreshState() {
+    try {
+      const newState = this._fetchPlayerState();
+      this._applyState(newState);
+    } catch (e) {
+    }
+  }
+  _fetchPlayerState() {
+    const [result] = smartUnpack(this._connection.call_sync(
+      this._busName,
+      MPRIS_OBJECT,
+      DBUS_PROPERTIES_INTERFACE,
       "GetAll",
       new GLib4.Variant("(s)", [MPRIS_INTERFACE]),
       null,
@@ -985,57 +1144,96 @@ var _MediaPlayer = class _MediaPlayer extends GObject.Object {
     }
     const playerState = mapObject(result, PlayerStateMap);
     const trackInfo = mapObject(result, TrackInfoMap);
-    const state = {
-      player: playerState,
-      trackInfo
-    };
-    return state;
+    return { player: playerState, trackInfo };
   }
-  getTrackInfo() {
-    return this._state.trackInfo;
-  }
-  getPlayerInfo() {
-    return this._state.player;
-  }
-  getName() {
-    return this._name;
-  }
-  getOwner() {
-    return this._owner;
-  }
-  removePlayer() {
-    logDebug(`Removing MediaPlayer for ${this._name}`);
-    this._mpris.emit("player-removed", this._name, this);
-    if (this._playerPropertiesTimer !== null) {
-      GLib4.source_remove(this._playerPropertiesTimer);
-      this._playerPropertiesTimer = null;
-    }
-    this._state = {
-      player: __spreadValues({}, DEFAULT_PLAYER_STATE),
-      trackInfo: void 0
-    };
-  }
-  _playerTimerCallback() {
-    const newState = this.getPlayerState();
+  _applyState(newState) {
+    var _a, _b;
     const oldState = this._state;
-    const [playerChanged, [playerPath, oldPlayerValue, newPlayerValue]] = checkChanged(oldState.player, newState.player);
-    const [trackChanged, [trackPath, oldTrackValue, newTrackValue]] = checkChanged(oldState.trackInfo, newState.trackInfo);
+    this._lastSeen = Date.now();
+    if (newState.player.playbackStatus === "Playing") {
+      this._lastPlayingTime = Date.now();
+    }
+    const trackId = (_b = (_a = newState.trackInfo) == null ? void 0 : _a.trackId) != null ? _b : null;
+    if (trackId && trackId !== this._lastTrackId) {
+      this._lastTrackId = trackId;
+    }
+    const [playerChanged] = checkChanged(oldState.player, newState.player);
+    const [trackChanged] = checkChanged(oldState.trackInfo, newState.trackInfo);
     if (playerChanged) {
       this._state.player = newState.player;
-      this._mpris.emit("player-state-changed", this._name, this);
+      this._mpris.emit("player-state-changed", this._busName, this);
       if (newState.player.playbackStatus !== oldState.player.playbackStatus) {
-        this._mpris.emit("player-status-changed", this._name, newState.player.playbackStatus);
+        this._mpris.emit("player-status-changed", this._busName, newState.player.playbackStatus);
       }
     }
     if (trackChanged) {
       this._state.trackInfo = newState.trackInfo;
-      this._mpris.emit("player-track-changed", this._name, this);
+      this._mpris.emit("player-track-changed", this._busName, this);
     }
+  }
+  _onPropertiesChanged(_connection, _sender, _path, _iface, _signal, parameters) {
+    const [iface, changed] = smartUnpack(parameters);
+    if (iface !== MPRIS_INTERFACE || !changed) {
+      return;
+    }
+    const merged = __spreadValues(__spreadValues({}, this._flattenState(this._state)), changed);
+    const playerState = mapObject(merged, PlayerStateMap);
+    const trackInfo = mapObject(merged, TrackInfoMap);
+    this._applyState({ player: playerState, trackInfo });
+  }
+  _flattenState(state) {
+    const flat = {
+      PlaybackStatus: state.player.playbackStatus,
+      CanControl: state.player.canControl,
+      CanGoNext: state.player.canGoNext,
+      CanGoPrevious: state.player.canGoPrevious,
+      CanPause: state.player.canPause,
+      CanPlay: state.player.canPlay,
+      CanSeek: state.player.canSeek,
+      Volume: state.player.volume,
+      MinimumRate: state.player.minimumRate,
+      MaximumRate: state.player.maximumRate,
+      Position: state.player.position
+    };
+    if (state.trackInfo) {
+      flat["xesam:title"] = state.trackInfo.title;
+      flat["xesam:artist"] = state.trackInfo.artist;
+      flat["xesam:album"] = state.trackInfo.album;
+      flat["mpris:artUrl"] = state.trackInfo.artUrl;
+      flat["mpris:length"] = state.trackInfo.length;
+      flat["mpris:trackid"] = state.trackInfo.trackId;
+    }
+    return flat;
+  }
+  _fallbackPoll() {
+    this._refreshState();
     return GLib4.SOURCE_CONTINUE;
   }
 };
 GObject.registerClass(_MediaPlayer);
 var MediaPlayer = _MediaPlayer;
+
+// src/providers/mpris-provider/player-filter.ts
+function isPlayerAllowed(busName, system) {
+  const mode = system.playerFilterMode;
+  if (mode === 0) {
+    return true;
+  }
+  const listStr = system.filteredPlayers.toLowerCase();
+  const list = listStr.split(",").map((s) => s.trim()).filter((s) => s.length > 0);
+  if (list.length === 0) {
+    return mode === 1;
+  }
+  const lowerName = busName.toLowerCase();
+  const match = list.some((item) => lowerName.includes(item));
+  if (mode === 1) {
+    return !match;
+  }
+  if (mode === 2) {
+    return match;
+  }
+  return true;
+}
 
 // src/providers/mpris-provider/index.ts
 var flags = Gio4.DBusConnectionFlags.AUTHENTICATION_CLIENT | Gio4.DBusConnectionFlags.MESSAGE_BUS_CONNECTION;
@@ -1045,9 +1243,12 @@ var _MPRISProvider = class _MPRISProvider extends GObject2.Object {
     __publicField(this, "_address", getDBusSessionAddress());
     __publicField(this, "_connection", null);
     __publicField(this, "_nameOwnerChangedSignal", null);
+    /** keyed by MPRIS bus name */
     __publicField(this, "_players", /* @__PURE__ */ new Map());
+    __publicField(this, "_systemSettings", null);
   }
-  start() {
+  start(systemSettings) {
+    this._systemSettings = systemSettings != null ? systemSettings : null;
     logDebug(`Creating DBus connection for address: ${this._address}`);
     this._connection = Gio4.DBusConnection.new_for_address_sync(this._address, flags, null, null);
     this._nameOwnerChangedSignal = this._connection.signal_subscribe(
@@ -1059,15 +1260,7 @@ var _MPRISProvider = class _MPRISProvider extends GObject2.Object {
       Gio4.DBusSignalFlags.NONE,
       this._nameOwnerChanged.bind(this)
     );
-    const names = this.listPlayers();
-    for (const name of names) {
-      const owner = this.getPlayerOwner(name);
-      if (!owner) {
-        continue;
-      }
-      const player = new MediaPlayer(name, owner, this);
-      this._players.set(owner, player);
-    }
+    this.rescan();
   }
   stop() {
     if (this._connection === null) {
@@ -1084,6 +1277,10 @@ var _MPRISProvider = class _MPRISProvider extends GObject2.Object {
     }
     this._connection.close_sync(null);
     this._connection = null;
+    this._systemSettings = null;
+  }
+  setSystemSettings(systemSettings) {
+    this._systemSettings = systemSettings;
   }
   getConnection() {
     if (this._connection === null) {
@@ -1091,24 +1288,64 @@ var _MPRISProvider = class _MPRISProvider extends GObject2.Object {
     }
     return this._connection;
   }
+  getPlayer(busName) {
+    return this._players.get(busName);
+  }
+  getPlayers() {
+    return Array.from(this._players.values());
+  }
+  getPlayerBusNames() {
+    return Array.from(this._players.keys());
+  }
+  rescan() {
+    if (this._connection === null) {
+      return;
+    }
+    const names = this.listPlayers().filter((name) => this._shouldAllow(name));
+    let changed = false;
+    for (const name of names) {
+      if (!this._players.has(name)) {
+        const owner = this.getPlayerOwner(name);
+        if (!owner) {
+          continue;
+        }
+        this._players.set(name, new MediaPlayer(name, owner, this));
+        changed = true;
+      }
+    }
+    for (const busName of [...this._players.keys()]) {
+      if (!names.includes(busName)) {
+        const player = this._players.get(busName);
+        player == null ? void 0 : player.removePlayer();
+        this._players.delete(busName);
+        changed = true;
+      }
+    }
+    if (changed) {
+      logDebug(`MPRIS rescan: ${this._players.size} player(s)`);
+    }
+  }
   getPlayerOwner(name) {
     if (!this._connection) {
       return void 0;
     }
-    logDebug(`Getting owner for player: ${name}`);
-    const result = this._connection.call_sync(
-      "org.freedesktop.DBus",
-      "/org/freedesktop/DBus",
-      "org.freedesktop.DBus",
-      "GetNameOwner",
-      new GLib5.Variant("(s)", [name]),
-      null,
-      Gio4.DBusCallFlags.NONE,
-      -1,
-      null
-    );
-    const [owner] = smartUnpack(result);
-    return owner || void 0;
+    try {
+      const result = this._connection.call_sync(
+        "org.freedesktop.DBus",
+        "/org/freedesktop/DBus",
+        "org.freedesktop.DBus",
+        "GetNameOwner",
+        new GLib5.Variant("(s)", [name]),
+        null,
+        Gio4.DBusCallFlags.NONE,
+        -1,
+        null
+      );
+      const [owner] = smartUnpack(result);
+      return owner || void 0;
+    } catch (e) {
+      return void 0;
+    }
   }
   listPlayers() {
     if (this._connection === null) {
@@ -1128,10 +1365,13 @@ var _MPRISProvider = class _MPRISProvider extends GObject2.Object {
     const names = smartUnpack(result)[0];
     return names.filter((name) => name.startsWith(`${PLAYER_INTERFACE}.`));
   }
-  getPlayer(name) {
-    return this._players.get(name);
+  _shouldAllow(busName) {
+    if (!this._systemSettings) {
+      return true;
+    }
+    return isPlayerAllowed(busName, this._systemSettings);
   }
-  _nameOwnerChanged(connection, sender_name, object_path, interface_name, signal_name, parameters) {
+  _nameOwnerChanged(_connection, sender_name, object_path, interface_name, signal_name, parameters) {
     const [name, oldOwner, newOwner] = smartUnpack(parameters);
     if (!(name == null ? void 0 : name.startsWith(PLAYER_INTERFACE))) {
       return;
@@ -1141,21 +1381,17 @@ var _MPRISProvider = class _MPRISProvider extends GObject2.Object {
     if (name === void 0 || oldOwner === void 0 || newOwner === void 0) {
       return;
     }
-    if (oldOwner === newOwner || oldOwner.length === 0 && this._players.has(newOwner)) {
+    if (newOwner.length === 0 && this._players.has(name)) {
+      const player = this._players.get(name);
+      player == null ? void 0 : player.removePlayer();
+      this._players.delete(name);
       return;
     }
-    if (newOwner.length === 0 && this._players.has(oldOwner)) {
-      const player = this._players.get(oldOwner);
-      if (player) {
-        player.removePlayer();
-        this._players.delete(oldOwner);
-      }
+    if (newOwner.length > 0 && !this._players.has(name) && this._shouldAllow(name)) {
+      this._players.set(name, new MediaPlayer(name, newOwner, this));
       return;
     }
-    if (newOwner.length > 0 && !this._players.has(newOwner)) {
-      const player = new MediaPlayer(name, newOwner, this);
-      this._players.set(newOwner, player);
-    }
+    this.rescan();
   }
 };
 GObject2.registerClass({
@@ -1185,6 +1421,1378 @@ GObject2.registerClass({
 }, _MPRISProvider);
 var MPRISProvider = _MPRISProvider;
 
+// src/controllers/music-controller.ts
+import GLib9 from "gi://GLib";
+import * as Main2 from "resource:///org/gnome/shell/ui/main.js";
+
+// src/controllers/active-player.ts
+var BROWSER_PATTERN = /chrome|chromium|firefox|brave|edge|opera/;
+function getActivePlayer(ctx) {
+  const { settings, players, lastActionTime, lastWinnerName } = ctx;
+  if (players.length === 0) {
+    return null;
+  }
+  const manualBus = settings.popup.selectedPlayerBus;
+  if (manualBus && manualBus !== "") {
+    const manual = players.find((p) => p.getBusName() === manualBus);
+    if (manual) {
+      return manual;
+    }
+  }
+  const now = Date.now();
+  if (now - lastActionTime < 3e3 && lastWinnerName) {
+    const locked = players.find((p) => p.getBusName() === lastWinnerName);
+    if (locked) {
+      return locked;
+    }
+  }
+  const filterMode = settings.system.playerFilterMode;
+  const filterList = settings.system.filteredPlayers.toLowerCase().split(",").map((s) => s.trim()).filter(Boolean);
+  const scored = players.map((player) => {
+    var _a;
+    let score = 0;
+    const status = player.getPlayerInfo().playbackStatus;
+    const track = player.getTrackInfo();
+    if (track == null ? void 0 : track.title) {
+      const trackUrl = (_a = track.url) != null ? _a : "";
+      const isWeb = trackUrl.startsWith("http://") || trackUrl.startsWith("https://");
+      if (isWeb && filterMode === 2) {
+        const urlMatch = filterList.some((item) => trackUrl.includes(item));
+        if (!urlMatch) {
+          return { player, score: -1 };
+        }
+      }
+    }
+    const hasTitle = !!(track == null ? void 0 : track.title);
+    if (status === "Playing" && hasTitle) {
+      score = 500;
+    } else if (status === "Paused" && hasTitle) {
+      score = 100;
+    }
+    if (score === 0 && isBrowserBus(player.getBusName())) {
+      score = -10;
+    }
+    return { player, score };
+  });
+  scored.sort((a, b) => {
+    if (b.score !== a.score) {
+      return b.score - a.score;
+    }
+    return b.player.getLastPlayingTime() - a.player.getLastPlayingTime();
+  });
+  if (scored.length === 0 || scored[0].score < 0) {
+    return null;
+  }
+  let winner = scored[0].player;
+  if (winner.getPlayerInfo().playbackStatus !== "Playing") {
+    const anyPlaying = scored.find(
+      (s) => {
+        var _a;
+        return s.score > 0 && s.player.getPlayerInfo().playbackStatus === "Playing" && !!((_a = s.player.getTrackInfo()) == null ? void 0 : _a.title);
+      }
+    );
+    if (anyPlaying) {
+      winner = anyPlaying.player;
+    }
+  }
+  return winner;
+}
+function resolveDisplayTrack(player, cached) {
+  var _a, _b, _c, _d;
+  const track = player.getTrackInfo();
+  const busName = player.getBusName();
+  const status = player.getPlayerInfo().playbackStatus;
+  let title = track == null ? void 0 : track.title;
+  let artist = formatArtist(track == null ? void 0 : track.artist);
+  let artUrl = track == null ? void 0 : track.artUrl;
+  if (!title && cached && cached.busName === busName && status !== "Stopped") {
+    title = cached.title;
+    artist = (_a = cached.artist) != null ? _a : artist;
+    artUrl = (_b = cached.artUrl) != null ? _b : artUrl;
+  }
+  if (!title) {
+    title = void 0;
+    artist = void 0;
+  }
+  return {
+    busName,
+    title,
+    artist,
+    artUrl,
+    url: (_d = (_c = player.getTrackInfo()) == null ? void 0 : _c.url) != null ? _d : ""
+  };
+}
+function formatArtist(artist) {
+  if (!artist || artist.length === 0) {
+    return void 0;
+  }
+  return artist.map((a) => smartUnpack(a)).join(", ");
+}
+function isBrowserBus(busName) {
+  const short = busName.replace("org.mpris.MediaPlayer2.", "").split(".")[0].toLowerCase();
+  return BROWSER_PATTERN.test(short);
+}
+
+// src/ui/music-pill/index.ts
+import GObject7 from "gi://GObject";
+import St3 from "gi://St";
+import Clutter3 from "gi://Clutter";
+
+// node_modules/.pnpm/@girs+st-18@18.0.0-4.0.4/node_modules/@girs/st-18/st-18.js
+import St from "gi://St?version=18";
+var st_18_default = St;
+
+// src/components/crossfade-art.ts
+import GObject3 from "gi://GObject";
+
+// node_modules/.pnpm/@girs+clutter-18@18.0.0-4.0.4/node_modules/@girs/clutter-18/clutter-18.js
+import Clutter from "gi://Clutter?version=18";
+var clutter_18_default = Clutter;
+
+// src/components/crossfade-art.ts
+var _CrossfadeArt = class _CrossfadeArt extends st_18_default.Widget {
+  constructor(properties, ...args) {
+    super(properties, args);
+    __publicField(this, "_radius", crossfade_art_constants_exports.RADIUS);
+    __publicField(this, "_shadowCSS", "box-shadow: none;");
+    __publicField(this, "_lastCSS");
+    __publicField(this, "_currentUrl");
+    __publicField(this, "_bgUrl");
+    this.layoutManager = new clutter_18_default.BinLayout();
+    this.set_style_class_name("art-widget");
+    this.set_clip_to_allocation(false);
+    this.set_x_expand(false);
+    this.set_y_expand(false);
+  }
+  _updateContainerStyle() {
+    this.setRadius(this._radius);
+    let hasArt = !!this._currentUrl && this._currentUrl.length > 0;
+    let activeShadow = hasArt ? this._shadowCSS : "box-shadow: none;";
+    let bgColor = hasArt ? `background-color: ${crossfade_art_constants_exports.DEFAULT_COLOR};` : "background-color: transparent;";
+    this.set_style(`${activeShadow} ${bgColor}`);
+  }
+  _refreshLayerStyle(layer) {
+    if (!layer || !layer.get_parent()) return;
+    let bgCSS = layer._bgUrl ? `background-image: ("${layer._bgUrl}");` : "";
+    let radius = this.getRadius();
+    let radiusCSS = `border-radius: ${radius}px; background-size: cover; box-shadow: none; `;
+    let fullCSS = bgCSS + radiusCSS;
+    if (fullCSS === layer._lastCSS) {
+      return;
+    }
+    layer._lastCSS = fullCSS;
+    layer.set_style(fullCSS);
+  }
+  getRadius() {
+    return isNaN(this._radius) ? crossfade_art_constants_exports.RADIUS : this._radius;
+  }
+  setRadius(radius) {
+    this._radius = isNaN(radius) ? crossfade_art_constants_exports.RADIUS : radius;
+    this.set_style(`border-radius: ${radius}px; ${this._shadowCSS}`);
+    const actors = this.get_children().filter((c) => c instanceof _CrossfadeArt);
+    actors.forEach((c) => c._refreshLayerStyle(c));
+  }
+  setShadowStyle(cssString) {
+    this._shadowCSS = cssString;
+    this._updateContainerStyle();
+    const actors = this.get_children().filter((c) => c instanceof _CrossfadeArt);
+    actors.forEach((a) => a._refreshLayerStyle(a));
+  }
+  setArt(newUrl, force = false) {
+    let children = this.get_children().filter((c) => c instanceof _CrossfadeArt && c._bgUrl === newUrl);
+    if (children.length > 0) {
+      return;
+    }
+    this._currentUrl = newUrl;
+    this._updateContainerStyle();
+    children.forEach((c) => c.remove_all_transitions());
+    let newLayer = new _CrossfadeArt({
+      x_expand: true,
+      y_expand: true,
+      opacity: 0
+    });
+    newLayer._bgUrl = newUrl;
+    this.add_child(newLayer);
+    this._refreshLayerStyle(newLayer);
+    newLayer.ease({
+      opacity: 255,
+      duration: 1e3,
+      mode: clutter_18_default.AnimationMode.EASE_OUT_QUAD,
+      onStopped: (isFinished) => {
+        if (!isFinished) return;
+        newLayer.opacity = 255;
+        let currentChildren = this.get_children();
+        let layerIndex = currentChildren.indexOf(newLayer);
+        if (layerIndex > 0) {
+          for (let i = 0; i < layerIndex; i++) {
+            let oldLayer = currentChildren[i];
+            oldLayer.ease({
+              opacity: 0,
+              duration: 300,
+              mode: clutter_18_default.AnimationMode.EASE_OUT_QUAD,
+              onStopped: () => oldLayer.destroy()
+            });
+          }
+        }
+      }
+    });
+  }
+};
+GObject3.registerClass(_CrossfadeArt);
+var CrossfadeArt = _CrossfadeArt;
+
+// src/components/pixel-snapped-box.ts
+import GObject4 from "gi://GObject";
+var _PixelSnappedBox = class _PixelSnappedBox extends st_18_default.BoxLayout {
+  vfunc_allocate(box) {
+    box.x1 = Math.round(box.x1);
+    box.x2 = Math.round(box.x2);
+    box.y1 = Math.round(box.y1);
+    box.y2 = Math.round(box.y2);
+    super.vfunc_allocate(box);
+  }
+};
+GObject4.registerClass(_PixelSnappedBox);
+var PixelSnappedBox = _PixelSnappedBox;
+
+// src/ui/music-pill/components/text-block/index.ts
+import St2 from "gi://St";
+import Clutter2 from "gi://Clutter";
+
+// node_modules/.pnpm/@girs+gobject-2.0@2.88.0-4.0.4/node_modules/@girs/gobject-2.0/gobject-2.0.js
+import GObject5 from "gi://GObject?version=2.0";
+var gobject_2_0_default = GObject5;
+
+// src/components/scroll-label.ts
+import Pango from "gi://Pango";
+import GLib7 from "gi://GLib";
+
+// src/components/effects/text-fade-effect.ts
+import GObject6 from "gi://GObject";
+import GLib6 from "gi://GLib";
+var textFadeEffectShaderSource = `
+    uniform sampler2D tex;
+    uniform float width;
+    uniform float fade_pixels;
+    uniform float enable_left;
+    uniform float enable_right;
+
+    void main(void) {
+        vec2 uv = cogl_tex_coord_in[0].xy;
+        vec4 color = texture2D(tex, uv);
+
+        float left_alpha = mix(1.0, left_fade, enable_left);
+        float right_alpha = mix(1.0, right_fade, enable_right);
+
+        float alpha = min(left_alpha, right_alpha);
+        cogl_color_out = vec4(color.rgb * alpha, color.a * alpha) * cogl_color_in;
+    }
+`;
+var _TextFadeEffect = class _TextFadeEffect extends clutter_18_default.ShaderEffect {
+  constructor(fadePixels = 32, properties, ...args) {
+    super(__spreadValues({
+      shader_type: 1
+    }, properties), args);
+    __publicField(this, "_fadePixels", 32);
+    __publicField(this, "_enableLeft", 0);
+    __publicField(this, "_enableRight", 1);
+    __publicField(this, "_animId", null);
+    this._fadePixels = fadePixels;
+    this.set_shader_source(textFadeEffectShaderSource);
+  }
+  setFadePixels(pixels) {
+    this._fadePixels = pixels;
+  }
+  setEdges(left = true, right = true, animate = false) {
+    let targetLeft = left ? 1 : 0;
+    let targetRight = right ? 1 : 0;
+    if (this._animId) {
+      GLib6.Source.remove(this._animId);
+      this._animId = null;
+    }
+    if (!animate) {
+      this._enableLeft = targetLeft;
+      this._enableRight = targetRight;
+      let actor = this.get_actor();
+      if (actor) {
+        actor.queue_redraw();
+      }
+      return;
+    }
+    let startLeft = this._enableLeft;
+    let startRight = this._enableRight;
+    let startTime = Date.now();
+    let duration = 300;
+    this._animId = GLib6.timeout_add(GLib6.PRIORITY_DEFAULT, 16, () => {
+      let actor = this.get_actor();
+      if (!actor) {
+        this._animId = null;
+        return GLib6.SOURCE_REMOVE;
+      }
+      let now = Date.now();
+      let p = Math.min(1, (now - startTime) / duration);
+      let t = p * (2 - p);
+      this._enableLeft = startLeft + (targetLeft - startLeft) * t;
+      this._enableRight = startRight + (targetRight - startRight) * t;
+      actor.queue_redraw();
+      if (p >= 1) {
+        this._animId = null;
+        return GLib6.SOURCE_REMOVE;
+      }
+      return GLib6.SOURCE_CONTINUE;
+    });
+  }
+  vfunc_paint_target(node, paint_context) {
+    let actor = this.get_actor();
+    if (!actor) {
+      return;
+    }
+    let widthVal = new GObject6.Value();
+    widthVal.init(GObject6.TYPE_FLOAT);
+    widthVal.set_float(actor.get_width());
+    this.set_uniform_value("width", widthVal);
+    let fadeVal = new GObject6.Value();
+    fadeVal.init(GObject6.TYPE_FLOAT);
+    fadeVal.set_float(this._fadePixels);
+    this.set_uniform_value("fade_pixels", fadeVal);
+    let leftVal = new GObject6.Value();
+    leftVal.init(GObject6.TYPE_FLOAT);
+    leftVal.set_float(this._enableLeft);
+    this.set_uniform_value("enable_left", leftVal);
+    let rightVal = new GObject6.Value();
+    rightVal.init(GObject6.TYPE_FLOAT);
+    rightVal.set_float(this._enableRight);
+    this.set_uniform_value("enable_right", rightVal);
+    super.vfunc_paint_target(node, paint_context);
+  }
+};
+GObject6.registerClass(_TextFadeEffect);
+var TextFadeEffect = _TextFadeEffect;
+
+// src/components/scroll-label.ts
+var _ScrollLabel = class _ScrollLabel extends st_18_default.Widget {
+  constructor(styleClass, properties, ...args) {
+    super(properties, args);
+    __publicField(this, "_appContext");
+    __publicField(this, "_text", "");
+    __publicField(this, "_gameMode", false);
+    __publicField(this, "_playerPaused", false);
+    __publicField(this, "_paused", false);
+    __publicField(this, "_isScrolling", false);
+    __publicField(this, "_hoverOnly", false);
+    __publicField(this, "_hovered", false);
+    __publicField(this, "_forceScroll", false);
+    __publicField(this, "_pendingScrollStop", false);
+    __publicField(this, "_lyricTime", 0);
+    __publicField(this, "_container");
+    __publicField(this, "_label1");
+    __publicField(this, "_label2");
+    __publicField(this, "_separator");
+    __publicField(this, "_fadeEffect", null);
+    __publicField(this, "_fadeEffectAttached", false);
+    __publicField(this, "_resizeTimer", null);
+    __publicField(this, "_measureTimeout", null);
+    __publicField(this, "_idleResizeId", null);
+    __publicField(this, "_ignoreResizeUntil", 0);
+    __publicField(this, "_isFinalized", false);
+    __publicField(this, "_lyricFinished", false);
+    __publicField(this, "_scrollTimer", null);
+    this.layoutManager = new clutter_18_default.BinLayout();
+    this.set_x_expand(true);
+    this.set_y_expand(false);
+    this.set_clip_to_allocation(true);
+    this._appContext = getAppContext();
+    const { scrollControls } = this._appContext.settings;
+    this._hoverOnly = scrollControls.onHoverOnly;
+    this._container = new PixelSnappedBox({
+      x_expand: true,
+      y_expand: true,
+      x_align: clutter_18_default.ActorAlign.CENTER,
+      y_align: clutter_18_default.ActorAlign.CENTER,
+      orientation: clutter_18_default.Orientation.HORIZONTAL
+    });
+    this.add_child(this._container);
+    this._label1 = new st_18_default.Label({
+      style_class: styleClass,
+      y_align: clutter_18_default.ActorAlign.CENTER
+    });
+    this._label1.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
+    this._label1.clutter_text.line_wrap = false;
+    this._label2 = new st_18_default.Label({
+      style_class: styleClass,
+      y_align: clutter_18_default.ActorAlign.CENTER
+    });
+    this._label2.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
+    this._label2.clutter_text.line_wrap = false;
+    this._separator = new st_18_default.Widget({ width: 30 });
+    this._container.add_child(this._label1);
+    this._container.add_child(this._separator);
+    this._container.add_child(this._label2);
+    scrollControls.connect("changed::scroll-text", () => {
+      this.setText(this._text, true);
+    });
+    scrollControls.connect("changed::scroll-on-hover-only", () => {
+      this._hoverOnly = scrollControls.onHoverOnly;
+      if (this._hoverOnly && !this._hovered)
+        this._stopAnimation();
+      else
+        this.setText(this._text, true);
+    });
+    scrollControls.connect("changed::freeze-scroll-on-pause", () => {
+      this._updatePausedState();
+    });
+    scrollControls.connect("notify::allocation", () => {
+      if (this._resizeTimer) {
+        GLib7.Source.remove(this._resizeTimer);
+      }
+      this._resizeTimer = GLib7.timeout_add(GLib7.PRIORITY_DEFAULT, 100, () => {
+        this._resizeTimer = null;
+        if (this.has_allocation()) {
+          this._checkResize();
+        }
+        return GLib7.SOURCE_REMOVE;
+      });
+    });
+    this.connect("destroy", this._cleanup.bind(this));
+  }
+  vfunc_get_preferred_width(forHeight) {
+    if (this._label1) {
+      let [minW, natW] = this._label1.get_preferred_width(forHeight);
+      return [0, natW];
+    }
+    return super.vfunc_get_preferred_width(forHeight);
+  }
+  setLabelStyle(css) {
+    if (this._label1) {
+      this._label1.set_style(css);
+    }
+    if (this._label2) {
+      this._label2.set_style(css);
+    }
+  }
+  _setFadeOutEffect(enableLeft = true, enableRight = true, animate = false) {
+    if (!this._label1) {
+      return;
+    }
+    let fontDesc = this._label1.get_theme_node().get_font();
+    let fadeWidth = fontDesc.get_size() / Pango.SCALE * 4;
+    if (!this._fadeEffect) {
+      this._fadeEffect = new TextFadeEffect(fadeWidth);
+      this.add_effect(this._fadeEffect);
+    } else if (!this._fadeEffectAttached) {
+      this.add_effect(this._fadeEffect);
+    }
+    this._fadeEffectAttached = true;
+    this._fadeEffect.setFadePixels(fadeWidth);
+    this._fadeEffect.setEdges(enableLeft, enableRight, animate);
+  }
+  _clearFadeOutEffect() {
+    if (!this._fadeEffect || !this._fadeEffectAttached) {
+      return;
+    }
+    this._fadeEffect.setEdges(false, false, false);
+    this.remove_effect(this._fadeEffect);
+    this._fadeEffectAttached = false;
+  }
+  _cleanup() {
+    this._stopAnimation();
+    if (this._fadeEffect) {
+      if (this._fadeEffectAttached) {
+        this.remove_effect(this._fadeEffect);
+      }
+      this._fadeEffect = null;
+      this._fadeEffectAttached = false;
+    }
+    this._cleanupTimers();
+  }
+  _cleanupTimers() {
+    if (this._resizeTimer) {
+      GLib7.Source.remove(this._resizeTimer);
+      this._resizeTimer = null;
+    }
+    if (this._measureTimeout) {
+      GLib7.Source.remove(this._measureTimeout);
+      this._measureTimeout = null;
+    }
+    if (this._idleResizeId) {
+      GLib7.Source.remove(this._idleResizeId);
+      this._idleResizeId = null;
+    }
+  }
+  setGameMode(active) {
+    this._gameMode = active;
+    if (active) {
+      this._stopAnimation();
+    } else {
+      this._checkResize();
+    }
+  }
+  setPlayerPaused(isPaused) {
+    this._playerPaused = isPaused;
+    this._updatePausedState();
+  }
+  _updatePausedState() {
+    let shouldPause = this._playerPaused && this._appContext.settings.scrollControls.freezeOnPause;
+    if (shouldPause) {
+      if (this._paused) {
+        return;
+      }
+      this._cleanupTimers();
+      this._stopAnimation(true);
+    } else if (this._paused) {
+      this._paused = false;
+      this._checkResize();
+    }
+  }
+  setHoverMode(hovered) {
+    this._hovered = hovered;
+    if (!this._hoverOnly) {
+      return;
+    }
+    if (this._hovered) {
+      this._checkResize();
+      return;
+    }
+    if (this._lyricTime > 0) {
+      return;
+    }
+    if (this._forceScroll) {
+      return;
+    }
+    if (this._isScrolling) {
+      this._pendingScrollStop = true;
+    } else {
+      this._stopAnimation(true);
+      this._container.x_align = clutter_18_default.ActorAlign.CENTER;
+      this._label2.hide();
+      this._separator.hide();
+    }
+  }
+  setForceScroll(force) {
+    this._forceScroll = force;
+    if (force) {
+      this._checkResize();
+    }
+  }
+  setPendingScrollStop(stop) {
+    this._pendingScrollStop = stop;
+  }
+  _checkResize() {
+    if (!this._text || this._gameMode || this._paused) {
+      return;
+    }
+    if (this._ignoreResizeUntil && Date.now() < this._ignoreResizeUntil) {
+      return;
+    }
+    if (this._idleResizeId) {
+      GLib7.Source.remove(this._idleResizeId);
+      this._idleResizeId = null;
+    }
+    this._idleResizeId = GLib7.idle_add(GLib7.PRIORITY_DEFAULT, () => {
+      if (!this) {
+        return GLib7.SOURCE_REMOVE;
+      }
+      this._idleResizeId = null;
+      if (this._isFinalized || !this.get_parent()) {
+        return GLib7.SOURCE_REMOVE;
+      }
+      if (this._lyricFinished) {
+        return GLib7.SOURCE_REMOVE;
+      }
+      let boxWidth = this.get_allocation_box().get_width();
+      if (boxWidth <= 1) {
+        return GLib7.SOURCE_REMOVE;
+      }
+      this._label1.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
+      let textWidth = this._label1.get_preferred_width(-1)[1] || 0;
+      let needsScroll = textWidth > boxWidth + 5 && this._appContext.settings.scrollControls.scrollText || this._lyricTime > 0;
+      let isScrolling = this._scrollTimer != null || this._isScrolling;
+      if (needsScroll && !isScrolling) {
+        this._container.x_align = clutter_18_default.ActorAlign.START;
+        if (this._lyricTime > 0) {
+          this._startLyricScroll(textWidth);
+        } else if (!this._hoverOnly || this._hovered || this._forceScroll) {
+          this._startInfiniteScroll(textWidth);
+        }
+      } else if (!needsScroll && isScrolling) {
+        this._stopAnimation(true);
+        this._container.x_align = clutter_18_default.ActorAlign.CENTER;
+        this._label2.hide();
+        this._separator.hide();
+      } else if (!needsScroll) {
+        this._stopAnimation(true);
+        this._container.x_align = clutter_18_default.ActorAlign.CENTER;
+      }
+      return GLib7.SOURCE_REMOVE;
+    });
+  }
+  setText(text, force = false, lyricTime = 0) {
+    if (!force && this._text === text) {
+      return;
+    }
+    const { scrollControls, lyrics, pill } = this._appContext.settings;
+    this._text = text || "";
+    this._lyricTime = lyricTime;
+    this._lyricFinished = false;
+    this._stopAnimation(true);
+    this._container.x_align = clutter_18_default.ActorAlign.CENTER;
+    this._label1.text = this._text;
+    this._label2.text = this._text;
+    this._label2.hide();
+    this._separator.hide();
+    this._label1.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
+    this._label1.remove_transition("opacity");
+    let isLyric = lyricTime > 0;
+    let lyricFadeEnabled = lyrics.fade;
+    if (!isLyric || isLyric && lyricFadeEnabled) {
+      let duration = isLyric ? lyrics.fadeDuration : 300;
+      this._label1.opacity = 0;
+      this._label1.ease({
+        opacity: 255,
+        duration,
+        mode: clutter_18_default.AnimationMode.EASE_OUT_QUAD
+      });
+    } else {
+      this._label1.opacity = 255;
+    }
+    if (!scrollControls.scrollText && !this._lyricTime || this._paused) {
+      return;
+    }
+    if (pill.dynamicWidth) {
+      this._ignoreResizeUntil = Date.now() + 450;
+    }
+    let delay = pill.dynamicWidth ? 450 : 100;
+    if (this._measureTimeout) {
+      GLib7.Source.remove(this._measureTimeout);
+      this._measureTimeout = null;
+    }
+    this._measureTimeout = GLib7.timeout_add(GLib7.PRIORITY_DEFAULT, delay, () => {
+      this._measureTimeout = null;
+      if (this.has_allocation()) {
+        this._checkOverflow();
+      }
+      return GLib7.SOURCE_REMOVE;
+    });
+  }
+  _stopAnimation(resetPosition = true) {
+    this._isScrolling = false;
+    this._clearFadeOutEffect();
+    this._container.remove_all_transitions();
+    if (resetPosition) {
+      this._container.translation_x = 0;
+    }
+    if (this._scrollTimer) {
+      GLib7.Source.remove(this._scrollTimer);
+      this._scrollTimer = null;
+    }
+  }
+  _checkOverflow() {
+    if (this._gameMode || this._paused || !this.get_parent()) {
+      return;
+    }
+    let boxWidth = this.get_allocation_box().get_width();
+    if (boxWidth <= 1) {
+      return;
+    }
+    let textWidth = this._label1.get_preferred_width(-1)[1] || 0;
+    let needsScroll = textWidth > boxWidth + 5;
+    if (needsScroll) {
+      this._container.x_align = clutter_18_default.ActorAlign.START;
+      if (this._lyricTime > 0) {
+        this._startLyricScroll(textWidth);
+      } else if (this._appContext.settings.scrollControls.scrollText) {
+        if (!this._hoverOnly || this._hovered || this._forceScroll) {
+          this._startInfiniteScroll(textWidth);
+        }
+      }
+    } else {
+      this._stopAnimation(true);
+      this._container.x_align = clutter_18_default.ActorAlign.CENTER;
+    }
+  }
+  _startInfiniteScroll(textWidth) {
+    this._stopAnimation(true);
+    this._isScrolling = true;
+    this._label2.show();
+    this._separator.show();
+    const distance = textWidth + 30;
+    const duration = distance / 30 * 1e3;
+    const loop = () => {
+      if (this._gameMode || !this.get_parent()) {
+        return GLib7.SOURCE_REMOVE;
+      }
+      if (this._pendingScrollStop) {
+        this._pendingScrollStop = false;
+        this._isScrolling = false;
+        this._stopAnimation(true);
+        this._container.x_align = clutter_18_default.ActorAlign.CENTER;
+        this._label2.hide();
+        this._separator.hide();
+        return GLib7.SOURCE_REMOVE;
+      }
+      this._setFadeOutEffect(true, true, true);
+      this._container.ease({
+        translationX: -distance,
+        duration,
+        mode: clutter_18_default.AnimationMode.LINEAR,
+        onStopped: (isFinished) => {
+          if (!isFinished || this._gameMode || this._pendingScrollStop) {
+            this._isScrolling = false;
+            this._pendingScrollStop = false;
+            return;
+          }
+          this._container.translation_x = 0;
+          loop();
+        }
+      });
+      return GLib7.SOURCE_REMOVE;
+    };
+    loop();
+  }
+  _startLyricScroll(textWidth) {
+    this._stopAnimation(true);
+    this._isScrolling = true;
+    this._label2.hide();
+    this._separator.hide();
+    let boxWidth = this.get_allocation_box().get_width();
+    const distance = textWidth - boxWidth;
+    if (distance <= 5) {
+      return;
+    }
+    const totalDurationMs = this._lyricTime * 1e3;
+    const pauseTime = boxWidth / textWidth * totalDurationMs * 0.5;
+    const tailTime = totalDurationMs * 0.2;
+    const scrollDuration = totalDurationMs - pauseTime - tailTime;
+    if (scrollDuration <= 0) {
+      return;
+    }
+    this._clearFadeOutEffect();
+    if (this._scrollTimer) {
+      GLib7.Source.remove(this._scrollTimer);
+    }
+    this._scrollTimer = GLib7.timeout_add(GLib7.PRIORITY_DEFAULT, Math.max(100, pauseTime), () => {
+      this._scrollTimer = null;
+      if (this._gameMode || !this.get_parent()) {
+        return GLib7.SOURCE_REMOVE;
+      }
+      this._container.ease({
+        translationX: -distance,
+        duration: scrollDuration,
+        mode: clutter_18_default.AnimationMode.LINEAR,
+        onStopped: () => {
+          this._isScrolling = false;
+          this._lyricFinished = true;
+        }
+      });
+      return GLib7.SOURCE_REMOVE;
+    });
+  }
+};
+gobject_2_0_default.registerClass(_ScrollLabel);
+var ScrollLabel = _ScrollLabel;
+
+// src/ui/music-pill/components/text-block/index.ts
+var TextBlock = class extends St2.BoxLayout {
+  constructor() {
+    super({
+      x_expand: true,
+      y_align: Clutter2.ActorAlign.CENTER,
+      vertical: true
+    });
+    __publicField(this, "_titleScroll");
+    __publicField(this, "_artistScroll");
+    this._titleScroll = new ScrollLabel("music-label-title");
+    this._artistScroll = new ScrollLabel("music-label-artist");
+    this.add_child(this._titleScroll);
+    this.add_child(this._artistScroll);
+  }
+  setTitle(text) {
+    this._titleScroll.setText(text, true, 0);
+  }
+  setArtist(text) {
+    this._artistScroll.setText(text, true);
+  }
+  setPlayerPaused(paused) {
+    this._titleScroll.setPlayerPaused(paused);
+    this._artistScroll.setPlayerPaused(paused);
+  }
+};
+
+// src/ui/music-pill/index.ts
+var _MusicPill = class _MusicPill extends St3.Widget {
+  constructor(settings) {
+    super({
+      style_class: "music-pill-container",
+      reactive: false,
+      layout_manager: new Clutter3.BinLayout(),
+      y_expand: true,
+      y_align: Clutter3.ActorAlign.FILL,
+      x_align: Clutter3.ActorAlign.CENTER,
+      opacity: 0,
+      width: 0,
+      visible: false
+    });
+    __publicField(this, "textBlock");
+    __publicField(this, "_settings");
+    __publicField(this, "_state");
+    __publicField(this, "_body");
+    __publicField(this, "_artWidget");
+    __publicField(this, "_currentStatus", "Stopped");
+    this._settings = settings;
+    this._state = {
+      lastScrollTime: 0,
+      isActive: false,
+      targetWidth: 250,
+      paddingX: 14,
+      paddingY: 6,
+      radius: 28,
+      shadowCSS: "box-shadow: none",
+      inPanel: false,
+      gameMode: false,
+      currentBusName: null,
+      displayedColor: { r: 40, g: 40, b: 40 },
+      targetColor: { r: 40, g: 40, b: 40 },
+      colorAnimId: null,
+      hideGraceTimer: null,
+      lastBodyCss: null,
+      lastLeftCss: null,
+      lastRightCss: null
+    };
+    this._body = new St3.BoxLayout({
+      style_class: "pill-body",
+      x_expand: false,
+      y_expand: false,
+      y_align: Clutter3.ActorAlign.CENTER
+    });
+    this._body.set_pivot_point(0.5, 0.5);
+    this._artWidget = new CrossfadeArt();
+    const artBin = new St3.Bin({
+      child: this._artWidget,
+      style: "margin-right: 8px;",
+      x_expand: false,
+      y_expand: false
+    });
+    this.textBlock = new TextBlock();
+    this._body.add_child(artBin);
+    this._body.add_child(this.textBlock);
+    this.add_child(this._body);
+  }
+  updateDimensions() {
+    const height = this._settings.pill.dockHeight;
+    const width = this._settings.pill.dynamicWidth ? -1 : this._settings.pill.dockWidth;
+    this._state.targetWidth = width === -1 ? 250 : width;
+    this._body.set_height(height);
+    if (width > 0) {
+      this._body.set_width(width);
+    }
+    this.set_height(height);
+  }
+  updateDisplay(payload) {
+    if (!this.get_parent()) {
+      return;
+    }
+    const hasContent = !!(payload.title || payload.status === "Playing" || payload.status === "Paused");
+    this.setStatus(payload.status);
+    this.setBusName(payload.busName);
+    if (payload.title) {
+      this.setTitle(payload.title);
+    }
+    if (payload.artist !== void 0) {
+      this.setArtist(payload.artist);
+    }
+    if (payload.artUrl !== void 0) {
+      this.setArtUrl(payload.artUrl);
+    }
+    this.textBlock.setPlayerPaused(payload.status !== "Playing");
+    if (hasContent) {
+      this.showActive();
+    } else {
+      this.hideInactive();
+    }
+  }
+  setTitle(title) {
+    this.textBlock.setTitle(title);
+  }
+  setArtist(artist) {
+    this.textBlock.setArtist(artist);
+  }
+  setArtUrl(url) {
+    if (!this._settings.pill.showAlbumArt) {
+      return;
+    }
+    if (url) {
+      this._artWidget.setArt(url, true);
+    }
+  }
+  setStatus(status) {
+    this._currentStatus = status;
+  }
+  setBusName(busName) {
+    this._state.currentBusName = busName;
+  }
+  showActive() {
+    this._state.isActive = true;
+    this.visible = true;
+    this.reactive = true;
+    this.set_width(-1);
+    this.opacity = 255;
+    this.updateDimensions();
+  }
+  hideInactive() {
+    if (this._settings.pill.alwaysShow && this._state.currentBusName) {
+      this.textBlock.setTitle("Sem m\xEDdia");
+      this.textBlock.setArtist("Aguardando reprodu\xE7\xE3o...");
+      this.showActive();
+      return;
+    }
+    this._state.isActive = false;
+    this.reactive = false;
+    this.opacity = 0;
+    this.visible = false;
+    this.set_width(0);
+  }
+};
+GObject7.registerClass(_MusicPill);
+var MusicPill = _MusicPill;
+
+// src/ui/music-pill/positioning/inject.ts
+import GLib8 from "gi://GLib";
+
+// src/ui/music-pill/positioning/container-resolver.ts
+import * as Main from "resource:///org/gnome/shell/ui/main.js";
+function resolveTargetContainer(targetContainer) {
+  var _a;
+  const panel2 = Main.panel;
+  const statusArea = panel2.statusArea;
+  if (targetContainer === 0) {
+    const dtd = (_a = statusArea["dash-to-dock"]) != null ? _a : statusArea["ubuntu-dock"];
+    const dashBox = dtd == null ? void 0 : dtd._box;
+    return dashBox != null ? dashBox : Main.overview.dash._box;
+  }
+  if (targetContainer === 1) {
+    return panel2._leftBox;
+  }
+  if (targetContainer === 2) {
+    return panel2._centerBox;
+  }
+  if (targetContainer === 3) {
+    return panel2._rightBox;
+  }
+  return null;
+}
+function isDockContainer(container) {
+  var _a;
+  const panel2 = Main.panel;
+  const statusArea = panel2.statusArea;
+  const dtd = (_a = statusArea["dash-to-dock"]) != null ? _a : statusArea["ubuntu-dock"];
+  if (dtd && dtd._box === container) {
+    return true;
+  }
+  return Main.overview.dash._box === container;
+}
+
+// src/ui/music-pill/positioning/drag-fix.ts
+function setupDragFix(container, pill, getIsMoving, setIsMoving) {
+  const dash = container._delegate;
+  if (!(dash == null ? void 0 : dash.handleDragOver) || dash._musicPillOrigHandleDragOver) {
+    return;
+  }
+  const adjustX = (x) => {
+    if (!pill || pill.get_parent() !== container) {
+      return x;
+    }
+    const pillWidth = pill.get_width();
+    const pillX = pill.x;
+    if (x > pillX + pillWidth) {
+      return x - pillWidth;
+    }
+    if (x >= pillX) {
+      return pillX;
+    }
+    return x;
+  };
+  const adjustWidth = (fn) => {
+    const pillWidth = (pill == null ? void 0 : pill.get_parent()) === container ? pill.get_width() : 0;
+    if (pillWidth > 0) {
+      Object.defineProperty(container, "width", {
+        get() {
+          return container.get_width() - pillWidth;
+        },
+        configurable: true,
+        enumerable: false
+      });
+    }
+    try {
+      return fn();
+    } finally {
+      if (pillWidth > 0) {
+        Reflect.deleteProperty(container, "width");
+      }
+    }
+  };
+  dash._musicPillOrigHandleDragOver = dash.handleDragOver;
+  dash.handleDragOver = (source, actor, x, y, time) => adjustWidth(() => dash._musicPillOrigHandleDragOver.call(dash, source, actor, adjustX(x), y, time));
+  if (typeof dash.acceptDrop === "function") {
+    dash._musicPillOrigAcceptDrop = dash.acceptDrop;
+    dash.acceptDrop = (source, actor, x, y, time) => {
+      const parent = pill.get_parent();
+      if (parent) {
+        setIsMoving(true);
+        parent.remove_child(pill);
+      }
+      const result = dash._musicPillOrigAcceptDrop.call(dash, source, actor, adjustX(x), y, time);
+      if (parent) {
+        parent.insert_child_at_index(pill, 0);
+      }
+      setIsMoving(false);
+      return result;
+    };
+  }
+}
+function teardownDragFix(container) {
+  const dash = container._delegate;
+  if (!dash) {
+    return;
+  }
+  if (dash._musicPillOrigHandleDragOver) {
+    dash.handleDragOver = dash._musicPillOrigHandleDragOver;
+    delete dash._musicPillOrigHandleDragOver;
+  }
+  if (dash._musicPillOrigAcceptDrop) {
+    dash.acceptDrop = dash._musicPillOrigAcceptDrop;
+    delete dash._musicPillOrigAcceptDrop;
+  }
+}
+
+// src/ui/music-pill/positioning/inject.ts
+function createPillInjector(pill, settings) {
+  let injectTimeout = null;
+  let currentDock = null;
+  let isMovingItem = false;
+  let isUserDragging = false;
+  function ensurePosition(container) {
+    if (isMovingItem || isUserDragging) {
+      return false;
+    }
+    const mode = settings.pill.alignmentPreset;
+    const manualIndex = settings.pill.manualIndex;
+    const children = container.get_children();
+    const otherChildren = children.filter((c) => c !== pill);
+    const realItemCount = otherChildren.length;
+    let targetIndex = 0;
+    if (mode === 0) {
+      targetIndex = manualIndex;
+    } else if (mode === 1) {
+      targetIndex = 0;
+    } else if (mode === 2) {
+      targetIndex = Math.floor(realItemCount / 2);
+    } else if (mode === 3) {
+      targetIndex = realItemCount;
+    }
+    targetIndex = Math.max(0, Math.min(targetIndex, realItemCount));
+    let currentIndex = children.indexOf(pill);
+    const pillParent = pill.get_parent();
+    if (currentIndex === -1 && pillParent === container) {
+      currentIndex = 0;
+    }
+    if (pillParent && pillParent !== container) {
+      pillParent.remove_child(pill);
+      currentIndex = -1;
+    }
+    if (currentIndex !== targetIndex) {
+      isMovingItem = true;
+      if (currentIndex !== -1) {
+        container.set_child_at_index(pill, targetIndex);
+      } else {
+        container.insert_child_at_index(pill, targetIndex);
+      }
+      isMovingItem = false;
+      return true;
+    }
+    return false;
+  }
+  function inject() {
+    var _a, _b;
+    if (injectTimeout !== null) {
+      GLib8.source_remove(injectTimeout);
+      injectTimeout = null;
+    }
+    const target = settings.style.targetContainer;
+    const container = resolveTargetContainer(target);
+    if (!container) {
+      return;
+    }
+    const oldParent = pill.get_parent();
+    const parentChanged = oldParent !== null && oldParent !== container;
+    if (parentChanged && oldParent) {
+      oldParent.remove_child(pill);
+      if (currentDock == null ? void 0 : currentDock.disconnectObject) {
+        currentDock.disconnectObject(pill);
+        currentDock = null;
+      }
+      teardownDragFix(container);
+    }
+    if (target === 0 && currentDock !== container) {
+      currentDock = container;
+      (_a = container.connectObject) == null ? void 0 : _a.call(container, "child-added", () => {
+        if (!isMovingItem) {
+          queueInject();
+        }
+      }, pill);
+      (_b = container.connectObject) == null ? void 0 : _b.call(container, "child-removed", () => {
+        if (!isMovingItem) {
+          queueInject();
+        }
+      }, pill);
+    }
+    const moved = ensurePosition(container);
+    if (parentChanged || moved || !oldParent) {
+      pill.updateDimensions();
+    }
+    if (target === 0) {
+      setupDragFix(container, pill, () => isMovingItem, (v) => {
+        isMovingItem = v;
+      });
+    }
+  }
+  function queueInject() {
+    if (injectTimeout !== null) {
+      GLib8.source_remove(injectTimeout);
+    }
+    injectTimeout = GLib8.timeout_add(GLib8.PRIORITY_DEFAULT, 100, () => {
+      inject();
+      injectTimeout = null;
+      return GLib8.SOURCE_REMOVE;
+    });
+  }
+  function destroy() {
+    if (injectTimeout !== null) {
+      GLib8.source_remove(injectTimeout);
+      injectTimeout = null;
+    }
+    if (currentDock == null ? void 0 : currentDock.disconnectObject) {
+      currentDock.disconnectObject(pill);
+      currentDock = null;
+    }
+    const parent = pill.get_parent();
+    if (parent && isDockContainer(parent)) {
+      teardownDragFix(parent);
+    }
+  }
+  return { inject, queueInject, destroy };
+}
+
+// src/controllers/music-controller.ts
+var MusicController = class {
+  constructor(context) {
+    __publicField(this, "_context");
+    __publicField(this, "_pill", null);
+    __publicField(this, "_injector", null);
+    __publicField(this, "_lastWinnerName", null);
+    __publicField(this, "_lastActionTime", 0);
+    __publicField(this, "_lastDisplay", null);
+    __publicField(this, "_updateTimeoutId", null);
+    __publicField(this, "_watchdogId", null);
+    __publicField(this, "_signalIds", []);
+    __publicField(this, "_settingsSignalIds", []);
+    __publicField(this, "_overviewDragBegin", 0);
+    __publicField(this, "_overviewDragEnd", 0);
+    __publicField(this, "_isShuttingDown", false);
+    this._context = context;
+  }
+  enable() {
+    this._isShuttingDown = false;
+    this._createPill();
+    const { mpris, settings } = this._context;
+    mpris.setSystemSettings(settings.system);
+    this._bindMprisSignals(mpris);
+    this._bindSettingsSignals();
+    if (Main2.layoutManager._startingUp) {
+      const startupId = Main2.layoutManager.connect("startup-complete", () => {
+        Main2.layoutManager.disconnect(startupId);
+        this._doEnable();
+      });
+    } else {
+      this._doEnable();
+    }
+  }
+  disable() {
+    var _a;
+    this._isShuttingDown = true;
+    if (this._updateTimeoutId !== null) {
+      GLib9.source_remove(this._updateTimeoutId);
+      this._updateTimeoutId = null;
+    }
+    if (this._watchdogId !== null) {
+      GLib9.source_remove(this._watchdogId);
+      this._watchdogId = null;
+    }
+    for (const id of this._signalIds) {
+      this._context.mpris.disconnect(id);
+    }
+    this._signalIds = [];
+    for (const id of this._settingsSignalIds) {
+      this._context.settings.gioInternal.disconnect(id);
+    }
+    this._settingsSignalIds = [];
+    if (this._overviewDragBegin) {
+      Main2.overview.disconnect(this._overviewDragBegin);
+      this._overviewDragBegin = 0;
+    }
+    if (this._overviewDragEnd) {
+      Main2.overview.disconnect(this._overviewDragEnd);
+      this._overviewDragEnd = 0;
+    }
+    (_a = this._injector) == null ? void 0 : _a.destroy();
+    this._injector = null;
+    if (this._pill) {
+      this._pill.destroy();
+      this._pill = null;
+    }
+    this._lastDisplay = null;
+    this._lastWinnerName = null;
+  }
+  togglePlayback() {
+    const player = this._getActivePlayerInstance();
+    player == null ? void 0 : player.playPause();
+  }
+  next() {
+    var _a;
+    this._lastActionTime = Date.now();
+    (_a = this._getActivePlayerInstance()) == null ? void 0 : _a.next();
+    this.triggerUpdate();
+  }
+  previous() {
+    var _a;
+    this._lastActionTime = Date.now();
+    (_a = this._getActivePlayerInstance()) == null ? void 0 : _a.previous();
+    this.triggerUpdate();
+  }
+  triggerUpdate() {
+    if (this._updateTimeoutId !== null) {
+      return;
+    }
+    const delay = this._context.settings.system.compatibilityDelay ? 800 : 150;
+    this._updateTimeoutId = GLib9.timeout_add(GLib9.PRIORITY_DEFAULT, delay, () => {
+      this._updateTimeoutId = null;
+      this._updateUI();
+      return GLib9.SOURCE_REMOVE;
+    });
+  }
+  _doEnable() {
+    var _a;
+    this._context.mpris.start(this._context.settings.system);
+    (_a = this._injector) == null ? void 0 : _a.inject();
+    this._watchdogId = GLib9.timeout_add_seconds(GLib9.PRIORITY_DEFAULT, 5, () => {
+      var _a2, _b;
+      if (this._isShuttingDown) {
+        return GLib9.SOURCE_REMOVE;
+      }
+      if (!((_a2 = this._pill) == null ? void 0 : _a2.get_parent())) {
+        (_b = this._injector) == null ? void 0 : _b.queueInject();
+      }
+      return GLib9.SOURCE_CONTINUE;
+    });
+    this._overviewDragBegin = Main2.overview.connect("item-drag-begin", () => {
+    });
+    this._overviewDragEnd = Main2.overview.connect("item-drag-end", () => {
+      var _a2;
+      (_a2 = this._injector) == null ? void 0 : _a2.queueInject();
+    });
+    this._context.mpris.rescan();
+    this.triggerUpdate();
+  }
+  _createPill() {
+    if (this._pill) {
+      return;
+    }
+    this._pill = new MusicPill(this._context.settings);
+    this._injector = createPillInjector(this._pill, this._context.settings);
+    this._pill.connect("destroy", () => {
+      var _a;
+      this._pill = null;
+      if (!this._isShuttingDown) {
+        (_a = this._injector) == null ? void 0 : _a.queueInject();
+      }
+    });
+  }
+  _bindMprisSignals(mpris) {
+    const handler = () => this.triggerUpdate();
+    this._signalIds.push(
+      mpris.connect("player-added", handler),
+      mpris.connect("player-removed", handler),
+      mpris.connect("player-state-changed", handler),
+      mpris.connect("player-track-changed", handler),
+      mpris.connect("player-status-changed", handler)
+    );
+  }
+  _bindSettingsSignals() {
+    const { settings, mpris } = this._context;
+    const rescan = () => {
+      mpris.setSystemSettings(settings.system);
+      mpris.rescan();
+      this.triggerUpdate();
+    };
+    const reinject = () => {
+      var _a;
+      return (_a = this._injector) == null ? void 0 : _a.queueInject();
+    };
+    this._settingsSignalIds.push(
+      settings.gioInternal.connect("changed::player-filter-mode", rescan),
+      settings.gioInternal.connect("changed::player-filter-list", rescan),
+      settings.gioInternal.connect("changed::target-container", reinject),
+      settings.gioInternal.connect("changed::position-mode", reinject),
+      settings.gioInternal.connect("changed::dock-position", reinject),
+      settings.gioInternal.connect("changed::selected-player-bus", () => this.triggerUpdate())
+    );
+  }
+  _getActivePlayerInstance() {
+    return getActivePlayer({
+      settings: this._context.settings,
+      players: this._context.mpris.getPlayers(),
+      lastActionTime: this._lastActionTime,
+      lastWinnerName: this._lastWinnerName
+    });
+  }
+  _updateUI() {
+    var _a;
+    if (!this._pill) {
+      this._createPill();
+    }
+    if (!this._pill) {
+      return;
+    }
+    if (!this._pill.get_parent()) {
+      (_a = this._injector) == null ? void 0 : _a.inject();
+    }
+    const active = this._getActivePlayerInstance();
+    if (!active) {
+      this._pill.updateDisplay({
+        title: void 0,
+        artist: void 0,
+        artUrl: void 0,
+        status: "Stopped",
+        busName: null
+      });
+      return;
+    }
+    if (this._lastWinnerName !== active.getBusName()) {
+      this._lastDisplay = null;
+    }
+    this._lastWinnerName = active.getBusName();
+    const display = resolveDisplayTrack(active, this._lastDisplay);
+    this._lastDisplay = display;
+    const status = active.getPlayerInfo().playbackStatus;
+    this._pill.updateDisplay({
+      title: display.title,
+      artist: display.artist,
+      artUrl: display.artUrl,
+      status,
+      busName: display.busName
+    });
+  }
+};
+
 // src/extension.ts
 var instance = null;
 function getAppContext() {
@@ -1194,24 +2802,12 @@ function getAppContext() {
   return instance.context;
 }
 var DynamicMusicPillExtension = class extends extension_exports.Extension {
-  /**
-   * Creates a new instance of the DynamicMusicPillExtension
-   * @param metadata Extension metadata
-   */
   constructor(metadata) {
     super(metadata);
-    /**
-     * Application context containing references to key components
-     */
     __publicField(this, "context");
-    /**
-     * MPRIS provider for music control
-     */
     __publicField(this, "mpris");
-    /**
-     * Settings provider for extension configuration
-     */
     __publicField(this, "settings");
+    __publicField(this, "controller");
     instance = this;
     loadEnv();
     this.initTranslations("dynamic-music-pill");
@@ -1222,43 +2818,17 @@ var DynamicMusicPillExtension = class extends extension_exports.Extension {
       settings: this.settings,
       mpris: this.mpris
     };
-    this.mpris.connect("player-added", this._playerAdded.bind(this));
-    this.mpris.connect("player-removed", this._playerRemoved.bind(this));
-    this.mpris.connect("player-state-changed", this._playerStateChanged.bind(this));
-    this.mpris.connect("player-track-changed", this._playerTrackChanged.bind(this));
-    this.mpris.connect("player-status-changed", this._playerPlaybackStatusChanged.bind(this));
+    this.controller = new MusicController(this.context);
   }
-  /**
-   * Enables the extension
-   * Starts the MPRIS provider and logs information
-   */
   enable() {
     logInfo("Extension enabled.");
     logInfo(isDevelopment() ? "Is Dev" : "Is Not Dev");
-    this.mpris.start();
+    this.controller.enable();
   }
-  /**
-   * Disables the extension
-   * Stops the MPRIS provider and logs a warning
-   */
   disable() {
+    this.controller.disable();
     this.mpris.stop();
     logWarning("Extension disabled.");
-  }
-  _playerAdded(provider, name, player) {
-    logInfo(`Player added: ${name} ${player.getOwner()}`);
-  }
-  _playerRemoved(provider, name) {
-    logInfo(`Player removed: ${name}`);
-  }
-  _playerStateChanged(provider, name, player) {
-    logInfo(`Player state changed: ${name} ${JSON.stringify(player.getPlayerInfo() || {})}`);
-  }
-  _playerTrackChanged(provider, name, player) {
-    logInfo(`Player track changed: ${name} ${JSON.stringify(player.getTrackInfo() || {})}`);
-  }
-  _playerPlaybackStatusChanged(provider, name, status) {
-    logInfo(`Player playback status changed: ${name} ${status}`);
   }
 };
 export {

@@ -70,6 +70,10 @@ const map = createSettingsMap({
         key: 'hide-auto-smart-selection',
         default: false
     },
+    selectedPlayerBus: {
+        key: 'selected-player-bus',
+        default: ''
+    },
     showAlbumTitle: {
         key: 'popup-show-album-title',
         default: false
