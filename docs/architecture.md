@@ -41,15 +41,18 @@ Saída na raiz: `extension.js`, `prefs.js` e source maps.
 src/
 ├── extension.ts          # Ponto de entrada da extensão
 ├── prefs.ts              # Ponto de entrada das preferências
-├── controllers/          # Lógica de controle (ex.: music-controller)
+├── controllers/          # MusicController + active-player
 ├── providers/            # MPRIS e configurações
-│   ├── mpris-provider.ts
-│   ├── settings-provider/
-│   └── mock/             # Provider mock para desenvolvimento
+│   ├── mpris-provider/
+│   └── settings-provider/
+├── services/             # Letras (LyricsClient)
 ├── ui/
-│   ├── music-pill/       # Widget principal no painel/dock
-│   └── preferences/      # Abas e linhas de preferências
-├── components/           # Widgets reutilizáveis (St)
+│   ├── music-pill/       # Widget no dock/painel
+│   ├── expanded-player/  # Pop-up
+│   ├── player-selector/  # Menu de players
+│   ├── visualizers/      # Barras simuladas
+│   └── preferences/      # Abas Adw
+├── components/           # CrossfadeArt, ScrollLabel, etc.
 ├── interfaces/           # Contratos (ex.: IMPrisProvider)
 ├── types/                # Tipos auxiliares
 ├── constants/            # Constantes MPRIS, log, etc.

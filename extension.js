@@ -227,7 +227,7 @@ function createSettingsGroup(settings, map9) {
           return settings.get_string(entry.key);
       }
     },
-    set(_, prop, value) {
+    set(_2, prop, value) {
       const entry = map9[prop];
       const type = typeof entry.default;
       switch (type) {
@@ -1066,6 +1066,48 @@ var _MediaPlayer = class _MediaPlayer extends GObject.Object {
       null
     );
   }
+  setPosition(positionUs) {
+    var _a;
+    const trackId = ((_a = this._state.trackInfo) == null ? void 0 : _a.trackId) || "/org/mpris/MediaPlayer2/TrackList/NoTrack";
+    this._connection.call_sync(
+      this._busName,
+      MPRIS_OBJECT,
+      MPRIS_INTERFACE,
+      "SetPosition",
+      new GLib4.Variant("(ox)", [trackId, positionUs]),
+      null,
+      Gio3.DBusCallFlags.NONE,
+      -1,
+      null
+    );
+    this._state.player.position = positionUs;
+  }
+  raise() {
+    this._connection.call_sync(
+      this._busName,
+      MPRIS_OBJECT,
+      PLAYER_INTERFACE,
+      "Raise",
+      null,
+      null,
+      Gio3.DBusCallFlags.NONE,
+      -1,
+      null
+    );
+  }
+  quit() {
+    this._connection.call_sync(
+      this._busName,
+      MPRIS_OBJECT,
+      PLAYER_INTERFACE,
+      "Quit",
+      null,
+      null,
+      Gio3.DBusCallFlags.NONE,
+      -1,
+      null
+    );
+  }
   removePlayer() {
     logDebug(`Removing MediaPlayer for ${this._busName}`);
     this._mpris.emit("player-removed", this._busName, this);
@@ -1422,8 +1464,8 @@ GObject2.registerClass({
 var MPRISProvider = _MPRISProvider;
 
 // src/controllers/music-controller.ts
-import GLib9 from "gi://GLib";
-import * as Main2 from "resource:///org/gnome/shell/ui/main.js";
+import GLib12 from "gi://GLib";
+import * as Main5 from "resource:///org/gnome/shell/ui/main.js";
 
 // src/controllers/active-player.ts
 var BROWSER_PATTERN = /chrome|chromium|firefox|brave|edge|opera/;
@@ -1534,9 +1576,10 @@ function isBrowserBus(busName) {
 }
 
 // src/ui/music-pill/index.ts
-import GObject7 from "gi://GObject";
-import St3 from "gi://St";
-import Clutter3 from "gi://Clutter";
+import GObject9 from "gi://GObject";
+import St5 from "gi://St";
+import Clutter5 from "gi://Clutter";
+import GLib9 from "gi://GLib";
 
 // node_modules/.pnpm/@girs+st-18@18.0.0-4.0.4/node_modules/@girs/st-18/st-18.js
 import St from "gi://St?version=18";
@@ -2218,26 +2261,195 @@ var TextBlock = class extends St2.BoxLayout {
   }
 };
 
+// src/ui/visualizers/waveform.ts
+import GObject8 from "gi://GObject";
+import St4 from "gi://St";
+import Clutter4 from "gi://Clutter";
+
+// src/ui/visualizers/simulated.ts
+import GObject7 from "gi://GObject";
+import GLib8 from "gi://GLib";
+import St3 from "gi://St";
+import Clutter3 from "gi://Clutter";
+var _SimulatedVisualizer = class _SimulatedVisualizer extends St3.BoxLayout {
+  constructor(settings, isPopup = false) {
+    super({
+      style: "spacing: 2px;",
+      y_align: Clutter3.ActorAlign.CENTER,
+      x_align: Clutter3.ActorAlign.END
+    });
+    __publicField(this, "_settings");
+    __publicField(this, "_isPopup");
+    __publicField(this, "_bars", []);
+    __publicField(this, "_timer", null);
+    __publicField(this, "_playing", false);
+    __publicField(this, "_mode", 1);
+    __publicField(this, "_color", { r: 255, g: 255, b: 255 });
+    this._settings = settings;
+    this._isPopup = isPopup;
+    this._rebuildBars();
+  }
+  setMode(mode) {
+    this._mode = mode;
+    this.visible = mode !== 0;
+    if (mode === 0) {
+      this.setPlaying(false);
+    }
+  }
+  setColor(c) {
+    this._color = c;
+    this._applyBarStyles();
+  }
+  setPlaying(playing) {
+    this._playing = playing && this._mode !== 0;
+    if (this._playing) {
+      this._start();
+    } else {
+      this._stop();
+      for (const bar of this._bars) {
+        bar.set_height(2);
+      }
+    }
+  }
+  updateBarCount() {
+    this._rebuildBars();
+  }
+  _barCount() {
+    return this._isPopup ? this._settings.popup.popupVisualizerBars || 10 : this._settings.style.visualizerBarCount || 10;
+  }
+  _barWidth() {
+    return this._isPopup ? this._settings.popup.popupVisualizerBarWidth || 2 : this._settings.style.visualizerBarWidth || 2;
+  }
+  _rebuildBars() {
+    this.destroy_all_children();
+    this._bars = [];
+    const count = this._barCount();
+    const width = this._barWidth();
+    for (let i = 0; i < count; i++) {
+      const bar = new St3.Widget({
+        width,
+        height: 2,
+        style: `background-color: rgb(${this._color.r},${this._color.g},${this._color.b}); border-radius: 2px;`
+      });
+      this._bars.push(bar);
+      this.add_child(bar);
+    }
+  }
+  _applyBarStyles() {
+    for (const bar of this._bars) {
+      bar.set_style(`background-color: rgb(${this._color.r},${this._color.g},${this._color.b}); border-radius: 2px;`);
+    }
+  }
+  _start() {
+    if (this._timer !== null) {
+      return;
+    }
+    this._timer = GLib8.timeout_add(GLib8.PRIORITY_DEFAULT, 50, () => {
+      if (!this._playing) {
+        this._timer = null;
+        return GLib8.SOURCE_REMOVE;
+      }
+      const maxH = Math.max(8, this.get_height() || 24);
+      for (const bar of this._bars) {
+        const h = this._mode === 2 ? Math.max(2, Math.floor(maxH * (0.3 + Math.random() * 0.7))) : Math.max(2, Math.floor(maxH * Math.random()));
+        bar.set_height(h);
+      }
+      return GLib8.SOURCE_CONTINUE;
+    });
+  }
+  _stop() {
+    if (this._timer !== null) {
+      GLib8.source_remove(this._timer);
+      this._timer = null;
+    }
+  }
+  destroy() {
+    this._stop();
+    super.destroy();
+  }
+};
+GObject7.registerClass(_SimulatedVisualizer);
+var SimulatedVisualizer = _SimulatedVisualizer;
+
+// src/ui/visualizers/waveform.ts
+var _WaveformVisualizer = class _WaveformVisualizer extends St4.Bin {
+  constructor(defaultHeight = 24, settings, isPopup = false) {
+    super({
+      y_align: Clutter4.ActorAlign.CENTER,
+      x_align: Clutter4.ActorAlign.END,
+      y_expand: true,
+      height: defaultHeight
+    });
+    __publicField(this, "_settings");
+    __publicField(this, "_isPopup");
+    __publicField(this, "_simulated");
+    __publicField(this, "_mode", 1);
+    __publicField(this, "_playing", false);
+    __publicField(this, "_maxHeight", null);
+    this._settings = settings;
+    this._isPopup = isPopup;
+    this._simulated = new SimulatedVisualizer(settings, isPopup);
+    this.set_child(this._simulated);
+    this._updateSize();
+  }
+  setHeightClamped(maxH) {
+    this._maxHeight = maxH;
+    this._updateSize();
+  }
+  setMode(mode) {
+    this._mode = mode === 3 ? 2 : mode;
+    this._simulated.setMode(this._mode);
+    this._simulated.setPlaying(this._playing);
+    this.visible = this._mode !== 0;
+  }
+  setColor(c) {
+    this._simulated.setColor(c);
+  }
+  setPlaying(playing) {
+    this._playing = playing;
+    this._simulated.setPlaying(playing);
+  }
+  _updateSize() {
+    let h = this._isPopup ? this._settings.popup.popupVisualizerHeight || 80 : this._settings.style.visualizerHeight || 24;
+    if (this._maxHeight && !this._isPopup) {
+      h = Math.min(h, this._maxHeight);
+    }
+    this.set_height(h);
+    this._simulated.set_height(h);
+    this._simulated.updateBarCount();
+  }
+};
+GObject8.registerClass(_WaveformVisualizer);
+var WaveformVisualizer = _WaveformVisualizer;
+
 // src/ui/music-pill/index.ts
-var _MusicPill = class _MusicPill extends St3.Widget {
+var _MusicPill = class _MusicPill extends St5.Widget {
   constructor(settings) {
     super({
       style_class: "music-pill-container",
-      reactive: false,
-      layout_manager: new Clutter3.BinLayout(),
+      reactive: true,
+      layout_manager: new Clutter5.BinLayout(),
       y_expand: true,
-      y_align: Clutter3.ActorAlign.FILL,
-      x_align: Clutter3.ActorAlign.CENTER,
+      y_align: Clutter5.ActorAlign.FILL,
+      x_align: Clutter5.ActorAlign.CENTER,
       opacity: 0,
       width: 0,
-      visible: false
+      visible: false,
+      can_focus: true,
+      track_hover: true
     });
     __publicField(this, "textBlock");
     __publicField(this, "_settings");
     __publicField(this, "_state");
     __publicField(this, "_body");
     __publicField(this, "_artWidget");
+    __publicField(this, "_artBin");
+    __publicField(this, "_visualizer");
     __publicField(this, "_currentStatus", "Stopped");
+    __publicField(this, "_lastArtUrl", null);
+    __publicField(this, "_onAction", null);
+    __publicField(this, "_clickTimer", null);
+    __publicField(this, "_lastClick", 0);
     this._settings = settings;
     this._state = {
       lastScrollTime: 0,
@@ -2258,24 +2470,42 @@ var _MusicPill = class _MusicPill extends St3.Widget {
       lastLeftCss: null,
       lastRightCss: null
     };
-    this._body = new St3.BoxLayout({
+    this._body = new St5.BoxLayout({
       style_class: "pill-body",
       x_expand: false,
       y_expand: false,
-      y_align: Clutter3.ActorAlign.CENTER
+      y_align: Clutter5.ActorAlign.CENTER,
+      style: "spacing: 6px;"
     });
     this._body.set_pivot_point(0.5, 0.5);
     this._artWidget = new CrossfadeArt();
-    const artBin = new St3.Bin({
+    this._artBin = new St5.Bin({
       child: this._artWidget,
-      style: "margin-right: 8px;",
+      style: "margin-right: 4px;",
       x_expand: false,
       y_expand: false
     });
     this.textBlock = new TextBlock();
-    this._body.add_child(artBin);
+    this._visualizer = new WaveformVisualizer(24, settings, false);
+    this._visualizer.setMode(settings.style.visualizerAnimation || 1);
+    this._body.add_child(this._artBin);
     this._body.add_child(this.textBlock);
+    this._body.add_child(this._visualizer);
     this.add_child(this._body);
+    this.connect("button-release-event", (_a, event) => this._onButton(event));
+    this.connect("scroll-event", (_a, event) => this._onScroll(event));
+  }
+  setActionHandler(handler) {
+    this._onAction = handler;
+  }
+  get displayedColor() {
+    return this._state.displayedColor;
+  }
+  get lastArtUrl() {
+    return this._lastArtUrl;
+  }
+  get currentBgAlpha() {
+    return 0.95;
   }
   updateDimensions() {
     const height = this._settings.pill.dockHeight;
@@ -2286,24 +2516,26 @@ var _MusicPill = class _MusicPill extends St3.Widget {
       this._body.set_width(width);
     }
     this.set_height(height);
+    this._visualizer.setHeightClamped(Math.max(8, height - 8));
   }
   updateDisplay(payload) {
     if (!this.get_parent()) {
       return;
     }
     const hasContent = !!(payload.title || payload.status === "Playing" || payload.status === "Paused");
-    this.setStatus(payload.status);
-    this.setBusName(payload.busName);
+    this._currentStatus = payload.status;
+    this._state.currentBusName = payload.busName;
     if (payload.title) {
-      this.setTitle(payload.title);
+      this.textBlock.setTitle(payload.title);
     }
     if (payload.artist !== void 0) {
-      this.setArtist(payload.artist);
+      this.textBlock.setArtist(payload.artist);
     }
     if (payload.artUrl !== void 0) {
       this.setArtUrl(payload.artUrl);
     }
     this.textBlock.setPlayerPaused(payload.status !== "Playing");
+    this._visualizer.setPlaying(payload.status === "Playing" && !this._settings.popup.hidePillVisualizer);
     if (hasContent) {
       this.showActive();
     } else {
@@ -2318,10 +2550,16 @@ var _MusicPill = class _MusicPill extends St3.Widget {
   }
   setArtUrl(url) {
     if (!this._settings.pill.showAlbumArt) {
+      this._artBin.hide();
       return;
     }
     if (url) {
+      this._artBin.show();
       this._artWidget.setArt(url, true);
+      this._lastArtUrl = url;
+    } else {
+      this._artBin.hide();
+      this._lastArtUrl = null;
     }
   }
   setStatus(status) {
@@ -2350,13 +2588,73 @@ var _MusicPill = class _MusicPill extends St3.Widget {
     this.opacity = 0;
     this.visible = false;
     this.set_width(0);
+    this._visualizer.setPlaying(false);
+  }
+  _emit(action) {
+    var _a;
+    if (action && action !== "none") {
+      (_a = this._onAction) == null ? void 0 : _a.call(this, action);
+    }
+  }
+  _onButton(event) {
+    const button = event.get_button();
+    if (button === 2) {
+      this._emit(this._settings.mouseActions.middleClick);
+      return Clutter5.EVENT_STOP;
+    }
+    if (button === 3) {
+      this._emit(this._settings.mouseActions.rightClick);
+      return Clutter5.EVENT_STOP;
+    }
+    if (button !== 1) {
+      return Clutter5.EVENT_PROPAGATE;
+    }
+    const now = Date.now();
+    const doubleAction = this._settings.mouseActions.doubleClick;
+    const singleAction = this._settings.mouseActions.leftClick;
+    if (!doubleAction || doubleAction === "none") {
+      this._emit(singleAction);
+      return Clutter5.EVENT_STOP;
+    }
+    if (this._lastClick && now - this._lastClick <= 220) {
+      this._lastClick = 0;
+      if (this._clickTimer !== null) {
+        GLib9.source_remove(this._clickTimer);
+        this._clickTimer = null;
+      }
+      this._emit(doubleAction);
+    } else {
+      this._lastClick = now;
+      if (this._clickTimer !== null) {
+        GLib9.source_remove(this._clickTimer);
+      }
+      this._clickTimer = GLib9.timeout_add(GLib9.PRIORITY_DEFAULT, 220, () => {
+        this._clickTimer = null;
+        this._lastClick = 0;
+        this._emit(singleAction);
+        return GLib9.SOURCE_REMOVE;
+      });
+    }
+    return Clutter5.EVENT_STOP;
+  }
+  _onScroll(event) {
+    const dir = event.get_scroll_direction();
+    if (dir === Clutter5.ScrollDirection.UP) {
+      this._emit("previous");
+      return Clutter5.EVENT_STOP;
+    }
+    if (dir === Clutter5.ScrollDirection.DOWN) {
+      this._emit("next");
+      return Clutter5.EVENT_STOP;
+    }
+    return Clutter5.EVENT_PROPAGATE;
   }
 };
-GObject7.registerClass(_MusicPill);
+GObject9.registerClass(_MusicPill);
 var MusicPill = _MusicPill;
 
 // src/ui/music-pill/positioning/inject.ts
-import GLib8 from "gi://GLib";
+import GLib10 from "gi://GLib";
 
 // src/ui/music-pill/positioning/container-resolver.ts
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
@@ -2514,7 +2812,7 @@ function createPillInjector(pill, settings) {
   function inject() {
     var _a, _b;
     if (injectTimeout !== null) {
-      GLib8.source_remove(injectTimeout);
+      GLib10.source_remove(injectTimeout);
       injectTimeout = null;
     }
     const target = settings.style.targetContainer;
@@ -2557,17 +2855,17 @@ function createPillInjector(pill, settings) {
   }
   function queueInject() {
     if (injectTimeout !== null) {
-      GLib8.source_remove(injectTimeout);
+      GLib10.source_remove(injectTimeout);
     }
-    injectTimeout = GLib8.timeout_add(GLib8.PRIORITY_DEFAULT, 100, () => {
+    injectTimeout = GLib10.timeout_add(GLib10.PRIORITY_DEFAULT, 100, () => {
       inject();
       injectTimeout = null;
-      return GLib8.SOURCE_REMOVE;
+      return GLib10.SOURCE_REMOVE;
     });
   }
   function destroy() {
     if (injectTimeout !== null) {
-      GLib8.source_remove(injectTimeout);
+      GLib10.source_remove(injectTimeout);
       injectTimeout = null;
     }
     if (currentDock == null ? void 0 : currentDock.disconnectObject) {
@@ -2582,12 +2880,715 @@ function createPillInjector(pill, settings) {
   return { inject, queueInject, destroy };
 }
 
+// src/ui/expanded-player/index.ts
+import GObject14 from "gi://GObject";
+import GLib11 from "gi://GLib";
+import St10 from "gi://St";
+import Clutter10 from "gi://Clutter";
+import * as Main3 from "resource:///org/gnome/shell/ui/main.js";
+
+// src/utils/dash-to-dock.ts
+import * as Main2 from "resource:///org/gnome/shell/ui/main.js";
+var disableRequests = 0;
+var dockManager = null;
+var importPromise = null;
+function initDTDModule() {
+  let ext = Main2.extensionManager.lookup("dash-to-dock@micxgx.gmail.com");
+  if (!ext || ext.state !== 1) {
+    ext = Main2.extensionManager.lookup("ubuntu-dock@ubuntu.com");
+  }
+  if (!ext || ext.state !== 1) {
+    return null;
+  }
+  if (importPromise) {
+    return importPromise;
+  }
+  importPromise = import(`file://${ext.path}/extension.js`).then((mod) => {
+    var _a;
+    dockManager = (_a = mod.dockManager) != null ? _a : null;
+    if (disableRequests > 0) {
+      applyDisable();
+    }
+  }).catch((e) => {
+    logDebug(`DTD import error: ${e.message}`);
+    importPromise = null;
+  });
+  return importPromise;
+}
+function applyDisable() {
+  if (!(dockManager == null ? void 0 : dockManager._allDocks)) {
+    return;
+  }
+  try {
+    for (const dock of dockManager._allDocks) {
+      dock.dash.requiresVisibility = true;
+      dock._show();
+    }
+  } catch (e) {
+    logDebug(`DTD disable error: ${e.message}`);
+  }
+}
+function applyRestore() {
+  if (!(dockManager == null ? void 0 : dockManager._allDocks)) {
+    return;
+  }
+  try {
+    for (const dock of dockManager._allDocks) {
+      dock.dash.requiresVisibility = false;
+      dock._updateDashVisibility();
+    }
+  } catch (e) {
+    logDebug(`DTD restore error: ${e.message}`);
+  }
+}
+function disableDashToDockAutohide() {
+  disableRequests++;
+  if (disableRequests === 1) {
+    if (dockManager) {
+      applyDisable();
+    } else {
+      initDTDModule();
+    }
+  }
+}
+function restoreDashToDockAutohide() {
+  if (disableRequests <= 0) {
+    return;
+  }
+  disableRequests--;
+  if (disableRequests === 0 && dockManager) {
+    applyRestore();
+  }
+}
+
+// src/ui/expanded-player/components/track-info.ts
+import GObject10 from "gi://GObject";
+import St6 from "gi://St";
+import Clutter6 from "gi://Clutter";
+var _TrackInfoBlock = class _TrackInfoBlock extends St6.BoxLayout {
+  constructor() {
+    super({
+      vertical: true,
+      x_expand: true,
+      y_align: Clutter6.ActorAlign.CENTER,
+      style: "spacing: 4px;"
+    });
+    __publicField(this, "_title");
+    __publicField(this, "_artist");
+    this._title = new ScrollLabel("music-label-title");
+    this._artist = new ScrollLabel("music-label-artist");
+    this.add_child(this._title);
+    this.add_child(this._artist);
+  }
+  setTitle(text) {
+    this._title.setText(text || "", true, 0);
+  }
+  setArtist(text) {
+    this._artist.setText(text || "", true);
+  }
+  setPaused(paused) {
+    this._title.setPlayerPaused(paused);
+    this._artist.setPlayerPaused(paused);
+  }
+};
+GObject10.registerClass(_TrackInfoBlock);
+var TrackInfoBlock = _TrackInfoBlock;
+
+// src/ui/expanded-player/components/progress-bar.ts
+import GObject11 from "gi://GObject";
+import St7 from "gi://St";
+import Clutter7 from "gi://Clutter";
+
+// src/utils/time.ts
+function formatTime(microSeconds, forceHours = false) {
+  if (!microSeconds || microSeconds < 0) {
+    return forceHours ? "0:00:00" : "0:00";
+  }
+  const totalSeconds = Math.floor(microSeconds / 1e6);
+  const hours = Math.floor(totalSeconds / 3600);
+  const min = Math.floor(totalSeconds % 3600 / 60);
+  const sec = totalSeconds % 60;
+  const pad = (n) => n < 10 ? `0${n}` : `${n}`;
+  if (forceHours || hours > 0) {
+    return `${hours}:${pad(min)}:${pad(sec)}`;
+  }
+  return `${min}:${pad(sec)}`;
+}
+
+// src/ui/expanded-player/components/progress-bar.ts
+var _ProgressBar = class _ProgressBar extends St7.BoxLayout {
+  constructor() {
+    super({
+      vertical: false,
+      x_expand: true,
+      style: "spacing: 8px;",
+      y_align: Clutter7.ActorAlign.CENTER
+    });
+    __publicField(this, "_current");
+    __publicField(this, "_total");
+    __publicField(this, "_fill");
+    __publicField(this, "_track");
+    __publicField(this, "_onSeek", null);
+    __publicField(this, "_length", 0);
+    __publicField(this, "_forceHours", false);
+    this._current = new St7.Label({ text: "0:00", y_align: Clutter7.ActorAlign.CENTER });
+    this._total = new St7.Label({ text: "0:00", y_align: Clutter7.ActorAlign.CENTER });
+    this._track = new St7.Widget({
+      style_class: "music-pill-progress-track",
+      style: "background-color: rgba(255,255,255,0.2); border-radius: 3px; height: 6px;",
+      x_expand: true,
+      reactive: true,
+      height: 6
+    });
+    this._fill = new St7.Widget({
+      style: "background-color: rgba(255,255,255,0.85); border-radius: 3px; height: 6px;",
+      height: 6,
+      width: 0
+    });
+    this._track.add_child(this._fill);
+    this._track.connect("button-release-event", (_a, event) => {
+      if (!this._onSeek) {
+        return Clutter7.EVENT_PROPAGATE;
+      }
+      const [ex] = event.get_coords();
+      const [tx] = this._track.get_transformed_position();
+      const w = this._track.get_width() || 1;
+      const ratio = Math.max(0, Math.min(1, (ex - tx) / w));
+      this._onSeek(ratio);
+      return Clutter7.EVENT_STOP;
+    });
+    this.add_child(this._current);
+    this.add_child(this._track);
+    this.add_child(this._total);
+  }
+  setSeekHandler(handler) {
+    this._onSeek = handler;
+  }
+  setForceHours(force) {
+    this._forceHours = force;
+  }
+  update(position, length) {
+    this._length = length;
+    this._current.text = formatTime(position, this._forceHours);
+    this._total.text = formatTime(length, this._forceHours);
+    const w = this._track.get_width() || 0;
+    const ratio = length > 0 ? Math.max(0, Math.min(1, position / length)) : 0;
+    this._fill.set_width(Math.floor(w * ratio));
+  }
+};
+GObject11.registerClass(_ProgressBar);
+var ProgressBar = _ProgressBar;
+
+// src/ui/expanded-player/components/transport-controls.ts
+import GObject12 from "gi://GObject";
+import St8 from "gi://St";
+import Clutter8 from "gi://Clutter";
+var _TransportControls = class _TransportControls extends St8.BoxLayout {
+  constructor(callbacks) {
+    super({
+      vertical: false,
+      x_align: Clutter8.ActorAlign.CENTER,
+      style: "spacing: 12px;"
+    });
+    __publicField(this, "_prev");
+    __publicField(this, "_play");
+    __publicField(this, "_next");
+    __publicField(this, "_playIcon");
+    this._prev = this._iconButton("media-skip-backward-symbolic", () => callbacks.onPrevious());
+    this._playIcon = new St8.Icon({ icon_name: "media-playback-start-symbolic", icon_size: 28 });
+    this._play = new St8.Button({
+      child: this._playIcon,
+      reactive: true,
+      can_focus: true,
+      style_class: "music-pill-transport-btn"
+    });
+    this._play.connect("clicked", () => callbacks.onPlayPause());
+    this._next = this._iconButton("media-skip-forward-symbolic", () => callbacks.onNext());
+    this.add_child(this._prev);
+    this.add_child(this._play);
+    this.add_child(this._next);
+  }
+  setStatus(status) {
+    this._playIcon.icon_name = status === "Playing" ? "media-playback-pause-symbolic" : "media-playback-start-symbolic";
+  }
+  setCapabilities(canPrev, canPlay, canNext) {
+    this._prev.opacity = canPrev ? 255 : 80;
+    this._play.opacity = canPlay ? 255 : 80;
+    this._next.opacity = canNext ? 255 : 80;
+    this._prev.reactive = canPrev;
+    this._play.reactive = canPlay;
+    this._next.reactive = canNext;
+  }
+  _iconButton(iconName, onClick) {
+    const btn = new St8.Button({
+      child: new St8.Icon({ icon_name: iconName, icon_size: 22 }),
+      reactive: true,
+      can_focus: true,
+      style_class: "music-pill-transport-btn"
+    });
+    btn.connect("clicked", onClick);
+    return btn;
+  }
+};
+GObject12.registerClass(_TransportControls);
+var TransportControls = _TransportControls;
+
+// src/ui/expanded-player/components/vinyl-art.ts
+import GObject13 from "gi://GObject";
+import St9 from "gi://St";
+import Clutter9 from "gi://Clutter";
+var _VinylArt = class _VinylArt extends St9.Bin {
+  constructor() {
+    super({
+      width: 96,
+      height: 96,
+      x_align: Clutter9.ActorAlign.CENTER,
+      y_align: Clutter9.ActorAlign.CENTER
+    });
+    __publicField(this, "_art");
+    __publicField(this, "_url", null);
+    __publicField(this, "_spinning", false);
+    __publicField(this, "_square", false);
+    this._art = new St9.Widget({
+      width: 96,
+      height: 96,
+      style: "border-radius: 48px; background-size: cover; background-color: rgba(40,40,40,0.8);"
+    });
+    this.set_child(this._art);
+  }
+  setSquare(square) {
+    this._square = square;
+    this._refreshStyle();
+  }
+  setArt(url) {
+    this._url = url;
+    this._refreshStyle();
+  }
+  setSpinning(spinning) {
+    if (this._spinning === spinning) {
+      return;
+    }
+    this._spinning = spinning;
+    this._art.remove_all_transitions();
+    if (spinning) {
+      this._art.set_pivot_point(0.5, 0.5);
+      this._spinOnce();
+    } else {
+      this._art.rotation_angle_z = 0;
+    }
+  }
+  _spinOnce() {
+    if (!this._spinning) {
+      return;
+    }
+    this._art.ease({
+      rotation_angle_z: this._art.rotation_angle_z + 360,
+      duration: 8e3,
+      mode: Clutter9.AnimationMode.LINEAR,
+      onStopped: (finished) => {
+        if (finished && this._spinning) {
+          this._spinOnce();
+        }
+      }
+    });
+  }
+  _refreshStyle() {
+    const radius = this._square ? 12 : 48;
+    const bg = this._url ? `background-image: url("${this._url}");` : "background-color: rgba(40,40,40,0.8);";
+    this._art.set_style(`border-radius: ${radius}px; background-size: cover; ${bg}`);
+  }
+};
+GObject13.registerClass(_VinylArt);
+var VinylArt = _VinylArt;
+
+// src/ui/expanded-player/index.ts
+var _ExpandedPlayer = class _ExpandedPlayer extends St10.Widget {
+  constructor(host) {
+    const [bgW, bgH] = global.display.get_size();
+    super({
+      width: bgW,
+      height: bgH,
+      reactive: true,
+      visible: false,
+      x: 0,
+      y: 0
+    });
+    __publicField(this, "box");
+    __publicField(this, "_host");
+    __publicField(this, "_player", null);
+    __publicField(this, "_timer", null);
+    __publicField(this, "_vinyl");
+    __publicField(this, "_info");
+    __publicField(this, "_progress");
+    __publicField(this, "_transport");
+    __publicField(this, "_visualizer");
+    __publicField(this, "_bgBtn");
+    this._host = host;
+    this._bgBtn = new St10.Button({
+      style: "background-color: transparent;",
+      reactive: true,
+      x_expand: true,
+      y_expand: true,
+      width: bgW,
+      height: bgH
+    });
+    this._bgBtn.connect("clicked", () => this.hidePopup());
+    this.add_child(this._bgBtn);
+    this.box = new PixelSnappedBox({
+      style_class: "music-pill-expanded",
+      reactive: true,
+      style: "padding: 16px; border-radius: 16px; background-color: rgba(30,30,30,0.95);"
+    });
+    this.box.layout_manager.orientation = Clutter10.Orientation.VERTICAL;
+    this.add_child(this.box);
+    this._vinyl = new VinylArt();
+    this._vinyl.setSquare(host.settings.popup.squareVinyl);
+    this._info = new TrackInfoBlock();
+    this._visualizer = new WaveformVisualizer(80, host.settings, true);
+    this._visualizer.setMode(host.settings.style.visualizerAnimation || 1);
+    const top = new St10.BoxLayout({ vertical: false, style: "spacing: 16px;", x_expand: true });
+    top.add_child(this._vinyl);
+    const mid = new St10.BoxLayout({ vertical: true, x_expand: true, style: "spacing: 8px;" });
+    mid.add_child(this._info);
+    mid.add_child(this._visualizer);
+    top.add_child(mid);
+    this.box.add_child(top);
+    this._progress = new ProgressBar();
+    this._progress.setForceHours(host.settings.popup.showHoursFormat);
+    this._progress.setSeekHandler((ratio) => this._onSeek(ratio));
+    this.box.add_child(this._progress);
+    this._transport = new TransportControls({
+      onPrevious: () => this._host.previous(),
+      onPlayPause: () => this._host.togglePlayback(),
+      onNext: () => this._host.next()
+    });
+    this.box.add_child(this._transport);
+    this.connect("key-press-event", (_a, event) => {
+      if (event.get_key_symbol() === Clutter10.KEY_Escape) {
+        this.hidePopup();
+        return Clutter10.EVENT_STOP;
+      }
+      return Clutter10.EVENT_PROPAGATE;
+    });
+    this.connect("destroy", () => this._cleanup());
+  }
+  setPlayer(player) {
+    this._player = player;
+  }
+  updateStyle(r, g, b, alpha = 0.95) {
+    this.box.set_style(
+      `padding: 16px; border-radius: 16px; background-color: rgba(${r},${g},${b},${alpha});`
+    );
+    this._visualizer.setColor({ r, g, b });
+  }
+  updateContent(title, artist, artUrl, status) {
+    this._info.setTitle(title || "");
+    this._info.setArtist(artist || "");
+    this._info.setPaused(status !== "Playing");
+    this._transport.setStatus(status);
+    if (this._host.settings.popup.showVinyl) {
+      this._vinyl.visible = true;
+      this._vinyl.setArt(artUrl);
+      this._vinyl.setSpinning(status === "Playing" && this._host.settings.popup.vinylRotate);
+    } else {
+      this._vinyl.visible = false;
+      this._vinyl.setSpinning(false);
+    }
+    if (this._host.settings.popup.showVisualizer) {
+      this._visualizer.visible = true;
+      this._visualizer.setPlaying(status === "Playing");
+    } else {
+      this._visualizer.visible = false;
+      this._visualizer.setPlaying(false);
+    }
+    if (this._player) {
+      const info = this._player.getPlayerInfo();
+      this._transport.setCapabilities(info.canGoPrevious, info.canPlay || info.canPause, info.canGoNext);
+    }
+  }
+  showFor(player, artUrl) {
+    var _a, _b, _c;
+    this._player = player;
+    const track = player.getTrackInfo();
+    const status = player.getPlayerInfo().playbackStatus;
+    this.updateContent((_a = track == null ? void 0 : track.title) != null ? _a : null, (_c = (_b = track == null ? void 0 : track.artist) == null ? void 0 : _b.join(", ")) != null ? _c : null, artUrl, status);
+    this._startTimer();
+    disableDashToDockAutohide();
+    this.visible = true;
+    this.opacity = 0;
+    this.ease({
+      opacity: 255,
+      duration: 180,
+      mode: Clutter10.AnimationMode.EASE_OUT_QUAD
+    });
+    global.stage.set_key_focus(this);
+  }
+  hidePopup() {
+    this._stopTimer();
+    restoreDashToDockAutohide();
+    this.ease({
+      opacity: 0,
+      duration: 150,
+      mode: Clutter10.AnimationMode.EASE_OUT_QUAD,
+      onStopped: () => {
+        this.visible = false;
+        this.destroy();
+      }
+    });
+  }
+  /** Alias used by controller to match legacy `hide()`. */
+  hide() {
+    this.hidePopup();
+  }
+  setPositionNearPill(px, py, pw, ph) {
+    var _a;
+    const monitor = (_a = Main3.layoutManager.findMonitorForActor(this)) != null ? _a : Main3.layoutManager.primaryMonitor;
+    if (!monitor) {
+      return;
+    }
+    this.box.set_width(-1);
+    const [, natW] = this.box.get_preferred_width(-1);
+    const [, natH] = this.box.get_preferred_height(natW);
+    let w = this._host.settings.popup.useCustomWidth ? Math.max(this._host.settings.popup.customWidth, 280) : Math.min(Math.max(natW || 320, 280), 600);
+    const h = natH > 0 ? natH : 220;
+    let x = px + (pw - w) / 2;
+    let y = py - h - 12;
+    if (y < monitor.y + 8) {
+      y = py + ph + 12;
+    }
+    x = Math.max(monitor.x + 8, Math.min(x, monitor.x + monitor.width - w - 8));
+    this.box.set_position(Math.round(x), Math.round(y));
+    this.box.set_size(Math.round(w), Math.round(h));
+  }
+  _onSeek(ratio) {
+    var _a;
+    if (!this._player) {
+      return;
+    }
+    const length = ((_a = this._player.getTrackInfo()) == null ? void 0 : _a.length) || 0;
+    if (length <= 0) {
+      return;
+    }
+    this._host.seekTo(this._player, Math.floor(length * ratio));
+  }
+  _startTimer() {
+    this._stopTimer();
+    this._timer = GLib11.timeout_add(GLib11.PRIORITY_DEFAULT, 500, () => {
+      this._tick();
+      return GLib11.SOURCE_CONTINUE;
+    });
+    this._tick();
+  }
+  _stopTimer() {
+    if (this._timer !== null) {
+      GLib11.source_remove(this._timer);
+      this._timer = null;
+    }
+  }
+  _tick() {
+    var _a;
+    if (!this._player) {
+      return;
+    }
+    const info = this._player.getPlayerInfo();
+    const length = ((_a = this._player.getTrackInfo()) == null ? void 0 : _a.length) || 0;
+    this._progress.update(info.position, length);
+    this._transport.setStatus(info.playbackStatus);
+    this._transport.setCapabilities(info.canGoPrevious, info.canPlay || info.canPause, info.canGoNext);
+  }
+  _cleanup() {
+    this._stopTimer();
+    restoreDashToDockAutohide();
+    this._player = null;
+  }
+};
+GObject14.registerClass(_ExpandedPlayer);
+var ExpandedPlayer = _ExpandedPlayer;
+
+// src/ui/player-selector/index.ts
+import GObject15 from "gi://GObject";
+import St11 from "gi://St";
+import Clutter11 from "gi://Clutter";
+import * as Main4 from "resource:///org/gnome/shell/ui/main.js";
+import { gettext as _ } from "resource:///org/gnome/shell/extensions/extension.js";
+
+// src/utils/player-icon.ts
+import Gio5 from "gi://Gio";
+function getPlayerIcon(player, busName) {
+  var _a, _b;
+  const names = [];
+  const desktopEntry = (_a = player == null ? void 0 : player.getDesktopEntry) == null ? void 0 : _a.call(player);
+  if (desktopEntry) {
+    const de = desktopEntry.replace(".desktop", "");
+    names.push(de, de.toLowerCase());
+  }
+  if (busName) {
+    const raw = busName.replace("org.mpris.MediaPlayer2.", "").split(".")[0];
+    names.push(raw.toLowerCase(), raw);
+  }
+  const identity = (_b = player == null ? void 0 : player.getIdentity) == null ? void 0 : _b.call(player);
+  if (identity) {
+    const id = identity.toLowerCase().replace(/ /g, "-");
+    names.push(id);
+  }
+  names.push("audio-x-generic");
+  for (const name of names) {
+    if (!name) {
+      continue;
+    }
+    const icon = Gio5.ThemedIcon.new(name);
+    if (icon) {
+      return icon;
+    }
+  }
+  return Gio5.ThemedIcon.new("audio-x-generic");
+}
+
+// src/ui/player-selector/index.ts
+var _PlayerSelectorMenu = class _PlayerSelectorMenu extends St11.Widget {
+  constructor(host) {
+    const [bgW, bgH] = global.display.get_size();
+    super({
+      width: bgW,
+      height: bgH,
+      reactive: true,
+      visible: false,
+      x: 0,
+      y: 0
+    });
+    __publicField(this, "_host");
+    __publicField(this, "_box");
+    __publicField(this, "_bg");
+    this._host = host;
+    this._bg = new St11.Button({
+      style: "background-color: transparent;",
+      reactive: true,
+      x_expand: true,
+      y_expand: true,
+      width: bgW,
+      height: bgH
+    });
+    this._bg.connect("clicked", () => this.hideMenu());
+    this.add_child(this._bg);
+    this._box = new St11.BoxLayout({
+      vertical: true,
+      reactive: true,
+      style: "padding: 12px; border-radius: 12px; background-color: rgba(30,30,30,0.95); spacing: 6px;"
+    });
+    this.add_child(this._box);
+    this.connect("key-press-event", (_a, event) => {
+      if (event.get_key_symbol() === Clutter11.KEY_Escape) {
+        this.hideMenu();
+        return Clutter11.EVENT_STOP;
+      }
+      return Clutter11.EVENT_PROPAGATE;
+    });
+  }
+  populate() {
+    this._box.destroy_all_children();
+    const title = new St11.Label({
+      text: _("Select Media Player"),
+      style: "font-weight: bold; margin-bottom: 8px;",
+      x_align: Clutter11.ActorAlign.CENTER
+    });
+    this._box.add_child(title);
+    const current = this._host.settings.popup.selectedPlayerBus;
+    if (!this._host.settings.popup.autoHidePlayer) {
+      this._box.add_child(this._row(
+        _("Auto (Smart Selection)"),
+        "emblem-system-symbolic",
+        current === "",
+        () => this._host.selectPlayer("")
+      ));
+    }
+    for (const player of this._host.getPlayers()) {
+      const bus = player.getBusName();
+      const identity = player.getIdentity() || bus.replace("org.mpris.MediaPlayer2.", "").split(".")[0];
+      this._box.add_child(this._row(
+        identity,
+        null,
+        current === bus,
+        () => this._host.selectPlayer(bus),
+        player,
+        bus
+      ));
+    }
+  }
+  showMenu(anchorX, anchorY, anchorW, anchorH) {
+    this.populate();
+    this.visible = true;
+    this.opacity = 0;
+    const [, natW] = this._box.get_preferred_width(-1);
+    const [, natH] = this._box.get_preferred_height(natW);
+    const w = Math.max(natW || 220, 200);
+    const h = natH || 120;
+    let x = anchorX + (anchorW - w) / 2;
+    let y = anchorY - h - 10;
+    const monitor = Main4.layoutManager.primaryMonitor;
+    if (!monitor) {
+      return;
+    }
+    if (y < monitor.y + 8) {
+      y = anchorY + anchorH + 10;
+    }
+    x = Math.max(monitor.x + 8, Math.min(x, monitor.x + monitor.width - w - 8));
+    this._box.set_position(Math.round(x), Math.round(y));
+    this._box.set_size(Math.round(w), Math.round(h));
+    this.ease({
+      opacity: 255,
+      duration: 150,
+      mode: Clutter11.AnimationMode.EASE_OUT_QUAD
+    });
+    global.stage.set_key_focus(this);
+  }
+  hideMenu() {
+    this.ease({
+      opacity: 0,
+      duration: 120,
+      mode: Clutter11.AnimationMode.EASE_OUT_QUAD,
+      onStopped: () => {
+        this.visible = false;
+        this._host.closePlayerMenu();
+      }
+    });
+  }
+  _row(label, iconName, selected, onClick, player, busName) {
+    const content = new St11.BoxLayout({ vertical: false, style: "spacing: 10px;" });
+    const icon = new St11.Icon({
+      icon_size: 22,
+      gicon: iconName ? null : getPlayerIcon(player != null ? player : null, busName != null ? busName : ""),
+      icon_name: iconName != null ? iconName : void 0
+    });
+    if (iconName) {
+      icon.icon_name = iconName;
+    }
+    content.add_child(icon);
+    content.add_child(new St11.Label({ text: label, y_align: Clutter11.ActorAlign.CENTER }));
+    const btn = new St11.Button({
+      child: content,
+      reactive: true,
+      can_focus: true,
+      x_expand: true,
+      style: `border-radius: 10px; padding: 8px; background-color: ${selected ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.05)"};`
+    });
+    btn.connect("clicked", () => {
+      onClick();
+      this.hideMenu();
+    });
+    return btn;
+  }
+};
+GObject15.registerClass(_PlayerSelectorMenu);
+var PlayerSelectorMenu = _PlayerSelectorMenu;
+
 // src/controllers/music-controller.ts
 var MusicController = class {
   constructor(context) {
     __publicField(this, "_context");
     __publicField(this, "_pill", null);
     __publicField(this, "_injector", null);
+    __publicField(this, "_expanded", null);
+    __publicField(this, "_playerMenu", null);
     __publicField(this, "_lastWinnerName", null);
     __publicField(this, "_lastActionTime", 0);
     __publicField(this, "_lastDisplay", null);
@@ -2602,14 +3603,14 @@ var MusicController = class {
   }
   enable() {
     this._isShuttingDown = false;
+    initDTDModule();
     this._createPill();
-    const { mpris, settings } = this._context;
-    mpris.setSystemSettings(settings.system);
-    this._bindMprisSignals(mpris);
+    this._context.mpris.setSystemSettings(this._context.settings.system);
+    this._bindMprisSignals(this._context.mpris);
     this._bindSettingsSignals();
-    if (Main2.layoutManager._startingUp) {
-      const startupId = Main2.layoutManager.connect("startup-complete", () => {
-        Main2.layoutManager.disconnect(startupId);
+    if (Main5.layoutManager._startingUp) {
+      const startupId = Main5.layoutManager.connect("startup-complete", () => {
+        Main5.layoutManager.disconnect(startupId);
         this._doEnable();
       });
     } else {
@@ -2619,29 +3620,12 @@ var MusicController = class {
   disable() {
     var _a;
     this._isShuttingDown = true;
-    if (this._updateTimeoutId !== null) {
-      GLib9.source_remove(this._updateTimeoutId);
-      this._updateTimeoutId = null;
-    }
-    if (this._watchdogId !== null) {
-      GLib9.source_remove(this._watchdogId);
-      this._watchdogId = null;
-    }
-    for (const id of this._signalIds) {
-      this._context.mpris.disconnect(id);
-    }
-    this._signalIds = [];
-    for (const id of this._settingsSignalIds) {
-      this._context.settings.gioInternal.disconnect(id);
-    }
-    this._settingsSignalIds = [];
-    if (this._overviewDragBegin) {
-      Main2.overview.disconnect(this._overviewDragBegin);
-      this._overviewDragBegin = 0;
-    }
-    if (this._overviewDragEnd) {
-      Main2.overview.disconnect(this._overviewDragEnd);
-      this._overviewDragEnd = 0;
+    this._clearTimers();
+    this._unbindSignals();
+    this.closePlayerMenu();
+    if (this._expanded) {
+      this._expanded.destroy();
+      this._expanded = null;
     }
     (_a = this._injector) == null ? void 0 : _a.destroy();
     this._injector = null;
@@ -2652,9 +3636,40 @@ var MusicController = class {
     this._lastDisplay = null;
     this._lastWinnerName = null;
   }
+  performAction(action) {
+    var _a, _b;
+    switch (action) {
+      case "play_pause":
+        this.togglePlayback();
+        break;
+      case "next":
+        this.next();
+        break;
+      case "previous":
+        this.previous();
+        break;
+      case "toggle_menu":
+        this.toggleMenu();
+        break;
+      case "open_player_menu":
+        this.togglePlayerMenu();
+        break;
+      case "open_settings":
+        this._context.extension.openPreferences();
+        break;
+      case "open_app":
+        (_a = this._getActivePlayerInstance()) == null ? void 0 : _a.raise();
+        break;
+      case "close_app":
+        (_b = this._getActivePlayerInstance()) == null ? void 0 : _b.quit();
+        break;
+      default:
+        logDebug(`Unknown action: ${action}`);
+    }
+  }
   togglePlayback() {
-    const player = this._getActivePlayerInstance();
-    player == null ? void 0 : player.playPause();
+    var _a;
+    (_a = this._getActivePlayerInstance()) == null ? void 0 : _a.playPause();
   }
   next() {
     var _a;
@@ -2668,34 +3683,103 @@ var MusicController = class {
     (_a = this._getActivePlayerInstance()) == null ? void 0 : _a.previous();
     this.triggerUpdate();
   }
+  seekTo(player, positionUs) {
+    try {
+      player.setPosition(positionUs);
+      this.triggerUpdate();
+    } catch (e) {
+      logDebug(`seekTo failed: ${e.message}`);
+    }
+  }
+  selectPlayer(busName) {
+    this._context.settings.popup.selectedPlayerBus = busName;
+    this.triggerUpdate();
+  }
+  toggleMenu() {
+    if (this._expanded) {
+      this._expanded.hidePopup();
+      return;
+    }
+    const player = this._getActivePlayerInstance();
+    if (!player || !this._pill) {
+      return;
+    }
+    this._expanded = new ExpandedPlayer({
+      settings: this._context.settings,
+      togglePlayback: () => this.togglePlayback(),
+      next: () => this.next(),
+      previous: () => this.previous(),
+      seekTo: (p, pos) => this.seekTo(p, pos)
+    });
+    this._expanded.connect("destroy", () => {
+      this._expanded = null;
+    });
+    Main5.layoutManager.addChrome(this._expanded);
+    const color = this._pill.displayedColor;
+    this._expanded.updateStyle(color.r, color.g, color.b, this._pill.currentBgAlpha);
+    const [px, py] = this._pill.get_transformed_position();
+    const [pw, ph] = this._pill.get_transformed_size();
+    this._expanded.showFor(player, this._pill.lastArtUrl);
+    this._expanded.setPositionNearPill(px, py, pw, ph);
+  }
+  togglePlayerMenu() {
+    if (this._playerMenu) {
+      this._playerMenu.hideMenu();
+      return;
+    }
+    if (!this._pill) {
+      return;
+    }
+    this._playerMenu = new PlayerSelectorMenu({
+      settings: this._context.settings,
+      getPlayers: () => this._context.mpris.getPlayers(),
+      selectPlayer: (bus) => this.selectPlayer(bus),
+      closePlayerMenu: () => this.closePlayerMenu()
+    });
+    this._playerMenu.connect("destroy", () => {
+      this._playerMenu = null;
+    });
+    Main5.layoutManager.addChrome(this._playerMenu);
+    const [px, py] = this._pill.get_transformed_position();
+    const [pw, ph] = this._pill.get_transformed_size();
+    this._playerMenu.showMenu(px, py, pw, ph);
+  }
+  closePlayerMenu() {
+    if (!this._playerMenu) {
+      return;
+    }
+    Main5.layoutManager.removeChrome(this._playerMenu);
+    this._playerMenu.destroy();
+    this._playerMenu = null;
+  }
   triggerUpdate() {
     if (this._updateTimeoutId !== null) {
       return;
     }
     const delay = this._context.settings.system.compatibilityDelay ? 800 : 150;
-    this._updateTimeoutId = GLib9.timeout_add(GLib9.PRIORITY_DEFAULT, delay, () => {
+    this._updateTimeoutId = GLib12.timeout_add(GLib12.PRIORITY_DEFAULT, delay, () => {
       this._updateTimeoutId = null;
       this._updateUI();
-      return GLib9.SOURCE_REMOVE;
+      return GLib12.SOURCE_REMOVE;
     });
   }
   _doEnable() {
     var _a;
     this._context.mpris.start(this._context.settings.system);
     (_a = this._injector) == null ? void 0 : _a.inject();
-    this._watchdogId = GLib9.timeout_add_seconds(GLib9.PRIORITY_DEFAULT, 5, () => {
+    this._watchdogId = GLib12.timeout_add_seconds(GLib12.PRIORITY_DEFAULT, 5, () => {
       var _a2, _b;
       if (this._isShuttingDown) {
-        return GLib9.SOURCE_REMOVE;
+        return GLib12.SOURCE_REMOVE;
       }
       if (!((_a2 = this._pill) == null ? void 0 : _a2.get_parent())) {
         (_b = this._injector) == null ? void 0 : _b.queueInject();
       }
-      return GLib9.SOURCE_CONTINUE;
+      return GLib12.SOURCE_CONTINUE;
     });
-    this._overviewDragBegin = Main2.overview.connect("item-drag-begin", () => {
+    this._overviewDragBegin = Main5.overview.connect("item-drag-begin", () => {
     });
-    this._overviewDragEnd = Main2.overview.connect("item-drag-end", () => {
+    this._overviewDragEnd = Main5.overview.connect("item-drag-end", () => {
       var _a2;
       (_a2 = this._injector) == null ? void 0 : _a2.queueInject();
     });
@@ -2707,6 +3791,7 @@ var MusicController = class {
       return;
     }
     this._pill = new MusicPill(this._context.settings);
+    this._pill.setActionHandler((action) => this.performAction(action));
     this._injector = createPillInjector(this._pill, this._context.settings);
     this._pill.connect("destroy", () => {
       var _a;
@@ -2755,7 +3840,7 @@ var MusicController = class {
     });
   }
   _updateUI() {
-    var _a;
+    var _a, _b, _c, _d, _e;
     if (!this._pill) {
       this._createPill();
     }
@@ -2790,6 +3875,43 @@ var MusicController = class {
       status,
       busName: display.busName
     });
+    if ((_b = this._expanded) == null ? void 0 : _b.visible) {
+      this._expanded.setPlayer(active);
+      this._expanded.updateContent(
+        (_c = display.title) != null ? _c : null,
+        (_d = display.artist) != null ? _d : null,
+        (_e = display.artUrl) != null ? _e : null,
+        status
+      );
+    }
+  }
+  _clearTimers() {
+    if (this._updateTimeoutId !== null) {
+      GLib12.source_remove(this._updateTimeoutId);
+      this._updateTimeoutId = null;
+    }
+    if (this._watchdogId !== null) {
+      GLib12.source_remove(this._watchdogId);
+      this._watchdogId = null;
+    }
+  }
+  _unbindSignals() {
+    for (const id of this._signalIds) {
+      this._context.mpris.disconnect(id);
+    }
+    this._signalIds = [];
+    for (const id of this._settingsSignalIds) {
+      this._context.settings.gioInternal.disconnect(id);
+    }
+    this._settingsSignalIds = [];
+    if (this._overviewDragBegin) {
+      Main5.overview.disconnect(this._overviewDragBegin);
+      this._overviewDragBegin = 0;
+    }
+    if (this._overviewDragEnd) {
+      Main5.overview.disconnect(this._overviewDragEnd);
+      this._overviewDragEnd = 0;
+    }
   }
 };
 

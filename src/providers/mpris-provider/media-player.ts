@@ -154,6 +154,50 @@ export class MediaPlayer extends GObject.Object {
         );
     }
 
+    setPosition(positionUs: number): void {
+        const trackId = this._state.trackInfo?.trackId || "/org/mpris/MediaPlayer2/TrackList/NoTrack";
+        this._connection.call_sync(
+            this._busName,
+            MPRIS_OBJECT,
+            MPRIS_INTERFACE,
+            "SetPosition",
+            new GLib.Variant("(ox)", [trackId, positionUs]),
+            null,
+            Gio.DBusCallFlags.NONE,
+            -1,
+            null
+        );
+        this._state.player.position = positionUs;
+    }
+
+    raise(): void {
+        this._connection.call_sync(
+            this._busName,
+            MPRIS_OBJECT,
+            PLAYER_INTERFACE,
+            "Raise",
+            null,
+            null,
+            Gio.DBusCallFlags.NONE,
+            -1,
+            null
+        );
+    }
+
+    quit(): void {
+        this._connection.call_sync(
+            this._busName,
+            MPRIS_OBJECT,
+            PLAYER_INTERFACE,
+            "Quit",
+            null,
+            null,
+            Gio.DBusCallFlags.NONE,
+            -1,
+            null
+        );
+    }
+
     removePlayer(): void {
         logDebug(`Removing MediaPlayer for ${this._busName}`);
         this._mpris.emit("player-removed", this._busName, this);
