@@ -924,6 +924,7 @@ msgid ""
 "4. Look at the <b>wmclass:</b> or <b>app:</b> field. That is your App ID! "
 "<i>(Remove the .desktop part)</i>\n"
 "5. Press Esc to close the debugger."
+
 msgstr ""
 "Para permitir que a extensão abra/feche seu player, informe o nome exato da janela (App ID).\n"
 "\n"

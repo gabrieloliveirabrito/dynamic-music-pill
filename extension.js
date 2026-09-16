@@ -1,5 +1,7 @@
 var __defProp = Object.defineProperty;
+var __defProps = Object.defineProperties;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropDescs = Object.getOwnPropertyDescriptors;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getOwnPropSymbols = Object.getOwnPropertySymbols;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
@@ -16,6 +18,7 @@ var __spreadValues = (a, b) => {
     }
   return a;
 };
+var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
 var __export = (target, all) => {
   for (var name in all)
     __defProp(target, name, { get: all[name], enumerable: true });
@@ -31,16 +34,13 @@ var __copyProps = (to, from, except, desc) => {
 var __reExport = (target, mod, secondTarget) => (__copyProps(target, mod, "default"), secondTarget && __copyProps(secondTarget, mod, "default"));
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 
+// src/utils/log.ts
+import GLib2 from "gi://GLib";
+
 // src/constants/mpris-constants.ts
-var mpris_constants_exports = {};
-__export(mpris_constants_exports, {
-  DefaultTrackInfo: () => DefaultTrackInfo,
-  MPRIS_INTERFACE: () => MPRIS_INTERFACE,
-  MPRIS_OBJECT: () => MPRIS_OBJECT
-});
-var MPRIS_INTERFACE = "org.mpris.MediaPlayer2.Player";
+var PLAYER_INTERFACE = "org.mpris.MediaPlayer2";
+var MPRIS_INTERFACE = `${PLAYER_INTERFACE}.Player`;
 var MPRIS_OBJECT = "/org/mpris/MediaPlayer2";
-var DefaultTrackInfo = { length: 0, canGoNext: false, canGoPrevious: false, canPause: false, canPlay: false, canSeek: false, rate: 1 };
 
 // src/constants/log-constants.ts
 var log_constants_exports = {};
@@ -49,44 +49,108 @@ __export(log_constants_exports, {
 });
 var LOG_PREFIX = "[DMP]";
 
-// src/utils/log.ts
-var PREFIX = log_constants_exports.LOG_PREFIX;
-function logInfo(message) {
-  console.log(`${PREFIX} ${message}`);
-}
-function logWarning(message) {
-  console.warn(`${PREFIX} ${message}`);
-}
-function logDebug(message) {
-  console.log(`${PREFIX} [DEBUG] ${message}`);
-}
-function logTrace(message) {
-  console.trace(`${PREFIX} ${message}`);
-}
-function logObject(object) {
-  if (object === null) {
-    logTrace("Object is null");
-    return;
-  }
-  if (object === void 0) {
-    logTrace("Object is undefined");
-    return;
-  }
-  let inspected = JSON.stringify(object, (key, value) => {
-    if (value && value.deep_unpack) {
-      return value.deep_unpack();
-    }
-    return value;
-  });
-  logInfo(`Inspecting object ${inspected}`);
-}
-
 // node_modules/.pnpm/@girs+glib-2.0@2.88.0-4.0.4/node_modules/@girs/glib-2.0/glib-2.0.js
 import GLib from "gi://GLib?version=2.0";
 var glib_2_0_default = GLib;
 
 // node_modules/.pnpm/@girs+glib-2.0@2.88.0-4.0.4/node_modules/@girs/glib-2.0/index.js
 var glib_2_default = glib_2_0_default;
+
+// src/utils/packing.ts
+function smartUnpack(object) {
+  if (object === null || object === void 0) {
+    return null;
+  }
+  if (object instanceof glib_2_default.Variant || typeof object === "object") {
+    let unpacked = object.deepUnpack ? object.deepUnpack() : object;
+    if (!unpacked) {
+      return unpacked;
+    }
+    if (Array.isArray(unpacked)) {
+      return unpacked.map(smartUnpack);
+    }
+    const entries = Object.entries(unpacked);
+    if (entries.length === 0) {
+      return unpacked;
+    }
+    for (const [key, value] of entries) {
+      if (value instanceof glib_2_default.Variant) {
+        unpacked[key] = smartUnpack(value);
+      }
+    }
+    return unpacked;
+  }
+  return object;
+}
+
+// src/utils/log.ts
+var PREFIX = log_constants_exports.LOG_PREFIX;
+function logInfo(message) {
+  console.log(`${PREFIX} [INFO] ${message}`);
+}
+function logWarning(message) {
+  console.warn(`${PREFIX} [WARNING] ${message}`);
+}
+function logDebug(message) {
+  console.log(`${PREFIX} [DEBUG] ${message}`);
+}
+function logTrace(message) {
+  console.trace(`${PREFIX} [TRACE] ${message}`);
+}
+function logObject(object, options = { trace: false, json: false, treeLevel: 0 }) {
+  const { trace = false, json = false, treeLevel = 0 } = options;
+  const level = "-".repeat(treeLevel);
+  const nextLevel = `${level}-`;
+  const logFn = trace ? logTrace : logInfo;
+  if (object === null) {
+    logFn(`${nextLevel} Object is null`);
+    return;
+  }
+  if (object === void 0) {
+    logFn(`${nextLevel} Object is undefined`);
+    return;
+  }
+  if (object instanceof GLib2.Variant) {
+    const unpacked = smartUnpack(object);
+    if (json) {
+      logFn(`${nextLevel} Variant as JSON: ${JSON.stringify(unpacked)}`);
+      return;
+    }
+    logInfo(`${nextLevel} Variant`);
+    logObject(unpacked, __spreadProps(__spreadValues({}, options), { treeLevel: treeLevel + 1 }));
+    return;
+  }
+  if (typeof object === "string") {
+    logFn(`${nextLevel} String ${object}`);
+    return;
+  }
+  if (typeof object === "number") {
+    logFn(`${nextLevel} Number ${object}`);
+    return;
+  }
+  if (typeof object === "boolean") {
+    logFn(`${nextLevel} Boolean ${object}`);
+    return;
+  }
+  if (Array.isArray(object)) {
+    logInfo(`${nextLevel} Array`);
+    for (const item of object) {
+      logObject(item, __spreadProps(__spreadValues({}, options), { treeLevel: treeLevel + 1 }));
+    }
+    return;
+  }
+  const variant = object.deep_unpack ? smartUnpack(object) : object;
+  if (json) {
+    logFn(`${nextLevel} Object as JSON: ${JSON.stringify(variant)}`);
+  } else {
+    const keys = Object.keys(variant);
+    keys.forEach((key) => {
+      const child = variant[key];
+      logFn(`${nextLevel} ${key} - ${typeof child}`);
+      logObject(child, __spreadProps(__spreadValues({}, options), { treeLevel: treeLevel + 1 }));
+    });
+  }
+}
 
 // src/utils/development.ts
 function isDevelopment() {
@@ -110,147 +174,22 @@ var extension_exports = {};
 __reExport(extension_exports, extension_star);
 import * as extension_star from "resource:///org/gnome/shell/extensions/extension.js";
 
-// node_modules/.pnpm/@girs+gio-2.0@2.88.0-4.0.4/node_modules/@girs/gio-2.0/gio-2.0.js
-import Gio from "gi://Gio?version=2.0";
-var gio_2_0_default = Gio;
-
-// node_modules/.pnpm/@girs+gio-2.0@2.88.0-4.0.4/node_modules/@girs/gio-2.0/index.js
-var gio_2_default = gio_2_0_default;
-
-// src/utils/packing.ts
-function smartUnpack(object) {
-  if (object === null || object === void 0) {
-    return null;
-  }
-  if (object instanceof glib_2_default.Variant) {
-    return object.deepUnpack();
-  }
-  if (Array.isArray(object)) {
-    return object.map(smartUnpack);
-  }
-  return object;
-}
-
-// src/utils/mapper.ts
-function invokeMapper(mapper, key, value, parent) {
-  logInfo(`Mapping ${key}`);
-  const map8 = mapper[key];
-  if (map8) {
-    map8(parent, value);
-  } else {
-    logDebug(`Map for key ${key} to type ${typeof parent} hasn't been found!`);
-  }
-}
-function mapObject(object, mapper, parent = {}) {
-  for (let [key, value] of Object.entries(object)) {
-    value = smartUnpack(value);
-    if (!value) {
-      continue;
-    }
-    if (typeof value === "object" && !Array.isArray(value)) {
-      mapObject(value, mapper, parent);
-      continue;
-    }
-    invokeMapper(mapper, key, value, parent);
-  }
-  return parent;
-}
-
-// src/providers/mpris-provider.ts
-var MTRISMap = {
-  "PlaybackStatus": (s, v) => s.playbackStatus = v,
-  "xesam:title": (s, v) => s.title = v,
-  "xesam:artist": (s, v) => s.artist = v,
-  "xesam:album": (s, v) => s.album = v,
-  "mpris:artUrl": (s, v) => s.artUrl = v,
-  "mpris:length": (s, v) => s.length = v,
-  "mpris:trackid": (s, v) => s.trackId = v,
-  "CanPlay": (s, v) => s.canPlay = v,
-  "CanPause": (s, v) => s.canPause = v,
-  "CanSeek": (s, v) => s.canSeek = v,
-  "CanGoNext": (s, v) => s.canGoNext = v,
-  "CanGoPrevious": (s, v) => s.canGoPrevious = v,
-  "Rate": (s, v) => s.rate = v
-};
-function createMPRISProvider() {
-  const address = getDBusSessionAddress();
-  let callbacks = /* @__PURE__ */ new Map();
-  let connection = null;
-  let signalId = null;
-  let state = __spreadValues({}, DefaultTrackInfo);
-  function signalEmit(conn, sender_name, object_path, interface_name, signal_name, parameters) {
-    if (!object_path.startsWith(mpris_constants_exports.MPRIS_OBJECT)) {
-      return;
-    }
-    const unpacked = parameters.deep_unpack();
-    if (!Array.isArray(unpacked)) {
-      return;
-    }
-    const [iface, changed] = unpacked;
-    if (iface != mpris_constants_exports.MPRIS_INTERFACE) {
-      return;
-    }
-    logObject(changed);
-    state = mapObject(changed, MTRISMap, state);
-    callbacks.forEach((c) => c(state));
-  }
-  function start() {
-    logInfo("Creating DBus connection");
-    connection = gio_2_default.DBusConnection.new_for_address_sync(
-      address,
-      gio_2_default.DBusConnectionFlags.AUTHENTICATION_CLIENT | gio_2_default.DBusConnectionFlags.MESSAGE_BUS_CONNECTION,
-      null,
-      null
-    );
-    logInfo("Subscribe signal PropertiesChanged");
-    signalId = connection.signal_subscribe(
-      null,
-      "org.freedesktop.DBus.Properties",
-      "PropertiesChanged",
-      null,
-      null,
-      gio_2_default.DBusSignalFlags.NONE,
-      signalEmit
-    );
-  }
-  function stop() {
-    if (connection && signalId !== null) {
-      connection.signal_unsubscribe(signalId);
-      connection.close_sync(null);
-    }
-    connection = null;
-    signalId = null;
-    callbacks.clear();
-  }
-  function addCallback(name, callback) {
-    if (callbacks.has(name)) {
-      logError(`Callback ${name} already exists!`);
-      return;
-    }
-    callbacks.set(name, callback);
-  }
-  function removeCallback(name) {
-    if (!callbacks.has(name)) {
-      return false;
-    }
-    return callbacks.delete(name);
-  }
-  return { start, stop, addCallback, removeCallback };
-}
-
 // src/providers/settings-provider/utils.ts
-import Gio2 from "gi://Gio";
-function createSettingsMap(map8) {
-  return map8;
+import Gio from "gi://Gio";
+function createSettingsMap(map9) {
+  return map9;
 }
-function createSettingsGroup(settings, map8) {
+function getSettingsKeys(map9) {
+  return Object.values(map9).map((entry) => entry.key);
+}
+function createSettingsGroup(settings, map9) {
   const methods = {
-    bind(prop, object, property, flags = Gio2.SettingsBindFlags.DEFAULT) {
+    bind(prop, object, property, flags2 = Gio.SettingsBindFlags.DEFAULT) {
       settings.bind(
-        map8[prop].key,
+        map9[prop].key,
         object,
         property,
-        flags
+        flags2
       );
     },
     connect(signal, callback) {
@@ -261,7 +200,7 @@ function createSettingsGroup(settings, map8) {
     get(target, prop) {
       if (prop in target)
         return target[prop];
-      const entry = map8[prop];
+      const entry = map9[prop];
       const type = typeof entry.default;
       switch (type) {
         case "boolean":
@@ -273,7 +212,7 @@ function createSettingsGroup(settings, map8) {
       }
     },
     set(_, prop, value) {
-      const entry = map8[prop];
+      const entry = map9[prop];
       const type = typeof entry.default;
       switch (type) {
         case "boolean":
@@ -322,6 +261,7 @@ var map = createSettingsMap({
     default: true
   }
 });
+var ScrollControlSettingsKeys = getSettingsKeys(map);
 function createScrollControlsSettings(settings) {
   return createSettingsGroup(settings, map);
 }
@@ -333,6 +273,7 @@ var map2 = createSettingsMap({
     default: ""
   }
 });
+var FallbackArtSettingsKeys = getSettingsKeys(map2);
 function createFallbackArtsSettings(settings) {
   return createSettingsGroup(settings, map2);
 }
@@ -412,6 +353,7 @@ var map3 = createSettingsMap({
     default: 32
   }
 });
+var PillSettingsKeys = getSettingsKeys(map3);
 function createPillSettings(settings) {
   return createSettingsGroup(settings, map3);
 }
@@ -435,6 +377,7 @@ var map4 = createSettingsMap({
     default: 50
   }
 });
+var LyricsSettingsKeys = getSettingsKeys(map4);
 function createLyricsSettings(settings) {
   return createSettingsGroup(settings, map4);
 }
@@ -466,6 +409,7 @@ var map5 = createSettingsMap({
     default: 0
   }
 });
+var MouseActionsKeys = getSettingsKeys(map5);
 function createMouseActions(settings) {
   return createSettingsGroup(settings, map5);
 }
@@ -581,6 +525,7 @@ var map6 = createSettingsMap({
     default: "none"
   }
 });
+var PopupSettingsKeys = getSettingsKeys(map6);
 function createPopupSettings(settings) {
   return createSettingsGroup(settings, map6);
 }
@@ -658,13 +603,68 @@ var map7 = createSettingsMap({
   customTextColor: {
     key: "custom-text-color",
     default: "40,40,40"
+  },
+  panelArtSize: {
+    key: "panel-art-size",
+    default: 14
+  },
+  panelWidth: {
+    key: "panel-pill-width",
+    default: 100
+  },
+  panelHeight: {
+    key: "panel-pill-height",
+    default: 100
   }
 });
+var StyleSettingsKeys = getSettingsKeys(map7);
 function createStyleSettings(settings) {
   return createSettingsGroup(settings, map7);
 }
 
+// src/providers/settings-provider/system.ts
+var map8 = createSettingsMap({
+  hideDefaultPlayer: {
+    key: "hide-default-player",
+    default: false
+  },
+  gameMode: {
+    key: "enable-gamemode",
+    default: false
+  },
+  compatibilityDelay: {
+    key: "compatibility-delay",
+    default: false
+  },
+  playerFilterMode: {
+    key: "player-filter-mode",
+    default: 0
+  },
+  filteredPlayers: {
+    key: "player-filter-list",
+    default: ""
+  },
+  appNameMapping: {
+    key: "app-name-mapping",
+    default: ""
+  }
+});
+var SystemSettingsKeys = getSettingsKeys(map8);
+function createSystemSettings(settings) {
+  return createSettingsGroup(settings, map8);
+}
+
 // src/providers/settings-provider/index.ts
+var SettingsKeys = [
+  ...ScrollControlSettingsKeys,
+  ...FallbackArtSettingsKeys,
+  ...PillSettingsKeys,
+  ...LyricsSettingsKeys,
+  ...MouseActionsKeys,
+  ...PopupSettingsKeys,
+  ...StyleSettingsKeys,
+  ...SystemSettingsKeys
+];
 function createSettingsProvider(settings) {
   const scrollControls = createScrollControlsSettings(settings);
   const fallbackArt = createFallbackArtsSettings(settings);
@@ -673,20 +673,517 @@ function createSettingsProvider(settings) {
   const mouseActions = createMouseActions(settings);
   const popup = createPopupSettings(settings);
   const style = createStyleSettings(settings);
+  const system = createSystemSettings(settings);
   function connect(signal, callback) {
     return settings.connect(signal, callback);
   }
+  function emit(signal, ...args) {
+    settings.emit(signal, ...args);
+  }
   return {
+    gioInternal: settings,
     connect,
+    emit,
     scrollControls,
     fallbackArt,
     pill,
     lyrics,
     mouseActions,
     popup,
-    style
+    style,
+    system
   };
 }
+
+// src/utils/env.ts
+import GLib3 from "gi://GLib";
+import Gio2 from "gi://Gio";
+function loadEnv() {
+  try {
+    const xdgRuntimeDir = GLib3.getenv("XDG_RUNTIME_DIR");
+    if (!xdgRuntimeDir) {
+      throw new Error("XDG_RUNTIME_DIR is not set");
+    }
+    const envPath = `${xdgRuntimeDir}/dynamic-music-pill.env`;
+    if (!GLib3.file_test(envPath, GLib3.FileTest.EXISTS)) {
+      logObject(process.env.NODE_ENV);
+      return;
+    }
+    parseEnvFile(envPath);
+  } catch (error) {
+    logError(error);
+  }
+}
+function parseEnvFile(envPath) {
+  const file = Gio2.File.new_for_path(envPath);
+  if (!file) {
+    logInfo(`Failed to load env file: ${envPath}`);
+    return;
+  }
+  const fileStream = file.read(null);
+  const dataStream = new Gio2.DataInputStream({
+    base_stream: fileStream,
+    byte_order: Gio2.DataStreamByteOrder.BIG_ENDIAN
+  });
+  const encoder = new TextDecoder("utf-8");
+  while (true) {
+    const [buffer, length] = dataStream.read_line(null);
+    if (buffer === null || length === 0) {
+      break;
+    }
+    const line = encoder.decode(buffer).trim();
+    if (line.startsWith("#") || line.length === 0) {
+      continue;
+    }
+    const firstKeySeparatorIndex = line.indexOf("=");
+    if (firstKeySeparatorIndex === -1) {
+      continue;
+    }
+    const key = line.substring(0, firstKeySeparatorIndex);
+    const value = line.substring(firstKeySeparatorIndex + 1);
+    GLib3.setenv(key, value, true);
+  }
+  dataStream.close(null);
+  fileStream.close(null);
+}
+
+// src/providers/mpris-provider/index.ts
+import Gio4 from "gi://Gio";
+import GObject2 from "gi://GObject";
+import GLib5 from "gi://GLib";
+
+// src/providers/mpris-provider/media-player.ts
+import Gio3 from "gi://Gio";
+import GLib4 from "gi://GLib";
+import GObject from "gi://GObject";
+
+// src/utils/mapper.ts
+function invokeMapper(mapper, key, value, parent) {
+  const map9 = mapper[key];
+  if (map9) {
+    map9(parent, value);
+  }
+}
+function mapObject(object, mapper, parent = {}) {
+  for (let [key, value] of Object.entries(object)) {
+    value = smartUnpack(value);
+    if (!value) {
+      continue;
+    }
+    if (typeof value === "object" && !Array.isArray(value)) {
+      mapObject(value, mapper, parent);
+      continue;
+    }
+    invokeMapper(mapper, key, value, parent);
+  }
+  return parent;
+}
+function checkChanged(oldValue, newValue, debug = false, tree = []) {
+  if (oldValue === void 0 && newValue !== void 0) {
+    if (debug) {
+      logDebug(`Changed: ${tree.join(" -> ")} is undefined -> defined`);
+    }
+    return [true, [tree.join(" -> "), oldValue, newValue]];
+  }
+  if (oldValue !== void 0 && newValue === void 0) {
+    if (debug) {
+      logDebug(`Changed: ${tree.join(" -> ")} is defined -> undefined`);
+    }
+    return [true, [tree.join(" -> "), oldValue, newValue]];
+  }
+  for (let [key, value] of Object.entries(oldValue)) {
+    const compareValue = newValue[key];
+    const newTree = tree.concat([key]);
+    const newTreeString = newTree.join(" -> ");
+    if (debug) {
+      logDebug(`Comparing: ${newTreeString} ${typeof value} -> ${typeof compareValue}`);
+    }
+    if (value === null && compareValue !== null) {
+      if (debug) {
+        logDebug(`Changed: ${newTreeString} value is null -> compareValue is not null`);
+      }
+      return [true, [newTreeString, value, compareValue]];
+    }
+    if (value !== null && compareValue === null) {
+      if (debug) {
+        logDebug(`Changed: ${newTreeString} value is not null -> compareValue is null`);
+      }
+      return [true, [newTreeString, value, compareValue]];
+    }
+    if (!Array.isArray(value)) {
+      if (typeof value === "object") {
+        const [changed, [objectPath, oldCheckValue, newCheckValue]] = checkChanged(value, compareValue, debug, newTree);
+        if (changed) {
+          if (debug) {
+            logDebug(`Changed: ${objectPath} ${typeof oldCheckValue} -> ${typeof newCheckValue}`);
+          }
+          return [true, [objectPath, oldCheckValue, newCheckValue]];
+        } else {
+          if (debug) {
+            logDebug(`Not changed: ${objectPath} ${typeof oldCheckValue} -> ${typeof newCheckValue}`);
+          }
+          return [false, [objectPath, oldCheckValue, newCheckValue]];
+        }
+      }
+      if (compareValue !== value) {
+        if (debug) {
+          logDebug(`Changed: ${newTreeString} ${typeof value} -> ${typeof compareValue}`);
+        }
+        return [true, [newTreeString, value, compareValue]];
+      }
+    } else {
+      if (!Array.isArray(compareValue)) {
+        if (debug) {
+          logDebug(`Changed: ${newTreeString} ${typeof value} -> ${typeof compareValue}`);
+        }
+        return [true, [newTreeString, value, compareValue]];
+      }
+      if (debug) {
+        logDebug(`Comparing object array: ${newTreeString} ${typeof value} -> ${typeof compareValue}`);
+      }
+      return checkArrayChanged(value, compareValue, newTree, debug);
+    }
+  }
+  if (Array.isArray(oldValue)) {
+    if (!Array.isArray(newValue)) {
+      if (debug) {
+        logDebug(`Changed: ${tree.join(" -> ")} is array -> not array`);
+      }
+      return [true, [tree.join(" -> "), oldValue, newValue]];
+    }
+    if (debug) {
+      logDebug(`Comparing array: ${tree.join(" -> ")} is array -> array`);
+    }
+    return checkArrayChanged(oldValue, newValue, tree, debug);
+  }
+  return [false, ["", void 0, void 0]];
+}
+function checkArrayChanged(oldValue, newValue, tree, debug = false) {
+  if (debug) {
+    logDebug(`Comparing array: ${tree.join(" -> ")} is array -> array`);
+  }
+  if (newValue.length != oldValue.length) {
+    if (debug) {
+      logDebug(`Changed: ${tree.join(" -> ")} size is different`);
+    }
+    return [true, [tree.join(" -> "), oldValue, newValue]];
+  }
+  for (let i = 0; i < newValue.length; i++) {
+    const compareValue = newValue[i];
+    const value = oldValue[i];
+    if (compareValue === void 0 && value !== void 0) {
+      if (debug) {
+        logDebug(`Changed: ${tree.join(" -> ")}${i} is defined -> undefined`);
+      }
+      return [true, [tree.join(" -> "), oldValue, newValue]];
+    }
+    if (compareValue !== void 0 && value === void 0) {
+      if (debug) {
+        logDebug(`Changed: ${tree.join(" -> ")}${i} is undefined -> defined`);
+      }
+      return [true, [tree.join(" -> "), oldValue, newValue]];
+    }
+    if (debug) {
+      logDebug(`Comparing: ${tree.join(" -> ")}${i} ${typeof value} -> ${typeof compareValue}`);
+    }
+    if (!Array.isArray(value)) {
+      if (Array.isArray(compareValue)) {
+        if (debug) {
+          logDebug(`Changed: ${tree.join(" -> ")}${i} is array -> not array`);
+        }
+        return [true, [tree.join(" -> "), oldValue, newValue]];
+      }
+    }
+    if (compareValue !== value) {
+      if (debug) {
+        logDebug(`Changed: ${tree.join(" -> ")}${i} is different`);
+      }
+      return [true, [tree.join(" -> "), oldValue, newValue]];
+    }
+  }
+  return [false, ["", void 0, void 0]];
+}
+
+// src/providers/mpris-provider/maps/player-state-map.ts
+var PlayerStateMap = {
+  "PlaybackStatus": (s, v) => s.playbackStatus = v,
+  "CanControl": (s, v) => s.canControl = v,
+  "CanGoNext": (s, v) => s.canGoNext = v,
+  "CanGoPrevious": (s, v) => s.canGoPrevious = v,
+  "CanPause": (s, v) => s.canPause = v,
+  "CanPlay": (s, v) => s.canPlay = v,
+  "CanSeek": (s, v) => s.canSeek = v,
+  "MaximumRate": (s, v) => s.maximumRate = v,
+  "MinimumRate": (s, v) => s.minimumRate = v,
+  "Volume": (s, v) => s.volume = v,
+  "Position": (s, v) => s.position = v
+};
+
+// src/providers/mpris-provider/maps/track-info-map.ts
+var TrackInfoMap = {
+  "xesam:title": (t, v) => t.title = v,
+  "xesam:artist": (t, v) => t.artist = v,
+  "xesam:album": (t, v) => t.album = v,
+  "mpris:artUrl": (t, v) => t.artUrl = v,
+  "mpris:length": (t, v) => t.length = v,
+  "mpris:trackid": (t, v) => t.trackId = v,
+  "rate": (t, v) => t.rate = v
+};
+
+// src/providers/mpris-provider/media-player.ts
+var DEFAULT_PLAYER_STATE = {
+  playbackStatus: "Stopped",
+  canControl: false,
+  canGoNext: false,
+  canGoPrevious: false,
+  canPause: false,
+  canPlay: false,
+  canSeek: false,
+  volume: 1,
+  minimumRate: 1,
+  maximumRate: 1,
+  position: 0
+};
+var _MediaPlayer = class _MediaPlayer extends GObject.Object {
+  constructor(name, owner, mpris) {
+    super();
+    __publicField(this, "_name");
+    __publicField(this, "_owner");
+    __publicField(this, "_mpris");
+    __publicField(this, "_connection");
+    __publicField(this, "_playerPropertiesTimer", null);
+    __publicField(this, "_state");
+    logDebug(`Creating MediaPlayer for ${name}`);
+    this._name = name;
+    this._owner = owner;
+    this._mpris = mpris;
+    this._connection = mpris.getConnection();
+    this._state = {
+      player: __spreadValues({}, DEFAULT_PLAYER_STATE),
+      trackInfo: void 0
+    };
+    this._playerPropertiesTimer = GLib4.timeout_add(GLib4.PRIORITY_DEFAULT, 1e3, this._playerTimerCallback.bind(this));
+    this._mpris.emit("player-added", this._name, this);
+  }
+  getPlayerState() {
+    if (this._connection === null) {
+      return this._state;
+    }
+    const [result] = smartUnpack(this._connection.call_sync(
+      this._name,
+      MPRIS_OBJECT,
+      "org.freedesktop.DBus.Properties",
+      "GetAll",
+      new GLib4.Variant("(s)", [MPRIS_INTERFACE]),
+      null,
+      Gio3.DBusCallFlags.NONE,
+      -1,
+      null
+    ));
+    if (!result) {
+      return this._state;
+    }
+    const playerState = mapObject(result, PlayerStateMap);
+    const trackInfo = mapObject(result, TrackInfoMap);
+    const state = {
+      player: playerState,
+      trackInfo
+    };
+    return state;
+  }
+  getTrackInfo() {
+    return this._state.trackInfo;
+  }
+  getPlayerInfo() {
+    return this._state.player;
+  }
+  getName() {
+    return this._name;
+  }
+  getOwner() {
+    return this._owner;
+  }
+  removePlayer() {
+    logDebug(`Removing MediaPlayer for ${this._name}`);
+    this._mpris.emit("player-removed", this._name, this);
+    if (this._playerPropertiesTimer !== null) {
+      GLib4.source_remove(this._playerPropertiesTimer);
+      this._playerPropertiesTimer = null;
+    }
+    this._state = {
+      player: __spreadValues({}, DEFAULT_PLAYER_STATE),
+      trackInfo: void 0
+    };
+  }
+  _playerTimerCallback() {
+    const newState = this.getPlayerState();
+    const oldState = this._state;
+    const [playerChanged, [playerPath, oldPlayerValue, newPlayerValue]] = checkChanged(oldState.player, newState.player);
+    const [trackChanged, [trackPath, oldTrackValue, newTrackValue]] = checkChanged(oldState.trackInfo, newState.trackInfo);
+    if (playerChanged) {
+      this._state.player = newState.player;
+      this._mpris.emit("player-state-changed", this._name, this);
+      if (newState.player.playbackStatus !== oldState.player.playbackStatus) {
+        this._mpris.emit("player-status-changed", this._name, newState.player.playbackStatus);
+      }
+    }
+    if (trackChanged) {
+      this._state.trackInfo = newState.trackInfo;
+      this._mpris.emit("player-track-changed", this._name, this);
+    }
+    return GLib4.SOURCE_CONTINUE;
+  }
+};
+GObject.registerClass(_MediaPlayer);
+var MediaPlayer = _MediaPlayer;
+
+// src/providers/mpris-provider/index.ts
+var flags = Gio4.DBusConnectionFlags.AUTHENTICATION_CLIENT | Gio4.DBusConnectionFlags.MESSAGE_BUS_CONNECTION;
+var _MPRISProvider = class _MPRISProvider extends GObject2.Object {
+  constructor() {
+    super();
+    __publicField(this, "_address", getDBusSessionAddress());
+    __publicField(this, "_connection", null);
+    __publicField(this, "_nameOwnerChangedSignal", null);
+    __publicField(this, "_players", /* @__PURE__ */ new Map());
+  }
+  start() {
+    logDebug(`Creating DBus connection for address: ${this._address}`);
+    this._connection = Gio4.DBusConnection.new_for_address_sync(this._address, flags, null, null);
+    this._nameOwnerChangedSignal = this._connection.signal_subscribe(
+      "org.freedesktop.DBus",
+      "org.freedesktop.DBus",
+      "NameOwnerChanged",
+      "/org/freedesktop/DBus",
+      null,
+      Gio4.DBusSignalFlags.NONE,
+      this._nameOwnerChanged.bind(this)
+    );
+    const names = this.listPlayers();
+    for (const name of names) {
+      const owner = this.getPlayerOwner(name);
+      if (!owner) {
+        continue;
+      }
+      const player = new MediaPlayer(name, owner, this);
+      this._players.set(owner, player);
+    }
+  }
+  stop() {
+    if (this._connection === null) {
+      return;
+    }
+    for (const player of this._players.values()) {
+      player.removePlayer();
+    }
+    this._players.clear();
+    logDebug("Stopping DBus connection");
+    if (this._nameOwnerChangedSignal !== null) {
+      this._connection.signal_unsubscribe(this._nameOwnerChangedSignal);
+      this._nameOwnerChangedSignal = null;
+    }
+    this._connection.close_sync(null);
+    this._connection = null;
+  }
+  getConnection() {
+    if (this._connection === null) {
+      throw new Error("DBus connection not initialized");
+    }
+    return this._connection;
+  }
+  getPlayerOwner(name) {
+    if (!this._connection) {
+      return void 0;
+    }
+    logDebug(`Getting owner for player: ${name}`);
+    const result = this._connection.call_sync(
+      "org.freedesktop.DBus",
+      "/org/freedesktop/DBus",
+      "org.freedesktop.DBus",
+      "GetNameOwner",
+      new GLib5.Variant("(s)", [name]),
+      null,
+      Gio4.DBusCallFlags.NONE,
+      -1,
+      null
+    );
+    const [owner] = smartUnpack(result);
+    return owner || void 0;
+  }
+  listPlayers() {
+    if (this._connection === null) {
+      return [];
+    }
+    const result = this._connection.call_sync(
+      "org.freedesktop.DBus",
+      "/org/freedesktop/DBus",
+      "org.freedesktop.DBus",
+      "ListNames",
+      null,
+      null,
+      Gio4.DBusCallFlags.NONE,
+      -1,
+      null
+    );
+    const names = smartUnpack(result)[0];
+    return names.filter((name) => name.startsWith(`${PLAYER_INTERFACE}.`));
+  }
+  getPlayer(name) {
+    return this._players.get(name);
+  }
+  _nameOwnerChanged(connection, sender_name, object_path, interface_name, signal_name, parameters) {
+    const [name, oldOwner, newOwner] = smartUnpack(parameters);
+    if (!(name == null ? void 0 : name.startsWith(PLAYER_INTERFACE))) {
+      return;
+    }
+    logDebug(`NameOwnerChanged: ${sender_name} ${object_path} ${interface_name} ${signal_name}`);
+    logObject(parameters, { json: true });
+    if (name === void 0 || oldOwner === void 0 || newOwner === void 0) {
+      return;
+    }
+    if (oldOwner === newOwner || oldOwner.length === 0 && this._players.has(newOwner)) {
+      return;
+    }
+    if (newOwner.length === 0 && this._players.has(oldOwner)) {
+      const player = this._players.get(oldOwner);
+      if (player) {
+        player.removePlayer();
+        this._players.delete(oldOwner);
+      }
+      return;
+    }
+    if (newOwner.length > 0 && !this._players.has(newOwner)) {
+      const player = new MediaPlayer(name, newOwner, this);
+      this._players.set(newOwner, player);
+    }
+  }
+};
+GObject2.registerClass({
+  Signals: {
+    "player-added": {
+      param_types: [GObject2.TYPE_STRING, GObject2.TYPE_OBJECT]
+    },
+    "player-removed": {
+      param_types: [GObject2.TYPE_STRING, GObject2.TYPE_OBJECT]
+    },
+    "player-status-changed": {
+      param_types: [GObject2.TYPE_STRING, GObject2.TYPE_STRING]
+    },
+    "player-rate-changed": {
+      param_types: [GObject2.TYPE_STRING, GObject2.TYPE_FLOAT]
+    },
+    "player-state-changed": {
+      param_types: [GObject2.TYPE_STRING, GObject2.TYPE_OBJECT]
+    },
+    "player-track-changed": {
+      param_types: [GObject2.TYPE_STRING, GObject2.TYPE_OBJECT]
+    },
+    "player-volume-changed": {
+      param_types: [GObject2.TYPE_STRING, GObject2.TYPE_FLOAT]
+    }
+  }
+}, _MPRISProvider);
+var MPRISProvider = _MPRISProvider;
 
 // src/extension.ts
 var instance = null;
@@ -710,23 +1207,26 @@ var DynamicMusicPillExtension = class extends extension_exports.Extension {
     /**
      * MPRIS provider for music control
      */
-    __publicField(this, "provider");
+    __publicField(this, "mpris");
     /**
      * Settings provider for extension configuration
      */
     __publicField(this, "settings");
     instance = this;
+    loadEnv();
     this.initTranslations("dynamic-music-pill");
     this.settings = createSettingsProvider(this.getSettings());
-    this.provider = createMPRISProvider();
-    this.provider.addCallback("first", (track) => {
-      logInfo(`Chegou aqui ${JSON.stringify(track)}`);
-    });
+    this.mpris = new MPRISProvider();
     this.context = {
       extension: this,
       settings: this.settings,
-      mpris: this.provider
+      mpris: this.mpris
     };
+    this.mpris.connect("player-added", this._playerAdded.bind(this));
+    this.mpris.connect("player-removed", this._playerRemoved.bind(this));
+    this.mpris.connect("player-state-changed", this._playerStateChanged.bind(this));
+    this.mpris.connect("player-track-changed", this._playerTrackChanged.bind(this));
+    this.mpris.connect("player-status-changed", this._playerPlaybackStatusChanged.bind(this));
   }
   /**
    * Enables the extension
@@ -735,15 +1235,30 @@ var DynamicMusicPillExtension = class extends extension_exports.Extension {
   enable() {
     logInfo("Extension enabled.");
     logInfo(isDevelopment() ? "Is Dev" : "Is Not Dev");
-    this.provider.start();
+    this.mpris.start();
   }
   /**
    * Disables the extension
    * Stops the MPRIS provider and logs a warning
    */
   disable() {
-    this.provider.stop();
+    this.mpris.stop();
     logWarning("Extension disabled.");
+  }
+  _playerAdded(provider, name, player) {
+    logInfo(`Player added: ${name} ${player.getOwner()}`);
+  }
+  _playerRemoved(provider, name) {
+    logInfo(`Player removed: ${name}`);
+  }
+  _playerStateChanged(provider, name, player) {
+    logInfo(`Player state changed: ${name} ${JSON.stringify(player.getPlayerInfo() || {})}`);
+  }
+  _playerTrackChanged(provider, name, player) {
+    logInfo(`Player track changed: ${name} ${JSON.stringify(player.getTrackInfo() || {})}`);
+  }
+  _playerPlaybackStatusChanged(provider, name, status) {
+    logInfo(`Player playback status changed: ${name} ${status}`);
   }
 };
 export {

@@ -1,8 +1,40 @@
 var __defProp = Object.defineProperty;
+var __defProps = Object.defineProperties;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropDescs = Object.getOwnPropertyDescriptors;
 var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getOwnPropSymbols = Object.getOwnPropertySymbols;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __propIsEnum = Object.prototype.propertyIsEnumerable;
 var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+var __spreadValues = (a, b) => {
+  for (var prop in b || (b = {}))
+    if (__hasOwnProp.call(b, prop))
+      __defNormalProp(a, prop, b[prop]);
+  if (__getOwnPropSymbols)
+    for (var prop of __getOwnPropSymbols(b)) {
+      if (__propIsEnum.call(b, prop))
+        __defNormalProp(a, prop, b[prop]);
+    }
+  return a;
+};
+var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
+var __objRest = (source, exclude) => {
+  var target = {};
+  for (var prop in source)
+    if (__hasOwnProp.call(source, prop) && exclude.indexOf(prop) < 0)
+      target[prop] = source[prop];
+  if (source != null && __getOwnPropSymbols)
+    for (var prop of __getOwnPropSymbols(source)) {
+      if (exclude.indexOf(prop) < 0 && __propIsEnum.call(source, prop))
+        target[prop] = source[prop];
+    }
+  return target;
+};
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
 var __copyProps = (to, from, except, desc) => {
   if (from && typeof from === "object" || typeof from === "function") {
     for (let key of __getOwnPropNames(from))
@@ -1392,8 +1424,8 @@ GObject56.registerClass(_PopupPage);
 var PopupPage = _PopupPage;
 
 // src/ui/preferences/style-page/index.ts
-import Adw91 from "gi://Adw";
-import GObject91 from "gi://GObject";
+import Adw95 from "gi://Adw";
+import GObject95 from "gi://GObject";
 
 // src/ui/preferences/style-page/look-group/index.ts
 import Adw65 from "gi://Adw";
@@ -2041,6 +2073,10 @@ var _DimensionsGroup = class _DimensionsGroup extends Adw86.PreferencesGroup {
       title: t("Widget Height")
     });
     this.add(widgetHeightRow);
+    settings.style.connect("changed::target-container", () => {
+      this.set_visible(settings.style.targetContainer === 0);
+    });
+    this.set_visible(settings.style.targetContainer === 0);
   }
 };
 GObject86.registerClass(_DimensionsGroup);
@@ -2150,8 +2186,97 @@ var _CustomColorsGroup = class _CustomColorsGroup extends Adw90.PreferencesGroup
 GObject90.registerClass(_CustomColorsGroup);
 var CustomColorsGroup = _CustomColorsGroup;
 
+// src/ui/preferences/style-page/panel-group/index.ts
+import Adw94 from "gi://Adw";
+import GObject94 from "gi://GObject";
+
+// src/ui/preferences/style-page/panel-group/components.ts/art-size-row.ts
+import Adw91 from "gi://Adw";
+import GObject91 from "gi://GObject";
+import Gtk76 from "gi://Gtk";
+var _ArtSizeRow = class _ArtSizeRow extends Adw91.ActionRow {
+  constructor(settings, properties, ...args) {
+    super(properties, args);
+    const artSizeRow = new Adw91.SpinRow({
+      adjustment: new Gtk76.Adjustment({ lower: 14, upper: 32, step_increment: 1 })
+    });
+    this.add_suffix(artSizeRow);
+    settings.style.connect("changed::panel-art-size", () => {
+      artSizeRow.set_value(settings.style.panelArtSize);
+    });
+    artSizeRow.set_value(settings.style.panelArtSize);
+  }
+};
+GObject91.registerClass(_ArtSizeRow);
+var ArtSizeRow = _ArtSizeRow;
+
+// src/ui/preferences/style-page/panel-group/components.ts/widget-width-row.ts
+import Adw92 from "gi://Adw";
+import GObject92 from "gi://GObject";
+import Gtk77 from "gi://Gtk";
+var _WidgetWidthRow2 = class _WidgetWidthRow2 extends Adw92.ActionRow {
+  constructor(settings, properties, ...args) {
+    super(properties, args);
+    const widgetWidthRow = new Adw92.SpinRow({
+      adjustment: new Gtk77.Adjustment({ lower: 100, upper: 600, step_increment: 10 })
+    });
+    this.add_suffix(widgetWidthRow);
+    settings.style.connect("changed::panel-pill-width", () => {
+      widgetWidthRow.set_value(settings.style.panelWidth);
+    });
+    widgetWidthRow.set_value(settings.style.panelWidth);
+  }
+};
+GObject92.registerClass(_WidgetWidthRow2);
+var WidgetWidthRow2 = _WidgetWidthRow2;
+
+// src/ui/preferences/style-page/panel-group/components.ts/widget-height-row.ts
+import Adw93 from "gi://Adw";
+import GObject93 from "gi://GObject";
+import Gtk78 from "gi://Gtk";
+var _WidgetHeightRow2 = class _WidgetHeightRow2 extends Adw93.ActionRow {
+  constructor(settings, properties, ...args) {
+    super(properties, args);
+    const widgetHeightRow = new Adw93.SpinRow({
+      adjustment: new Gtk78.Adjustment({ lower: 20, upper: 60, step_increment: 2 })
+    });
+    this.add_suffix(widgetHeightRow);
+    settings.style.connect("changed::panel-pill-height", () => {
+      widgetHeightRow.set_value(settings.style.panelHeight);
+    });
+    widgetHeightRow.set_value(settings.style.panelHeight);
+  }
+};
+GObject93.registerClass(_WidgetHeightRow2);
+var WidgetHeightRow2 = _WidgetHeightRow2;
+
+// src/ui/preferences/style-page/panel-group/index.ts
+var _PanelGroup = class _PanelGroup extends Adw94.PreferencesGroup {
+  constructor(settings, properties, ...args) {
+    super(properties, args);
+    const artSizeRow = new ArtSizeRow(settings, {
+      title: t("Album Art Size")
+    });
+    this.add(artSizeRow);
+    const widgetWidthRow = new WidgetWidthRow2(settings, {
+      title: t("Widget Width")
+    });
+    this.add(widgetWidthRow);
+    const widgetHeightRow = new WidgetHeightRow2(settings, {
+      title: t("Widget Height")
+    });
+    this.add(widgetHeightRow);
+    settings.style.connect("changed::target-container", () => {
+      this.set_visible(settings.style.targetContainer !== 0);
+    });
+    this.set_visible(settings.style.targetContainer !== 0);
+  }
+};
+GObject94.registerClass(_PanelGroup);
+var PanelGroup = _PanelGroup;
+
 // src/ui/preferences/style-page/index.ts
-var _StylePage = class _StylePage extends Adw91.PreferencesPage {
+var _StylePage = class _StylePage extends Adw95.PreferencesPage {
   constructor(settings, properties, ...args) {
     super(properties, args);
     const lookGroup = new LookGroup(settings, {
@@ -2174,28 +2299,489 @@ var _StylePage = class _StylePage extends Adw91.PreferencesPage {
       title: t("Dimensions (Dock Mode)")
     });
     this.add(dimensionsGroup);
+    const panelGroup = new PanelGroup(settings, {
+      title: t("Dimensions (Panel Mode)")
+    });
+    this.add(panelGroup);
     const customColorsGroup = new CustomColorsGroup(settings, {
       title: t("Custom Colors")
     });
     this.add(customColorsGroup);
   }
 };
-GObject91.registerClass(_StylePage);
+GObject95.registerClass(_StylePage);
 var StylePage = _StylePage;
+
+// src/ui/preferences/system-page/index.ts
+import Adw114 from "gi://Adw";
+import GObject114 from "gi://GObject";
+
+// src/ui/preferences/system-page/system-group/index.ts
+import Adw102 from "gi://Adw";
+import GObject102 from "gi://GObject";
+
+// src/ui/preferences/system-page/system-group/components/hide-player-row.ts
+import Adw96 from "gi://Adw";
+import Gtk79 from "gi://Gtk";
+import GObject96 from "gi://GObject";
+var _HidePlayerRow = class _HidePlayerRow extends Adw96.ActionRow {
+  constructor(settings, props, ...args) {
+    super(props, args);
+    const hidePlayerSwitch = new Gtk79.Switch({
+      active: settings.system.hideDefaultPlayer,
+      valign: Gtk79.Align.CENTER
+    });
+    settings.system.bind("hideDefaultPlayer", hidePlayerSwitch, "active");
+    this.add_suffix(hidePlayerSwitch);
+  }
+};
+GObject96.registerClass(_HidePlayerRow);
+var HidePlayerRow = _HidePlayerRow;
+
+// src/ui/preferences/system-page/system-group/components/game-mode.row.ts
+import Adw97 from "gi://Adw";
+import Gtk80 from "gi://Gtk";
+import GObject97 from "gi://GObject";
+var _GameModeRow = class _GameModeRow extends Adw97.ActionRow {
+  constructor(settings, props, ...args) {
+    super(props, args);
+    const gameModeSwitch = new Gtk80.Switch({
+      active: settings.system.gameMode,
+      valign: Gtk80.Align.CENTER
+    });
+    settings.system.bind("gameMode", gameModeSwitch, "active");
+    this.add_suffix(gameModeSwitch);
+  }
+};
+GObject97.registerClass(_GameModeRow);
+var GameModeRow = _GameModeRow;
+
+// src/ui/preferences/system-page/system-group/components/compatiblity-delay-row.ts
+import Adw98 from "gi://Adw";
+import Gtk81 from "gi://Gtk";
+import GObject98 from "gi://GObject";
+var _CompatibilityDelayRow = class _CompatibilityDelayRow extends Adw98.ActionRow {
+  constructor(settings, props, ...args) {
+    super(props, args);
+    const compatibilityDelaySwitch = new Gtk81.Switch({
+      active: settings.system.compatibilityDelay,
+      valign: Gtk81.Align.CENTER
+    });
+    settings.system.bind("compatibilityDelay", compatibilityDelaySwitch, "active");
+    this.add_suffix(compatibilityDelaySwitch);
+  }
+};
+GObject98.registerClass(_CompatibilityDelayRow);
+var CompatibilityDelayRow = _CompatibilityDelayRow;
+
+// src/ui/preferences/system-page/system-group/components/filter-mode-row.ts
+import Adw99 from "gi://Adw";
+import Gtk82 from "gi://Gtk";
+import GObject99 from "gi://GObject";
+var _FilterModeRow = class _FilterModeRow extends Adw99.ComboRow {
+  constructor(settings, properties, ...args) {
+    super(properties, args);
+    const model = new Gtk82.StringList();
+    model.append(t("Off (Allow All)"));
+    model.append(t("Blacklist (Exclude listed)"));
+    model.append(t("Whitelist (Only allow listed)"));
+    this.set_model(model);
+    this.set_selected(settings.system.playerFilterMode);
+    this.connect("notify::selected", () => {
+      settings.system.playerFilterMode = this.selected;
+    });
+  }
+};
+GObject99.registerClass(_FilterModeRow);
+var FilterModeRow = _FilterModeRow;
+
+// src/ui/preferences/system-page/system-group/components/filtered-players-row.ts
+import Adw100 from "gi://Adw";
+import GObject100 from "gi://GObject";
+var _FilteredPlayersRow = class _FilteredPlayersRow extends Adw100.EntryRow {
+  constructor(settings, properties, ...args) {
+    super(properties, args);
+    this.set_text(settings.system.filteredPlayers);
+    settings.system.bind("filteredPlayers", this, "text");
+    settings.system.connect("changed::player-filter-mode", () => {
+      this.set_sensitive(settings.system.playerFilterMode !== 0);
+    });
+    this.set_sensitive(settings.system.playerFilterMode !== 0);
+  }
+};
+GObject100.registerClass(_FilteredPlayersRow);
+var FilteredPlayersRow = _FilteredPlayersRow;
+
+// src/ui/preferences/system-page/system-group/components/detected-players-row.ts
+import Adw101 from "gi://Adw";
+import Gtk83 from "gi://Gtk";
+import GObject101 from "gi://GObject";
+var _DetectedPlayersRow = class _DetectedPlayersRow extends Adw101.ActionRow {
+  constructor(settings, mpris, properties, ...args) {
+    super(properties, args);
+    const refreshBtn = new Gtk83.Button({
+      icon_name: "view-refresh-symbolic",
+      valign: Gtk83.Align.CENTER,
+      margin_end: 10,
+      css_classes: ["flat"]
+    });
+    this.add_prefix(refreshBtn);
+    const playerBox = new Gtk83.Box({ spacing: 6, valign: Gtk83.Align.CENTER });
+    this.add_suffix(playerBox);
+    const updateDetected = () => {
+      let child = playerBox.get_first_child();
+      while (child) {
+        let next = child.get_next_sibling();
+        playerBox.remove(child);
+        child = next;
+      }
+      try {
+        const mprisNames = mpris.listPlayers();
+        let apps = mprisNames.map((n) => n.replace("org.mpris.MediaPlayer2.", "").split(".")[0]);
+        if (apps.length === 0) {
+          playerBox.append(new Gtk83.Label({ label: t("No players found") }));
+        } else {
+          for (const app of apps) {
+            let btn = new Gtk83.Button({ label: app, css_classes: ["suggested-action"] });
+            btn.connect("clicked", () => {
+              let current = settings.system.filteredPlayers;
+              let list = current.split(",").map((s) => s.trim()).filter((s) => s.length > 0);
+              if (!list.includes(app)) {
+                list.push(app);
+                settings.system.filteredPlayers = list.join(",");
+              }
+            });
+            playerBox.append(btn);
+          }
+        }
+      } catch (e) {
+        logError(e);
+      }
+    };
+    refreshBtn.connect("clicked", updateDetected);
+    updateDetected();
+    settings.system.connect("changed::player-filter-mode", () => {
+      this.set_sensitive(settings.system.playerFilterMode !== 0);
+    });
+    this.set_sensitive(settings.system.playerFilterMode !== 0);
+    this.add_suffix(playerBox);
+  }
+};
+GObject101.registerClass(_DetectedPlayersRow);
+var DetectedPlayersRow = _DetectedPlayersRow;
+
+// src/ui/preferences/system-page/system-group/index.ts
+var _SystemGroup = class _SystemGroup extends Adw102.PreferencesGroup {
+  constructor(settings, mpris, properties, ...args) {
+    super(properties, args);
+    const hidePlayerRow = new HidePlayerRow(settings, {
+      title: t("Hide Default GNOME Player"),
+      subtitle: t("Remove the duplicate built-in media controls")
+    });
+    this.add(hidePlayerRow);
+    const gameModeRow = new GameModeRow(settings, {
+      title: t("Game Mode"),
+      subtitle: t("Disable animations when a fullscreen app is active")
+    });
+    this.add(gameModeRow);
+    const compatibilityDelayRow = new CompatibilityDelayRow(settings, {
+      title: t("Slow Player Workaround"),
+      subtitle: t("Adds a slight delay to track changes (fixes sync issues)")
+    });
+    this.add(compatibilityDelayRow);
+    const filterModeRow = new FilterModeRow(settings, {
+      title: t("Player Filter Mode"),
+      subtitle: t("Choose how to filter media players (e.g. browsers)")
+    });
+    this.add(filterModeRow);
+    const filterListRow = new FilteredPlayersRow(settings, {
+      title: t("Filtered Players (comma separated)")
+    });
+    this.add(filterListRow);
+    const detectedPlayersRow = new DetectedPlayersRow(settings, mpris, {
+      title: t("Detected Players"),
+      subtitle: t("Click an active player to add it to the filter list")
+    });
+    this.add(detectedPlayersRow);
+  }
+};
+GObject102.registerClass(_SystemGroup);
+var SystemGroup = _SystemGroup;
+
+// src/ui/preferences/system-page/mapping-help/index.ts
+import Adw104 from "gi://Adw";
+import GObject104 from "gi://GObject";
+
+// src/ui/preferences/system-page/mapping-help/components/help-expander-row.ts
+import Adw103 from "gi://Adw";
+import Gtk84 from "gi://Gtk";
+import GObject103 from "gi://GObject";
+var _HelpExpanderRow = class _HelpExpanderRow extends Adw103.ExpanderRow {
+  constructor(settings, properties, ...args) {
+    super(properties, args);
+    let label = "To allow the extension to open/close your player, you need to provide its ";
+    label += "exact window name (App ID).\n";
+    label += "\n";
+    label += "<b>Common Examples:</b>\n";
+    label += "\u2022 Spotify (Flatpak): <b>com.spotify.Client</b>\n";
+    label += "\u2022 VLC: <b>vlc</b>\n";
+    label += "\u2022 YouTube Music (Web App): <b>youtube-music</b>\n";
+    label += "\u2022 High Tide: <b>io.github.nokse22.high-tide</b>\n";
+    label += "\u2022 Browsers: <b>chromium</b>, <b>firefox</b>, <b>brave-browser</b>\n";
+    label += "\n";
+    label += "<b>How to find it manually:</b>\n";
+    label += "1. Press <b>Alt + F2</b>, type <b>lg</b>, and press Enter.\n";
+    label += "2. Click on the <b>Windows</b> tab in the top right corner.\n";
+    label += "3. Find your music player in the list.\n";
+    label += "4. Look at the <b>wmclass:</b> or <b>app:</b> field. That is your App ID! ";
+    label += "<i>(Remove the .desktop part)</i>\n";
+    label += "5. Press Esc to close the debugger.";
+    const helpLabel = new Gtk84.Label({
+      label,
+      use_markup: true,
+      justify: Gtk84.Justification.LEFT,
+      xalign: 0,
+      wrap: true,
+      margin_top: 15,
+      margin_bottom: 15,
+      margin_start: 15,
+      margin_end: 15
+    });
+    this.add_row(helpLabel);
+  }
+};
+GObject103.registerClass(_HelpExpanderRow);
+var HelpExpanderRow = _HelpExpanderRow;
+
+// src/ui/preferences/system-page/mapping-help/index.ts
+var _MappingHelpGroup = class _MappingHelpGroup extends Adw104.PreferencesGroup {
+  constructor(settings, properties, ...args) {
+    super(properties, args);
+    const helpExpander = new HelpExpanderRow(settings, {
+      title: t("\u{1F4A1} How to find the correct App ID?"),
+      subtitle: t("Click here for a quick guide and examples")
+    });
+    this.add(helpExpander);
+  }
+};
+GObject104.registerClass(_MappingHelpGroup);
+var MappingHelpGroup = _MappingHelpGroup;
+
+// src/ui/preferences/system-page/aps-mapping-group/index.ts
+import Adw105 from "gi://Adw";
+import GObject105 from "gi://GObject";
+import Gtk85 from "gi://Gtk";
+import GLib from "gi://GLib";
+var _AppMappingGroup = class _AppMappingGroup extends Adw105.PreferencesGroup {
+  constructor(properties, ...args) {
+    const _a = properties, { settings, systemPage } = _a, props = __objRest(_a, ["settings", "systemPage"]);
+    super(props, args);
+    __publicField(this, "rows", []);
+    __publicField(this, "settings");
+    __publicField(this, "systemPage");
+    this.settings = settings;
+    this.systemPage = systemPage;
+    this.settings.system.connect("changed::app-name-mapping", () => this.refreshAppMappings());
+    this.refreshAppMappings();
+  }
+  clearRows() {
+    for (const row of this.rows) {
+      this.remove(row);
+    }
+    this.rows = [];
+  }
+  refreshAppMappings() {
+    const { settings, systemPage } = this;
+    if (systemPage.isRefreshingPlayers) {
+      return;
+    }
+    systemPage.isRefreshingPlayers = true;
+    this.clearRows();
+    const pairs = this.settings.system.appNameMapping.split(",").filter((p) => p.trim() !== "");
+    if (pairs.length === 0) {
+      this.set_description(t("No manual mappings saved."));
+      systemPage.isRefreshingPlayers = false;
+      return;
+    }
+    this.set_description(t("Type the correct App ID, then hit Enter or click the Save icon!"));
+    for (const pair of pairs) {
+      const parts = pair.split(":");
+      if (parts.length >= 2) {
+        const mprisName = parts[0].trim();
+        const targetId = parts.slice(1).join(":").trim();
+        const row = new Adw105.EntryRow({
+          title: mprisName,
+          text: targetId
+        });
+        const btnBox = new Gtk85.Box({
+          spacing: 6,
+          valign: Gtk85.Align.CENTER
+        });
+        const saveBtn = new Gtk85.Button({
+          icon_name: "document-save-symbolic",
+          valign: Gtk85.Align.CENTER,
+          css_classes: ["flat", "suggested-action"],
+          tooltip_text: t("Save App ID")
+        });
+        const saveAction = () => {
+          const newId = row.text.trim();
+          if (newId === "") return;
+          const currentPairs = settings.system.appNameMapping.split(",").filter((p) => p.trim() !== "");
+          const newPairs = currentPairs.map((p) => {
+            if (p.startsWith(`${mprisName}:`)) {
+              return `${mprisName}:${newId}`;
+            }
+            return p;
+          });
+          settings.system.appNameMapping = newPairs.join(",");
+          saveBtn.set_icon_name("object-select-symbolic");
+          GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1500, () => {
+            if (saveBtn) {
+              saveBtn.set_icon_name("document-save-symbolic");
+            }
+            return GLib.SOURCE_REMOVE;
+          });
+        };
+        saveBtn.connect("clicked", saveAction);
+        row.connect("apply", saveAction);
+        const deleteBtn = new Gtk85.Button({
+          icon_name: "user-trash-symbolic",
+          valign: Gtk85.Align.CENTER,
+          css_classes: ["flat", "destructive-action"],
+          tooltip_text: t("Delete Mapping")
+        });
+        deleteBtn.connect("clicked", () => {
+          const currentPairs = settings.system.appNameMapping.split(",").filter((p) => p.trim() !== "");
+          const newPairs = currentPairs.filter((p) => !p.startsWith(`${mprisName}:`));
+          settings.system.appNameMapping = newPairs.join(",");
+        });
+        btnBox.append(saveBtn);
+        btnBox.append(deleteBtn);
+        row.add_suffix(btnBox);
+        this.rows.push(row);
+        this.add(row);
+      }
+    }
+    systemPage.isRefreshingPlayers = false;
+  }
+};
+GObject105.registerClass(_AppMappingGroup);
+var AppMappingGroup = _AppMappingGroup;
+
+// src/ui/preferences/system-page/running-players-group/index.ts
+import Adw106 from "gi://Adw";
+import GObject106 from "gi://GObject";
+import Gtk86 from "gi://Gtk";
+
+// src/constants/mpris-constants.ts
+var PLAYER_INTERFACE = "org.mpris.MediaPlayer2";
+var MPRIS_INTERFACE = `${PLAYER_INTERFACE}.Player`;
+var MPRIS_OBJECT = "/org/mpris/MediaPlayer2";
+
+// src/ui/preferences/system-page/running-players-group/index.ts
+var _RunningPlayersGroup = class _RunningPlayersGroup extends Adw106.PreferencesGroup {
+  constructor(properties, ...args) {
+    const _a = properties, { settings, mpris, systemPage } = _a, props = __objRest(_a, ["settings", "mpris", "systemPage"]);
+    super(props, args);
+    __publicField(this, "settings");
+    __publicField(this, "mpris");
+    __publicField(this, "systemPage");
+    __publicField(this, "rows", []);
+    this.settings = settings;
+    this.mpris = mpris;
+    this.systemPage = systemPage;
+    const refreshMappingRow = new Adw106.ActionRow({
+      title: t("Refresh List"),
+      subtitle: t("Click to scan for active players again")
+    });
+    const refreshMappingBtn = new Gtk86.Button({
+      icon_name: "view-refresh-symbolic",
+      valign: Gtk86.Align.CENTER,
+      css_classes: ["flat"]
+    });
+    refreshMappingBtn.connect("clicked", () => this.refreshPlayers());
+    refreshMappingRow.add_suffix(refreshMappingBtn);
+    this.add(refreshMappingRow);
+    settings.system.connect("changed::app-name-mapping", () => this.refreshPlayers());
+    this.refreshPlayers();
+  }
+  clearRows() {
+    for (const row of this.rows) {
+      this.remove(row);
+    }
+    this.rows = [];
+  }
+  refreshPlayers() {
+    if (this.systemPage.isRefreshingPlayers) {
+      return;
+    }
+    this.systemPage.isRefreshingPlayers = true;
+    this.clearRows();
+    const currentAppMapping = this.settings.system.appNameMapping;
+    const mprisNames = this.mpris.listPlayers();
+    if (mprisNames.length === 0) {
+      this.set_description(t("No active players detected. Open a music app first!"));
+    } else {
+      this.set_description(t("Select a player to help the extension identify it:"));
+      for (const fullBusName of mprisNames) {
+        let shortName = fullBusName.replace(`${PLAYER_INTERFACE}.`, "");
+        if (shortName.includes(".instance")) {
+          shortName = shortName.split(".instance")[0];
+        }
+        const row = new Adw106.ActionRow({
+          title: shortName,
+          subtitle: `Bus: ${fullBusName}`
+        });
+        const btn = new Gtk86.Button({
+          label: t("Use This"),
+          css_classes: ["suggested-action"],
+          valign: Gtk86.Align.CENTER,
+          sensitive: !currentAppMapping.includes(`${shortName}:`)
+        });
+        btn.connect("clicked", () => {
+          if (currentAppMapping.includes(`${shortName}:`)) {
+            return;
+          }
+          const newVal = currentAppMapping ? `${currentAppMapping},${shortName}:ENTER_APP_ID_HERE` : `${shortName}:ENTER_APP_ID_HERE`;
+          this.settings.system.appNameMapping = newVal;
+        });
+        this.rows.push(row);
+        row.add_suffix(btn);
+        this.add(row);
+      }
+    }
+    this.systemPage.isRefreshingPlayers = false;
+  }
+};
+GObject106.registerClass(_RunningPlayersGroup);
+var RunningPlayersGroup = _RunningPlayersGroup;
+
+// src/ui/preferences/system-page/backup-group/index.ts
+import Adw109 from "gi://Adw";
+import GObject109 from "gi://GObject";
+
+// src/ui/preferences/system-page/backup-group/components/export-row.ts
+import Adw107 from "gi://Adw";
+import Gtk87 from "gi://Gtk";
+import Gio4 from "gi://Gio";
+import GObject107 from "gi://GObject";
 
 // src/providers/settings-provider/utils.ts
 import Gio3 from "gi://Gio";
-function createSettingsMap(map8) {
-  return map8;
+function createSettingsMap(map9) {
+  return map9;
 }
-function createSettingsGroup(settings, map8) {
+function getSettingsKeys(map9) {
+  return Object.values(map9).map((entry) => entry.key);
+}
+function createSettingsGroup(settings, map9) {
   const methods = {
-    bind(prop, object, property, flags = Gio3.SettingsBindFlags.DEFAULT) {
+    bind(prop, object, property, flags2 = Gio3.SettingsBindFlags.DEFAULT) {
       settings.bind(
-        map8[prop].key,
+        map9[prop].key,
         object,
         property,
-        flags
+        flags2
       );
     },
     connect(signal, callback) {
@@ -2206,7 +2792,7 @@ function createSettingsGroup(settings, map8) {
     get(target, prop) {
       if (prop in target)
         return target[prop];
-      const entry = map8[prop];
+      const entry = map9[prop];
       const type = typeof entry.default;
       switch (type) {
         case "boolean":
@@ -2218,7 +2804,7 @@ function createSettingsGroup(settings, map8) {
       }
     },
     set(_2, prop, value) {
-      const entry = map8[prop];
+      const entry = map9[prop];
       const type = typeof entry.default;
       switch (type) {
         case "boolean":
@@ -2267,6 +2853,7 @@ var map = createSettingsMap({
     default: true
   }
 });
+var ScrollControlSettingsKeys = getSettingsKeys(map);
 function createScrollControlsSettings(settings) {
   return createSettingsGroup(settings, map);
 }
@@ -2278,6 +2865,7 @@ var map2 = createSettingsMap({
     default: ""
   }
 });
+var FallbackArtSettingsKeys = getSettingsKeys(map2);
 function createFallbackArtsSettings(settings) {
   return createSettingsGroup(settings, map2);
 }
@@ -2357,6 +2945,7 @@ var map3 = createSettingsMap({
     default: 32
   }
 });
+var PillSettingsKeys = getSettingsKeys(map3);
 function createPillSettings(settings) {
   return createSettingsGroup(settings, map3);
 }
@@ -2380,6 +2969,7 @@ var map4 = createSettingsMap({
     default: 50
   }
 });
+var LyricsSettingsKeys = getSettingsKeys(map4);
 function createLyricsSettings(settings) {
   return createSettingsGroup(settings, map4);
 }
@@ -2411,6 +3001,7 @@ var map5 = createSettingsMap({
     default: 0
   }
 });
+var MouseActionsKeys = getSettingsKeys(map5);
 function createMouseActions(settings) {
   return createSettingsGroup(settings, map5);
 }
@@ -2526,6 +3117,7 @@ var map6 = createSettingsMap({
     default: "none"
   }
 });
+var PopupSettingsKeys = getSettingsKeys(map6);
 function createPopupSettings(settings) {
   return createSettingsGroup(settings, map6);
 }
@@ -2603,13 +3195,68 @@ var map7 = createSettingsMap({
   customTextColor: {
     key: "custom-text-color",
     default: "40,40,40"
+  },
+  panelArtSize: {
+    key: "panel-art-size",
+    default: 14
+  },
+  panelWidth: {
+    key: "panel-pill-width",
+    default: 100
+  },
+  panelHeight: {
+    key: "panel-pill-height",
+    default: 100
   }
 });
+var StyleSettingsKeys = getSettingsKeys(map7);
 function createStyleSettings(settings) {
   return createSettingsGroup(settings, map7);
 }
 
+// src/providers/settings-provider/system.ts
+var map8 = createSettingsMap({
+  hideDefaultPlayer: {
+    key: "hide-default-player",
+    default: false
+  },
+  gameMode: {
+    key: "enable-gamemode",
+    default: false
+  },
+  compatibilityDelay: {
+    key: "compatibility-delay",
+    default: false
+  },
+  playerFilterMode: {
+    key: "player-filter-mode",
+    default: 0
+  },
+  filteredPlayers: {
+    key: "player-filter-list",
+    default: ""
+  },
+  appNameMapping: {
+    key: "app-name-mapping",
+    default: ""
+  }
+});
+var SystemSettingsKeys = getSettingsKeys(map8);
+function createSystemSettings(settings) {
+  return createSettingsGroup(settings, map8);
+}
+
 // src/providers/settings-provider/index.ts
+var SettingsKeys = [
+  ...ScrollControlSettingsKeys,
+  ...FallbackArtSettingsKeys,
+  ...PillSettingsKeys,
+  ...LyricsSettingsKeys,
+  ...MouseActionsKeys,
+  ...PopupSettingsKeys,
+  ...StyleSettingsKeys,
+  ...SystemSettingsKeys
+];
 function createSettingsProvider(settings) {
   const scrollControls = createScrollControlsSettings(settings);
   const fallbackArt = createFallbackArtsSettings(settings);
@@ -2618,20 +3265,1024 @@ function createSettingsProvider(settings) {
   const mouseActions = createMouseActions(settings);
   const popup = createPopupSettings(settings);
   const style = createStyleSettings(settings);
+  const system = createSystemSettings(settings);
   function connect(signal, callback) {
     return settings.connect(signal, callback);
   }
+  function emit(signal, ...args) {
+    settings.emit(signal, ...args);
+  }
   return {
+    gioInternal: settings,
     connect,
+    emit,
     scrollControls,
     fallbackArt,
     pill,
     lyrics,
     mouseActions,
     popup,
-    style
+    style,
+    system
   };
 }
+
+// node_modules/.pnpm/@girs+glib-2.0@2.88.0-4.0.4/node_modules/@girs/glib-2.0/glib-2.0.js
+import GLib2 from "gi://GLib?version=2.0";
+var glib_2_0_default = GLib2;
+
+// node_modules/.pnpm/@girs+glib-2.0@2.88.0-4.0.4/node_modules/@girs/glib-2.0/index.js
+var glib_2_default = glib_2_0_default;
+
+// src/utils/packing.ts
+function smartUnpack(object) {
+  if (object === null || object === void 0) {
+    return null;
+  }
+  if (object instanceof glib_2_default.Variant || typeof object === "object") {
+    let unpacked = object.deepUnpack ? object.deepUnpack() : object;
+    if (!unpacked) {
+      return unpacked;
+    }
+    if (Array.isArray(unpacked)) {
+      return unpacked.map(smartUnpack);
+    }
+    const entries = Object.entries(unpacked);
+    if (entries.length === 0) {
+      return unpacked;
+    }
+    for (const [key, value] of entries) {
+      if (value instanceof glib_2_default.Variant) {
+        unpacked[key] = smartUnpack(value);
+      }
+    }
+    return unpacked;
+  }
+  return object;
+}
+
+// src/utils/log.ts
+import GLib3 from "gi://GLib";
+
+// src/constants/log-constants.ts
+var log_constants_exports = {};
+__export(log_constants_exports, {
+  LOG_PREFIX: () => LOG_PREFIX
+});
+var LOG_PREFIX = "[DMP]";
+
+// src/utils/log.ts
+var PREFIX = log_constants_exports.LOG_PREFIX;
+function logInfo(message) {
+  console.log(`${PREFIX} [INFO] ${message}`);
+}
+function logDebug(message) {
+  console.log(`${PREFIX} [DEBUG] ${message}`);
+}
+function logError2(message) {
+  console.error(`${PREFIX} [ERROR] ${message}`);
+  if (message instanceof Error) {
+    console.error(`${PREFIX} Stack trace: ${message.stack}`);
+  }
+}
+function logTrace(message) {
+  console.trace(`${PREFIX} [TRACE] ${message}`);
+}
+function logObject(object, options = { trace: false, json: false, treeLevel: 0 }) {
+  const { trace = false, json = false, treeLevel = 0 } = options;
+  const level = "-".repeat(treeLevel);
+  const nextLevel = `${level}-`;
+  const logFn = trace ? logTrace : logInfo;
+  if (object === null) {
+    logFn(`${nextLevel} Object is null`);
+    return;
+  }
+  if (object === void 0) {
+    logFn(`${nextLevel} Object is undefined`);
+    return;
+  }
+  if (object instanceof GLib3.Variant) {
+    const unpacked = smartUnpack(object);
+    if (json) {
+      logFn(`${nextLevel} Variant as JSON: ${JSON.stringify(unpacked)}`);
+      return;
+    }
+    logInfo(`${nextLevel} Variant`);
+    logObject(unpacked, __spreadProps(__spreadValues({}, options), { treeLevel: treeLevel + 1 }));
+    return;
+  }
+  if (typeof object === "string") {
+    logFn(`${nextLevel} String ${object}`);
+    return;
+  }
+  if (typeof object === "number") {
+    logFn(`${nextLevel} Number ${object}`);
+    return;
+  }
+  if (typeof object === "boolean") {
+    logFn(`${nextLevel} Boolean ${object}`);
+    return;
+  }
+  if (Array.isArray(object)) {
+    logInfo(`${nextLevel} Array`);
+    for (const item of object) {
+      logObject(item, __spreadProps(__spreadValues({}, options), { treeLevel: treeLevel + 1 }));
+    }
+    return;
+  }
+  const variant = object.deep_unpack ? smartUnpack(object) : object;
+  if (json) {
+    logFn(`${nextLevel} Object as JSON: ${JSON.stringify(variant)}`);
+  } else {
+    const keys = Object.keys(variant);
+    keys.forEach((key) => {
+      const child = variant[key];
+      logFn(`${nextLevel} ${key} - ${typeof child}`);
+      logObject(child, __spreadProps(__spreadValues({}, options), { treeLevel: treeLevel + 1 }));
+    });
+  }
+}
+
+// src/ui/preferences/system-page/backup-group/components/export-row.ts
+var _ExportRow = class _ExportRow extends Adw107.ActionRow {
+  constructor(settings, properties, ...args) {
+    super(properties, args);
+    const exportBtn = new Gtk87.Button({
+      label: t("Export"),
+      valign: Gtk87.Align.CENTER,
+      css_classes: ["suggested-action"]
+    });
+    exportBtn.connect("clicked", () => {
+      let data = {};
+      for (const k of SettingsKeys) {
+        const value = smartUnpack(settings.gioInternal.get_value(k));
+        data = Object.assign(data, { [k]: value });
+      }
+      const dialog = new Gtk87.FileDialog({
+        title: t("Save Settings"),
+        initial_name: "music-pill-backup.json"
+      });
+      dialog.save(null, null, (dlg, res) => {
+        if (!dlg) {
+          return;
+        }
+        try {
+          const file = dlg.save_finish(res);
+          if (file) {
+            const encoder = new TextEncoder();
+            const json = JSON.stringify(data, null, 2);
+            const buffer = encoder.encode(json);
+            file.replace_contents_bytes_async(buffer, null, false, Gio4.FileCreateFlags.REPLACE_DESTINATION, null, null);
+          }
+        } catch (error) {
+          logError2(error);
+        }
+      });
+    });
+    this.add_suffix(exportBtn);
+  }
+};
+GObject107.registerClass(_ExportRow);
+var ExportRow = _ExportRow;
+
+// src/ui/preferences/system-page/backup-group/components/import-row.ts
+import Adw108 from "gi://Adw";
+import Gtk88 from "gi://Gtk";
+import GLib4 from "gi://GLib";
+import GObject108 from "gi://GObject";
+var _ImportRow = class _ImportRow extends Adw108.ActionRow {
+  constructor(settings, properties, ...args) {
+    super(properties, args);
+    const importBtn = new Gtk88.Button({
+      label: t("Import"),
+      valign: Gtk88.Align.CENTER
+    });
+    importBtn.connect("clicked", () => {
+      const dialog = new Gtk88.FileDialog({ title: t("Open Settings Backup") });
+      dialog.open(null, null, (dlg, res) => {
+        var _a;
+        if (!dlg) {
+          return;
+        }
+        try {
+          const file = dlg.open_finish(res);
+          if (file) {
+            const [ok, contents] = file.load_contents(null);
+            if (ok) {
+              const decoder = new TextDecoder();
+              const json = decoder.decode(contents);
+              const data = JSON.parse(json);
+              for (const k of SettingsKeys) {
+                const type = (_a = settings.gioInternal.get_default_value(k)) == null ? void 0 : _a.get_type_string();
+                const value = data[k];
+                if (type && value !== void 0) {
+                  settings.gioInternal.set_value(k, new GLib4.Variant(type, value));
+                }
+              }
+            }
+          }
+        } catch (error) {
+          logError2(error);
+        }
+      });
+    });
+    this.add_suffix(importBtn);
+  }
+};
+GObject108.registerClass(_ImportRow);
+var ImportRow = _ImportRow;
+
+// src/ui/preferences/system-page/backup-group/index.ts
+var _BackupGroup = class _BackupGroup extends Adw109.PreferencesGroup {
+  constructor(settings, properties, ...args) {
+    super(properties, args);
+    const exportRow = new ExportRow(settings, {
+      title: t("Export Settings")
+    });
+    this.add(exportRow);
+    const importRow = new ImportRow(settings, {
+      title: t("Import Settings")
+    });
+    this.add(importRow);
+  }
+};
+GObject109.registerClass(_BackupGroup);
+var BackupGroup = _BackupGroup;
+
+// src/ui/preferences/system-page/cache-group/index.ts
+import Adw111 from "gi://Adw";
+import GObject111 from "gi://GObject";
+import GLib5 from "gi://GLib";
+
+// src/ui/preferences/system-page/cache-group/components/cache-row.ts
+import Adw110 from "gi://Adw";
+import GObject110 from "gi://GObject";
+import Gtk89 from "gi://Gtk";
+import Gio5 from "gi://Gio";
+var _CacheRow = class _CacheRow extends Adw110.ActionRow {
+  constructor(ownCacheDir, properties, ...args) {
+    super(properties, args);
+    __publicField(this, "_ownCacheDir");
+    this._ownCacheDir = ownCacheDir;
+    const cacheBtn = new Gtk89.Button({
+      label: t("Clear"),
+      valign: Gtk89.Align.CENTER,
+      css_classes: ["destructive-action"]
+    });
+    cacheBtn.connect("clicked", () => {
+      this.clearCache();
+    });
+    this.add_suffix(cacheBtn);
+    this.subtitle = this.buildSubtitle(this.getCacheInfo());
+  }
+  clearCache() {
+    let en = null;
+    try {
+      const dir = Gio5.File.new_for_path(this._ownCacheDir);
+      if (!dir.query_exists(null)) {
+        return;
+      }
+      en = dir.enumerate_children("standard::name", Gio5.FileQueryInfoFlags.NONE, null);
+      let fi;
+      while ((fi = en.next_file(null)) !== null) {
+        dir.get_child(fi.get_name()).delete(null);
+      }
+    } catch (error) {
+      logError2(error);
+    } finally {
+      en == null ? void 0 : en.close(null);
+    }
+    this.subtitle = this.buildSubtitle(this.getCacheInfo());
+  }
+  getCacheInfo() {
+    let en = null;
+    try {
+      const dir = Gio5.File.new_for_path(this._ownCacheDir);
+      if (!dir.query_exists(null)) {
+        return { count: 0, size: 0 };
+      }
+      en = dir.enumerate_children("standard::size", Gio5.FileQueryInfoFlags.NONE, null);
+      let count = 0, size = 0, fi;
+      while ((fi = en.next_file(null)) !== null) {
+        count++;
+        size += fi.get_size();
+      }
+      en.close(null);
+      return { count, size };
+    } catch (error) {
+      logError2(error);
+      return { count: 0, size: 0 };
+    } finally {
+      en == null ? void 0 : en.close(null);
+    }
+  }
+  kiloPow(power) {
+    return Math.pow(1024, power);
+  }
+  formatSize(size) {
+    if (size < this.kiloPow(1)) {
+      return `${size} B`;
+    }
+    if (size < this.kiloPow(2)) {
+      return `${(size / this.kiloPow(1)).toFixed(1)} KB`;
+    } else if (size < this.kiloPow(3)) {
+      return `${(size / this.kiloPow(2)).toFixed(1)} MB`;
+    } else {
+      return `${(size / this.kiloPow(3)).toFixed(1)} GB`;
+    }
+  }
+  buildSubtitle(info) {
+    return `${info.count} ${t("covers cached")}  \u2014  ${this.formatSize(info.size)}`;
+  }
+};
+GObject110.registerClass(_CacheRow);
+var CacheRow = _CacheRow;
+
+// src/ui/preferences/system-page/cache-group/index.ts
+var _CacheGroup = class _CacheGroup extends Adw111.PreferencesGroup {
+  constructor(settings, properties, ...args) {
+    super(properties, args);
+    const ownCacheDir = GLib5.build_filenamev([GLib5.get_user_cache_dir(), "music-pill", "art"]);
+    const cacheRow = new CacheRow(ownCacheDir, {
+      title: t("Album Art Cache")
+    });
+    this.add(cacheRow);
+  }
+};
+GObject111.registerClass(_CacheGroup);
+var CacheGroup = _CacheGroup;
+
+// src/ui/preferences/system-page/danger-group/index.ts
+import Adw113 from "gi://Adw";
+import GObject113 from "gi://GObject";
+
+// src/ui/preferences/system-page/danger-group/components/factory-reset-row.ts
+import Adw112 from "gi://Adw";
+import GObject112 from "gi://GObject";
+import Gtk90 from "gi://Gtk";
+var _FactoryResetRow = class _FactoryResetRow extends Adw112.ActionRow {
+  constructor(settings, properties, ...args) {
+    super(properties, args);
+    const resetBtn = new Gtk90.Button({
+      label: t("Reset All"),
+      valign: Gtk90.Align.CENTER,
+      css_classes: ["destructive-action"]
+    });
+    resetBtn.connect("clicked", () => {
+      for (const key of SettingsKeys) {
+        settings.gioInternal.reset(key);
+      }
+    });
+    this.add_suffix(resetBtn);
+  }
+};
+GObject112.registerClass(_FactoryResetRow);
+var FactoryResetRow = _FactoryResetRow;
+
+// src/ui/preferences/system-page/danger-group/index.ts
+var _DangerGroup = class _DangerGroup extends Adw113.PreferencesGroup {
+  constructor(settings, properties, ...args) {
+    super(properties, args);
+    const factoryResetRow = new FactoryResetRow(settings, {
+      title: t("Factory Reset")
+    });
+    this.add(factoryResetRow);
+  }
+};
+GObject113.registerClass(_DangerGroup);
+var DangerGroup = _DangerGroup;
+
+// src/ui/preferences/system-page/index.ts
+var _SystemPage = class _SystemPage extends Adw114.PreferencesPage {
+  constructor(settings, mpris, properties, ...args) {
+    super(properties, args);
+    __publicField(this, "_isRefreshingPlayers", false);
+    const systemGroup = new SystemGroup(settings, mpris, {
+      title: t("System")
+    });
+    this.add(systemGroup);
+    const mappingHelpGroup = new MappingHelpGroup(settings);
+    this.add(mappingHelpGroup);
+    const appMappingGroup = new AppMappingGroup({
+      systemPage: this,
+      settings,
+      title: t("Saved App Mappings"),
+      description: t("Edit the target App ID for manually mapped players, or remove them.")
+    });
+    this.add(appMappingGroup);
+    const activePlayersGroup = new RunningPlayersGroup({
+      systemPage: this,
+      settings,
+      mpris,
+      title: t("Running Players Detection"),
+      description: t("Click on a detected player to automatically fill the mapping.")
+    });
+    this.add(activePlayersGroup);
+    const backupGroup = new BackupGroup(settings, {
+      title: t("Backup & Restore")
+    });
+    this.add(backupGroup);
+    const cacheGroup = new CacheGroup(settings, {
+      title: t("Album Art Cache")
+    });
+    this.add(cacheGroup);
+    const dangerGroup = new DangerGroup(settings, {
+      title: t("Danger Zone")
+    });
+    this.add(dangerGroup);
+  }
+  get isRefreshingPlayers() {
+    return this._isRefreshingPlayers;
+  }
+  set isRefreshingPlayers(isRefreshing) {
+    this._isRefreshingPlayers = isRefreshing;
+  }
+};
+GObject114.registerClass(_SystemPage);
+var SystemPage = _SystemPage;
+
+// src/ui/preferences/about-page/index.ts
+import Adw116 from "gi://Adw";
+import GObject116 from "gi://GObject";
+
+// src/ui/preferences/about-page/components/whats-new/index.ts
+import Adw115 from "gi://Adw";
+import Gio6 from "gi://Gio";
+import Gtk91 from "gi://Gtk";
+import GLib6 from "gi://GLib";
+import GObject115 from "gi://GObject";
+var _WhatsNewGroup = class _WhatsNewGroup extends Adw115.PreferencesGroup {
+  constructor(extensionDir, properties, ...args) {
+    super(properties, args);
+    __publicField(this, "extensionDir", extensionDir);
+    try {
+      const extensionDirPath = extensionDir.get_path();
+      if (!extensionDirPath) {
+        return;
+      }
+      const changelogPath = GLib6.build_filenamev([extensionDirPath, "changelog.json"]);
+      const changelogFile = Gio6.File.new_for_path(changelogPath);
+      if (!changelogFile.query_exists(null)) {
+        return;
+      }
+      const [ok, changelogContent] = changelogFile.load_contents(null);
+      if (!ok || changelogContent.length === 0) {
+        return;
+      }
+      const decoder = new TextDecoder();
+      const changelogContentString = decoder.decode(changelogContent);
+      const changelog = JSON.parse(changelogContentString);
+      for (const release of changelog) {
+        const row = new Adw115.ExpanderRow({
+          title: release.version,
+          subtitle: release.subtitle,
+          expanded: release.expanded
+        });
+        for (const section of release.sections) {
+          const sectionRow = new Adw115.ExpanderRow({
+            title: section.title,
+            margin_top: 10,
+            margin_bottom: 10,
+            margin_start: 15,
+            margin_end: 15
+          });
+          for (const item of section.items) {
+            const itemRow = new Gtk91.Label({
+              label: `\u2022 ${item}`,
+              justify: Gtk91.Justification.LEFT,
+              xalign: 0,
+              margin_top: 5,
+              wrap: true
+            });
+            sectionRow.add_row(itemRow);
+          }
+          row.add_row(sectionRow);
+        }
+        this.add(row);
+      }
+    } catch (error) {
+      logError2(error);
+    }
+  }
+};
+GObject115.registerClass(_WhatsNewGroup);
+var WhatsNewGroup = _WhatsNewGroup;
+
+// src/ui/preferences/about-page/index.ts
+var _AboutPage = class _AboutPage extends Adw116.PreferencesPage {
+  constructor(prefs, properties, ...args) {
+    super(properties, args);
+    const whatsNewGroup = new WhatsNewGroup(prefs.dir, {
+      title: t("What's New")
+    });
+    this.add(whatsNewGroup);
+  }
+};
+GObject116.registerClass(_AboutPage);
+var AboutPage = _AboutPage;
+
+// src/utils/env.ts
+import GLib7 from "gi://GLib";
+import Gio7 from "gi://Gio";
+function loadEnv() {
+  try {
+    const xdgRuntimeDir = GLib7.getenv("XDG_RUNTIME_DIR");
+    if (!xdgRuntimeDir) {
+      throw new Error("XDG_RUNTIME_DIR is not set");
+    }
+    const envPath = `${xdgRuntimeDir}/dynamic-music-pill.env`;
+    if (!GLib7.file_test(envPath, GLib7.FileTest.EXISTS)) {
+      logObject(process.env.NODE_ENV);
+      return;
+    }
+    parseEnvFile(envPath);
+  } catch (error) {
+    logError(error);
+  }
+}
+function parseEnvFile(envPath) {
+  const file = Gio7.File.new_for_path(envPath);
+  if (!file) {
+    logInfo(`Failed to load env file: ${envPath}`);
+    return;
+  }
+  const fileStream = file.read(null);
+  const dataStream = new Gio7.DataInputStream({
+    base_stream: fileStream,
+    byte_order: Gio7.DataStreamByteOrder.BIG_ENDIAN
+  });
+  const encoder = new TextDecoder("utf-8");
+  while (true) {
+    const [buffer, length] = dataStream.read_line(null);
+    if (buffer === null || length === 0) {
+      break;
+    }
+    const line = encoder.decode(buffer).trim();
+    if (line.startsWith("#") || line.length === 0) {
+      continue;
+    }
+    const firstKeySeparatorIndex = line.indexOf("=");
+    if (firstKeySeparatorIndex === -1) {
+      continue;
+    }
+    const key = line.substring(0, firstKeySeparatorIndex);
+    const value = line.substring(firstKeySeparatorIndex + 1);
+    GLib7.setenv(key, value, true);
+  }
+  dataStream.close(null);
+  fileStream.close(null);
+}
+
+// src/providers/mpris-provider/index.ts
+import Gio9 from "gi://Gio";
+import GObject118 from "gi://GObject";
+import GLib9 from "gi://GLib";
+
+// src/utils/development.ts
+function getDBusSessionAddress() {
+  const dbusParent = glib_2_default.getenv("DBUS_PARENT");
+  if (dbusParent) {
+    return dbusParent;
+  }
+  const address = glib_2_default.getenv("DBUS_SESSION_BUS_ADDRESS");
+  if (address === null) {
+    throw new Error("Failed to find the DBus address");
+  }
+  return address;
+}
+
+// src/providers/mpris-provider/media-player.ts
+import Gio8 from "gi://Gio";
+import GLib8 from "gi://GLib";
+import GObject117 from "gi://GObject";
+
+// src/utils/mapper.ts
+function invokeMapper(mapper, key, value, parent) {
+  const map9 = mapper[key];
+  if (map9) {
+    map9(parent, value);
+  }
+}
+function mapObject(object, mapper, parent = {}) {
+  for (let [key, value] of Object.entries(object)) {
+    value = smartUnpack(value);
+    if (!value) {
+      continue;
+    }
+    if (typeof value === "object" && !Array.isArray(value)) {
+      mapObject(value, mapper, parent);
+      continue;
+    }
+    invokeMapper(mapper, key, value, parent);
+  }
+  return parent;
+}
+function checkChanged(oldValue, newValue, debug = false, tree = []) {
+  if (oldValue === void 0 && newValue !== void 0) {
+    if (debug) {
+      logDebug(`Changed: ${tree.join(" -> ")} is undefined -> defined`);
+    }
+    return [true, [tree.join(" -> "), oldValue, newValue]];
+  }
+  if (oldValue !== void 0 && newValue === void 0) {
+    if (debug) {
+      logDebug(`Changed: ${tree.join(" -> ")} is defined -> undefined`);
+    }
+    return [true, [tree.join(" -> "), oldValue, newValue]];
+  }
+  for (let [key, value] of Object.entries(oldValue)) {
+    const compareValue = newValue[key];
+    const newTree = tree.concat([key]);
+    const newTreeString = newTree.join(" -> ");
+    if (debug) {
+      logDebug(`Comparing: ${newTreeString} ${typeof value} -> ${typeof compareValue}`);
+    }
+    if (value === null && compareValue !== null) {
+      if (debug) {
+        logDebug(`Changed: ${newTreeString} value is null -> compareValue is not null`);
+      }
+      return [true, [newTreeString, value, compareValue]];
+    }
+    if (value !== null && compareValue === null) {
+      if (debug) {
+        logDebug(`Changed: ${newTreeString} value is not null -> compareValue is null`);
+      }
+      return [true, [newTreeString, value, compareValue]];
+    }
+    if (!Array.isArray(value)) {
+      if (typeof value === "object") {
+        const [changed, [objectPath, oldCheckValue, newCheckValue]] = checkChanged(value, compareValue, debug, newTree);
+        if (changed) {
+          if (debug) {
+            logDebug(`Changed: ${objectPath} ${typeof oldCheckValue} -> ${typeof newCheckValue}`);
+          }
+          return [true, [objectPath, oldCheckValue, newCheckValue]];
+        } else {
+          if (debug) {
+            logDebug(`Not changed: ${objectPath} ${typeof oldCheckValue} -> ${typeof newCheckValue}`);
+          }
+          return [false, [objectPath, oldCheckValue, newCheckValue]];
+        }
+      }
+      if (compareValue !== value) {
+        if (debug) {
+          logDebug(`Changed: ${newTreeString} ${typeof value} -> ${typeof compareValue}`);
+        }
+        return [true, [newTreeString, value, compareValue]];
+      }
+    } else {
+      if (!Array.isArray(compareValue)) {
+        if (debug) {
+          logDebug(`Changed: ${newTreeString} ${typeof value} -> ${typeof compareValue}`);
+        }
+        return [true, [newTreeString, value, compareValue]];
+      }
+      if (debug) {
+        logDebug(`Comparing object array: ${newTreeString} ${typeof value} -> ${typeof compareValue}`);
+      }
+      return checkArrayChanged(value, compareValue, newTree, debug);
+    }
+  }
+  if (Array.isArray(oldValue)) {
+    if (!Array.isArray(newValue)) {
+      if (debug) {
+        logDebug(`Changed: ${tree.join(" -> ")} is array -> not array`);
+      }
+      return [true, [tree.join(" -> "), oldValue, newValue]];
+    }
+    if (debug) {
+      logDebug(`Comparing array: ${tree.join(" -> ")} is array -> array`);
+    }
+    return checkArrayChanged(oldValue, newValue, tree, debug);
+  }
+  return [false, ["", void 0, void 0]];
+}
+function checkArrayChanged(oldValue, newValue, tree, debug = false) {
+  if (debug) {
+    logDebug(`Comparing array: ${tree.join(" -> ")} is array -> array`);
+  }
+  if (newValue.length != oldValue.length) {
+    if (debug) {
+      logDebug(`Changed: ${tree.join(" -> ")} size is different`);
+    }
+    return [true, [tree.join(" -> "), oldValue, newValue]];
+  }
+  for (let i = 0; i < newValue.length; i++) {
+    const compareValue = newValue[i];
+    const value = oldValue[i];
+    if (compareValue === void 0 && value !== void 0) {
+      if (debug) {
+        logDebug(`Changed: ${tree.join(" -> ")}${i} is defined -> undefined`);
+      }
+      return [true, [tree.join(" -> "), oldValue, newValue]];
+    }
+    if (compareValue !== void 0 && value === void 0) {
+      if (debug) {
+        logDebug(`Changed: ${tree.join(" -> ")}${i} is undefined -> defined`);
+      }
+      return [true, [tree.join(" -> "), oldValue, newValue]];
+    }
+    if (debug) {
+      logDebug(`Comparing: ${tree.join(" -> ")}${i} ${typeof value} -> ${typeof compareValue}`);
+    }
+    if (!Array.isArray(value)) {
+      if (Array.isArray(compareValue)) {
+        if (debug) {
+          logDebug(`Changed: ${tree.join(" -> ")}${i} is array -> not array`);
+        }
+        return [true, [tree.join(" -> "), oldValue, newValue]];
+      }
+    }
+    if (compareValue !== value) {
+      if (debug) {
+        logDebug(`Changed: ${tree.join(" -> ")}${i} is different`);
+      }
+      return [true, [tree.join(" -> "), oldValue, newValue]];
+    }
+  }
+  return [false, ["", void 0, void 0]];
+}
+
+// src/providers/mpris-provider/maps/player-state-map.ts
+var PlayerStateMap = {
+  "PlaybackStatus": (s, v) => s.playbackStatus = v,
+  "CanControl": (s, v) => s.canControl = v,
+  "CanGoNext": (s, v) => s.canGoNext = v,
+  "CanGoPrevious": (s, v) => s.canGoPrevious = v,
+  "CanPause": (s, v) => s.canPause = v,
+  "CanPlay": (s, v) => s.canPlay = v,
+  "CanSeek": (s, v) => s.canSeek = v,
+  "MaximumRate": (s, v) => s.maximumRate = v,
+  "MinimumRate": (s, v) => s.minimumRate = v,
+  "Volume": (s, v) => s.volume = v,
+  "Position": (s, v) => s.position = v
+};
+
+// src/providers/mpris-provider/maps/track-info-map.ts
+var TrackInfoMap = {
+  "xesam:title": (t2, v) => t2.title = v,
+  "xesam:artist": (t2, v) => t2.artist = v,
+  "xesam:album": (t2, v) => t2.album = v,
+  "mpris:artUrl": (t2, v) => t2.artUrl = v,
+  "mpris:length": (t2, v) => t2.length = v,
+  "mpris:trackid": (t2, v) => t2.trackId = v,
+  "rate": (t2, v) => t2.rate = v
+};
+
+// src/providers/mpris-provider/media-player.ts
+var DEFAULT_PLAYER_STATE = {
+  playbackStatus: "Stopped",
+  canControl: false,
+  canGoNext: false,
+  canGoPrevious: false,
+  canPause: false,
+  canPlay: false,
+  canSeek: false,
+  volume: 1,
+  minimumRate: 1,
+  maximumRate: 1,
+  position: 0
+};
+var _MediaPlayer = class _MediaPlayer extends GObject117.Object {
+  constructor(name, owner, mpris) {
+    super();
+    __publicField(this, "_name");
+    __publicField(this, "_owner");
+    __publicField(this, "_mpris");
+    __publicField(this, "_connection");
+    __publicField(this, "_playerPropertiesTimer", null);
+    __publicField(this, "_state");
+    logDebug(`Creating MediaPlayer for ${name}`);
+    this._name = name;
+    this._owner = owner;
+    this._mpris = mpris;
+    this._connection = mpris.getConnection();
+    this._state = {
+      player: __spreadValues({}, DEFAULT_PLAYER_STATE),
+      trackInfo: void 0
+    };
+    this._playerPropertiesTimer = GLib8.timeout_add(GLib8.PRIORITY_DEFAULT, 1e3, this._playerTimerCallback.bind(this));
+    this._mpris.emit("player-added", this._name, this);
+  }
+  getPlayerState() {
+    if (this._connection === null) {
+      return this._state;
+    }
+    const [result] = smartUnpack(this._connection.call_sync(
+      this._name,
+      MPRIS_OBJECT,
+      "org.freedesktop.DBus.Properties",
+      "GetAll",
+      new GLib8.Variant("(s)", [MPRIS_INTERFACE]),
+      null,
+      Gio8.DBusCallFlags.NONE,
+      -1,
+      null
+    ));
+    if (!result) {
+      return this._state;
+    }
+    const playerState = mapObject(result, PlayerStateMap);
+    const trackInfo = mapObject(result, TrackInfoMap);
+    const state = {
+      player: playerState,
+      trackInfo
+    };
+    return state;
+  }
+  getTrackInfo() {
+    return this._state.trackInfo;
+  }
+  getPlayerInfo() {
+    return this._state.player;
+  }
+  getName() {
+    return this._name;
+  }
+  getOwner() {
+    return this._owner;
+  }
+  removePlayer() {
+    logDebug(`Removing MediaPlayer for ${this._name}`);
+    this._mpris.emit("player-removed", this._name, this);
+    if (this._playerPropertiesTimer !== null) {
+      GLib8.source_remove(this._playerPropertiesTimer);
+      this._playerPropertiesTimer = null;
+    }
+    this._state = {
+      player: __spreadValues({}, DEFAULT_PLAYER_STATE),
+      trackInfo: void 0
+    };
+  }
+  _playerTimerCallback() {
+    const newState = this.getPlayerState();
+    const oldState = this._state;
+    const [playerChanged, [playerPath, oldPlayerValue, newPlayerValue]] = checkChanged(oldState.player, newState.player);
+    const [trackChanged, [trackPath, oldTrackValue, newTrackValue]] = checkChanged(oldState.trackInfo, newState.trackInfo);
+    if (playerChanged) {
+      this._state.player = newState.player;
+      this._mpris.emit("player-state-changed", this._name, this);
+      if (newState.player.playbackStatus !== oldState.player.playbackStatus) {
+        this._mpris.emit("player-status-changed", this._name, newState.player.playbackStatus);
+      }
+    }
+    if (trackChanged) {
+      this._state.trackInfo = newState.trackInfo;
+      this._mpris.emit("player-track-changed", this._name, this);
+    }
+    return GLib8.SOURCE_CONTINUE;
+  }
+};
+GObject117.registerClass(_MediaPlayer);
+var MediaPlayer = _MediaPlayer;
+
+// src/providers/mpris-provider/index.ts
+var flags = Gio9.DBusConnectionFlags.AUTHENTICATION_CLIENT | Gio9.DBusConnectionFlags.MESSAGE_BUS_CONNECTION;
+var _MPRISProvider = class _MPRISProvider extends GObject118.Object {
+  constructor() {
+    super();
+    __publicField(this, "_address", getDBusSessionAddress());
+    __publicField(this, "_connection", null);
+    __publicField(this, "_nameOwnerChangedSignal", null);
+    __publicField(this, "_players", /* @__PURE__ */ new Map());
+  }
+  start() {
+    logDebug(`Creating DBus connection for address: ${this._address}`);
+    this._connection = Gio9.DBusConnection.new_for_address_sync(this._address, flags, null, null);
+    this._nameOwnerChangedSignal = this._connection.signal_subscribe(
+      "org.freedesktop.DBus",
+      "org.freedesktop.DBus",
+      "NameOwnerChanged",
+      "/org/freedesktop/DBus",
+      null,
+      Gio9.DBusSignalFlags.NONE,
+      this._nameOwnerChanged.bind(this)
+    );
+    const names = this.listPlayers();
+    for (const name of names) {
+      const owner = this.getPlayerOwner(name);
+      if (!owner) {
+        continue;
+      }
+      const player = new MediaPlayer(name, owner, this);
+      this._players.set(owner, player);
+    }
+  }
+  stop() {
+    if (this._connection === null) {
+      return;
+    }
+    for (const player of this._players.values()) {
+      player.removePlayer();
+    }
+    this._players.clear();
+    logDebug("Stopping DBus connection");
+    if (this._nameOwnerChangedSignal !== null) {
+      this._connection.signal_unsubscribe(this._nameOwnerChangedSignal);
+      this._nameOwnerChangedSignal = null;
+    }
+    this._connection.close_sync(null);
+    this._connection = null;
+  }
+  getConnection() {
+    if (this._connection === null) {
+      throw new Error("DBus connection not initialized");
+    }
+    return this._connection;
+  }
+  getPlayerOwner(name) {
+    if (!this._connection) {
+      return void 0;
+    }
+    logDebug(`Getting owner for player: ${name}`);
+    const result = this._connection.call_sync(
+      "org.freedesktop.DBus",
+      "/org/freedesktop/DBus",
+      "org.freedesktop.DBus",
+      "GetNameOwner",
+      new GLib9.Variant("(s)", [name]),
+      null,
+      Gio9.DBusCallFlags.NONE,
+      -1,
+      null
+    );
+    const [owner] = smartUnpack(result);
+    return owner || void 0;
+  }
+  listPlayers() {
+    if (this._connection === null) {
+      return [];
+    }
+    const result = this._connection.call_sync(
+      "org.freedesktop.DBus",
+      "/org/freedesktop/DBus",
+      "org.freedesktop.DBus",
+      "ListNames",
+      null,
+      null,
+      Gio9.DBusCallFlags.NONE,
+      -1,
+      null
+    );
+    const names = smartUnpack(result)[0];
+    return names.filter((name) => name.startsWith(`${PLAYER_INTERFACE}.`));
+  }
+  getPlayer(name) {
+    return this._players.get(name);
+  }
+  _nameOwnerChanged(connection, sender_name, object_path, interface_name, signal_name, parameters) {
+    const [name, oldOwner, newOwner] = smartUnpack(parameters);
+    if (!(name == null ? void 0 : name.startsWith(PLAYER_INTERFACE))) {
+      return;
+    }
+    logDebug(`NameOwnerChanged: ${sender_name} ${object_path} ${interface_name} ${signal_name}`);
+    logObject(parameters, { json: true });
+    if (name === void 0 || oldOwner === void 0 || newOwner === void 0) {
+      return;
+    }
+    if (oldOwner === newOwner || oldOwner.length === 0 && this._players.has(newOwner)) {
+      return;
+    }
+    if (newOwner.length === 0 && this._players.has(oldOwner)) {
+      const player = this._players.get(oldOwner);
+      if (player) {
+        player.removePlayer();
+        this._players.delete(oldOwner);
+      }
+      return;
+    }
+    if (newOwner.length > 0 && !this._players.has(newOwner)) {
+      const player = new MediaPlayer(name, newOwner, this);
+      this._players.set(newOwner, player);
+    }
+  }
+};
+GObject118.registerClass({
+  Signals: {
+    "player-added": {
+      param_types: [GObject118.TYPE_STRING, GObject118.TYPE_OBJECT]
+    },
+    "player-removed": {
+      param_types: [GObject118.TYPE_STRING, GObject118.TYPE_OBJECT]
+    },
+    "player-status-changed": {
+      param_types: [GObject118.TYPE_STRING, GObject118.TYPE_STRING]
+    },
+    "player-rate-changed": {
+      param_types: [GObject118.TYPE_STRING, GObject118.TYPE_FLOAT]
+    },
+    "player-state-changed": {
+      param_types: [GObject118.TYPE_STRING, GObject118.TYPE_OBJECT]
+    },
+    "player-track-changed": {
+      param_types: [GObject118.TYPE_STRING, GObject118.TYPE_OBJECT]
+    },
+    "player-volume-changed": {
+      param_types: [GObject118.TYPE_STRING, GObject118.TYPE_FLOAT]
+    }
+  }
+}, _MPRISProvider);
+var MPRISProvider = _MPRISProvider;
 
 // src/prefs.ts
 var DynamicMusicPillPrefs = class extends prefs_exports.ExtensionPreferences {
@@ -2640,8 +4291,14 @@ var DynamicMusicPillPrefs = class extends prefs_exports.ExtensionPreferences {
   async fillPreferencesWindow(window) {
     window.search_enabled = true;
     pkg.initGettext();
+    loadEnv();
     const settings = this.getSettings();
     const settingsProvider = createSettingsProvider(settings);
+    const mpris = new MPRISProvider();
+    mpris.start();
+    window.connect("destroy", () => {
+      mpris.stop();
+    });
     const mainPage = new MainPage(settingsProvider, {
       title: t("Main Pill"),
       icon_name: "preferences-system-symbolic"
@@ -2657,6 +4314,16 @@ var DynamicMusicPillPrefs = class extends prefs_exports.ExtensionPreferences {
       icon_name: "applications-graphics-symbolic"
     });
     window.add(stylePage);
+    const systemPage = new SystemPage(settingsProvider, mpris, {
+      title: t("System & Reset"),
+      icon_name: "utilities-terminal-symbolic"
+    });
+    window.add(systemPage);
+    const aboutPage = new AboutPage(this, {
+      title: t("About"),
+      icon_name: "help-about-symbolic"
+    });
+    window.add(aboutPage);
   }
 };
 export {
