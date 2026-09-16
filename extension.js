@@ -578,7 +578,7 @@ var map7 = createSettingsMap({
   },
   corderRadius: {
     key: "border-radius",
-    default: 0
+    default: 22
   },
   showPillOutline: {
     key: "show-pill-border",
@@ -1464,7 +1464,7 @@ GObject2.registerClass({
 var MPRISProvider = _MPRISProvider;
 
 // src/controllers/music-controller.ts
-import GLib12 from "gi://GLib";
+import GLib13 from "gi://GLib";
 import * as Main5 from "resource:///org/gnome/shell/ui/main.js";
 
 // src/controllers/active-player.ts
@@ -2422,6 +2422,52 @@ var _WaveformVisualizer = class _WaveformVisualizer extends St6.Bin {
 GObject9.registerClass(_WaveformVisualizer);
 var WaveformVisualizer = _WaveformVisualizer;
 
+// src/ui/music-pill/handlers/style.ts
+function applyPillBodyStyle(body, settings, state, color, alpha = 1, playing = false) {
+  var _a;
+  const r = Number.isFinite(color.r) ? Math.floor(color.r) : 40;
+  const g = Number.isFinite(color.g) ? Math.floor(color.g) : 40;
+  const b = Number.isFinite(color.b) ? Math.floor(color.b) : 40;
+  let radius = settings.style.corderRadius;
+  if (!Number.isFinite(radius) || radius <= 0) {
+    radius = 28;
+  }
+  state.radius = radius;
+  const padX = Number.isFinite(state.paddingX) ? Math.floor(state.paddingX) : 14;
+  const padY = Number.isFinite(state.paddingY) ? Math.floor(state.paddingY) : 6;
+  let bg = `background-color: rgba(${r}, ${g}, ${b}, ${alpha});`;
+  if (settings.style.useCustomColors) {
+    const parts = (settings.style.customBgColor || "40,40,40").split(",").map((s) => parseInt(s.trim(), 10));
+    const cr = Number.isFinite(parts[0]) ? parts[0] : 40;
+    const cg = Number.isFinite(parts[1]) ? parts[1] : 40;
+    const cb = Number.isFinite(parts[2]) ? parts[2] : 40;
+    bg = `background-color: rgba(${cr}, ${cg}, ${cb}, ${alpha});`;
+    state.displayedColor = { r: cr, g: cg, b: cb };
+  } else {
+    state.displayedColor = { r, g, b };
+  }
+  let border = "border-width: 0px; border-color: transparent;";
+  if (settings.style.showPillOutline) {
+    const borderOp = playing ? 0.2 : 0.1;
+    border = `border-width: 1px; border-style: solid; border-color: rgba(255, 255, 255, ${borderOp});`;
+  }
+  let shadow = state.shadowCSS || "box-shadow: none;";
+  if (settings.pill.enableShadow) {
+    const blur = settings.pill.shadowBlur || 8;
+    const opacity = ((_a = settings.pill.shadowOpacity) != null ? _a : 50) / 100;
+    shadow = `box-shadow: 0 2px ${blur}px rgba(0,0,0,${opacity});`;
+    state.shadowCSS = shadow;
+  } else {
+    shadow = "box-shadow: none;";
+    state.shadowCSS = shadow;
+  }
+  const css = `${bg} ${border} padding: ${padY}px ${padX}px; border-radius: ${radius}px; ${shadow}`;
+  if (state.lastBodyCss !== css) {
+    state.lastBodyCss = css;
+    body.set_style(css);
+  }
+}
+
 // src/ui/music-pill/index.ts
 var _MusicPill = class _MusicPill extends St7.Widget {
   constructor(settings) {
@@ -2474,10 +2520,10 @@ var _MusicPill = class _MusicPill extends St7.Widget {
       style_class: "pill-body",
       x_expand: false,
       y_expand: false,
-      y_align: Clutter7.ActorAlign.CENTER,
-      style: "spacing: 6px;"
+      y_align: Clutter7.ActorAlign.CENTER
     });
     this._body.set_pivot_point(0.5, 0.5);
+    this._applyStyle();
     this._artWidget = new CrossfadeArt();
     this._artBin = new St7.Bin({
       child: this._artWidget,
@@ -2511,12 +2557,20 @@ var _MusicPill = class _MusicPill extends St7.Widget {
     const height = this._settings.pill.dockHeight;
     const width = this._settings.pill.dynamicWidth ? -1 : this._settings.pill.dockWidth;
     this._state.targetWidth = width === -1 ? 250 : width;
+    this._state.paddingX = this._settings.style.outerEdgeMargin || 14;
+    const rawPadY = Math.floor(height / 10);
+    this._state.paddingY = Math.max(2, Math.min(8, rawPadY));
+    const artSize = this._settings.pill.albumArtSize || 16;
+    this._artWidget.set_size(artSize, artSize);
+    this._artWidget.setRadius(Math.floor(artSize / 2));
+    this._artBin.set_size(artSize, artSize);
     this._body.set_height(height);
     if (width > 0) {
       this._body.set_width(width);
     }
     this.set_height(height);
     this._visualizer.setHeightClamped(Math.max(8, height - 8));
+    this._applyStyle();
   }
   updateDisplay(payload) {
     if (!this.get_parent()) {
@@ -2541,6 +2595,19 @@ var _MusicPill = class _MusicPill extends St7.Widget {
     } else {
       this.hideInactive();
     }
+    this._applyStyle();
+  }
+  _applyStyle() {
+    applyPillBodyStyle(
+      this._body,
+      this._settings,
+      this._state,
+      this._state.targetColor,
+      this.currentBgAlpha,
+      this._currentStatus === "Playing"
+    );
+    this._visualizer.setColor(this._state.displayedColor);
+    this._artWidget.setRadius(this._state.radius > 0 ? Math.min(this._state.radius, 16) : 8);
   }
   setTitle(title) {
     this.textBlock.setTitle(title);
@@ -2882,7 +2949,7 @@ function createPillInjector(pill, settings) {
 
 // src/ui/expanded-player/index.ts
 import GObject15 from "gi://GObject";
-import GLib11 from "gi://GLib";
+import GLib12 from "gi://GLib";
 import St12 from "gi://St";
 import Clutter12 from "gi://Clutter";
 import * as Main3 from "resource:///org/gnome/shell/ui/main.js";
@@ -3135,6 +3202,7 @@ var TransportControls = _TransportControls;
 
 // src/ui/expanded-player/components/vinyl-art.ts
 import GObject14 from "gi://GObject";
+import GLib11 from "gi://GLib";
 import St11 from "gi://St";
 import Clutter11 from "gi://Clutter";
 var _VinylArt = class _VinylArt extends St11.Bin {
@@ -3143,57 +3211,118 @@ var _VinylArt = class _VinylArt extends St11.Bin {
       width: 96,
       height: 96,
       x_align: Clutter11.ActorAlign.CENTER,
-      y_align: Clutter11.ActorAlign.CENTER
+      y_align: Clutter11.ActorAlign.CENTER,
+      style_class: "vinyl-container"
     });
     __publicField(this, "_art");
     __publicField(this, "_url", null);
     __publicField(this, "_spinning", false);
     __publicField(this, "_square", false);
+    __publicField(this, "_speed", 10);
+    __publicField(this, "_idleId", null);
     this._art = new St11.Widget({
       width: 96,
       height: 96,
+      style_class: "vinyl-container",
       style: "border-radius: 48px; background-size: cover; background-color: rgba(40,40,40,0.8);"
     });
     this.set_child(this._art);
+    this._art.set_pivot_point(0.5, 0.5);
   }
   setSquare(square) {
     this._square = square;
     this._refreshStyle();
+    if (square && this._spinning) {
+      this.setSpinning(false);
+    }
+  }
+  setSpeed(speed) {
+    this._speed = Math.max(1, speed || 10);
   }
   setArt(url) {
     this._url = url;
     this._refreshStyle();
   }
   setSpinning(spinning) {
+    if (spinning && this._square) {
+      spinning = false;
+    }
     if (this._spinning === spinning) {
       return;
     }
-    this._spinning = spinning;
-    this._art.remove_all_transitions();
     if (spinning) {
-      this._art.set_pivot_point(0.5, 0.5);
-      this._spinOnce();
+      this._spinning = true;
+      this._startSpin();
     } else {
-      this._art.rotation_angle_z = 0;
+      this._stopSpin();
     }
   }
-  _spinOnce() {
-    if (!this._spinning) {
-      return;
-    }
+  destroy() {
+    this._clearIdle();
+    this._spinning = false;
+    this._art.remove_all_transitions();
+    super.destroy();
+  }
+  _startSpin() {
+    this._clearIdle();
+    this._art.remove_all_transitions();
+    this._art.set_pivot_point(0.5, 0.5);
+    const factor = 10 / this._speed;
+    const initialDuration = Math.round(800 * factor);
+    const loopDuration = Math.round(35e4 * factor);
+    const currentAngle = this._art.rotation_angle_z || 0;
     this._art.ease({
-      rotation_angle_z: this._art.rotation_angle_z + 360,
-      duration: 8e3,
-      mode: Clutter11.AnimationMode.LINEAR,
+      rotation_angle_z: currentAngle + 90,
+      duration: initialDuration,
+      mode: Clutter11.AnimationMode.EASE_IN_QUAD,
       onStopped: (finished) => {
-        if (finished && this._spinning) {
-          this._spinOnce();
+        if (!finished || !this._spinning) {
+          return;
+        }
+        this._idleId = GLib11.idle_add(GLib11.PRIORITY_DEFAULT_IDLE, () => {
+          this._idleId = null;
+          if (!this._spinning) {
+            return GLib11.SOURCE_REMOVE;
+          }
+          const next = this._art.rotation_angle_z || 0;
+          this._art.ease({
+            rotation_angle_z: next + 36e3,
+            duration: loopDuration,
+            mode: Clutter11.AnimationMode.LINEAR
+          });
+          return GLib11.SOURCE_REMOVE;
+        });
+      }
+    });
+  }
+  _stopSpin() {
+    this._spinning = false;
+    this._clearIdle();
+    const factor = 10 / this._speed;
+    const stopDuration = Math.round(800 * factor);
+    const currentAngle = this._art.rotation_angle_z || 0;
+    this._art.remove_all_transitions();
+    this._art.ease({
+      rotation_angle_z: currentAngle + 90,
+      duration: stopDuration,
+      mode: Clutter11.AnimationMode.EASE_OUT_QUAD,
+      onStopped: (finished) => {
+        if (finished) {
+          this._art.rotation_angle_z = (this._art.rotation_angle_z || 0) % 360;
         }
       }
     });
   }
+  _clearIdle() {
+    if (this._idleId !== null) {
+      GLib11.source_remove(this._idleId);
+      this._idleId = null;
+    }
+  }
   _refreshStyle() {
     const radius = this._square ? 12 : 48;
+    const klass = this._square ? "vinyl-container-square" : "vinyl-container";
+    this._art.set_style_class_name(klass);
     const bg = this._url ? `background-image: url("${this._url}");` : "background-color: rgba(40,40,40,0.8);";
     this._art.set_style(`border-radius: ${radius}px; background-size: cover; ${bg}`);
   }
@@ -3243,6 +3372,7 @@ var _ExpandedPlayer = class _ExpandedPlayer extends St12.Widget {
     this.add_child(this.box);
     this._vinyl = new VinylArt();
     this._vinyl.setSquare(host.settings.popup.squareVinyl);
+    this._vinyl.setSpeed(host.settings.popup.vinylSpeed);
     this._info = new TrackInfoBlock();
     this._visualizer = new WaveformVisualizer(80, host.settings, true);
     this._visualizer.setMode(host.settings.style.visualizerAnimation || 1);
@@ -3373,15 +3503,15 @@ var _ExpandedPlayer = class _ExpandedPlayer extends St12.Widget {
   }
   _startTimer() {
     this._stopTimer();
-    this._timer = GLib11.timeout_add(GLib11.PRIORITY_DEFAULT, 500, () => {
+    this._timer = GLib12.timeout_add(GLib12.PRIORITY_DEFAULT, 500, () => {
       this._tick();
-      return GLib11.SOURCE_CONTINUE;
+      return GLib12.SOURCE_CONTINUE;
     });
     this._tick();
   }
   _stopTimer() {
     if (this._timer !== null) {
-      GLib11.source_remove(this._timer);
+      GLib12.source_remove(this._timer);
       this._timer = null;
     }
   }
@@ -3756,25 +3886,25 @@ var MusicController = class {
       return;
     }
     const delay = this._context.settings.system.compatibilityDelay ? 800 : 150;
-    this._updateTimeoutId = GLib12.timeout_add(GLib12.PRIORITY_DEFAULT, delay, () => {
+    this._updateTimeoutId = GLib13.timeout_add(GLib13.PRIORITY_DEFAULT, delay, () => {
       this._updateTimeoutId = null;
       this._updateUI();
-      return GLib12.SOURCE_REMOVE;
+      return GLib13.SOURCE_REMOVE;
     });
   }
   _doEnable() {
     var _a;
     this._context.mpris.start(this._context.settings.system);
     (_a = this._injector) == null ? void 0 : _a.inject();
-    this._watchdogId = GLib12.timeout_add_seconds(GLib12.PRIORITY_DEFAULT, 5, () => {
+    this._watchdogId = GLib13.timeout_add_seconds(GLib13.PRIORITY_DEFAULT, 5, () => {
       var _a2, _b;
       if (this._isShuttingDown) {
-        return GLib12.SOURCE_REMOVE;
+        return GLib13.SOURCE_REMOVE;
       }
       if (!((_a2 = this._pill) == null ? void 0 : _a2.get_parent())) {
         (_b = this._injector) == null ? void 0 : _b.queueInject();
       }
-      return GLib12.SOURCE_CONTINUE;
+      return GLib13.SOURCE_CONTINUE;
     });
     this._overviewDragBegin = Main5.overview.connect("item-drag-begin", () => {
     });
@@ -3886,11 +4016,11 @@ var MusicController = class {
   }
   _clearTimers() {
     if (this._updateTimeoutId !== null) {
-      GLib12.source_remove(this._updateTimeoutId);
+      GLib13.source_remove(this._updateTimeoutId);
       this._updateTimeoutId = null;
     }
     if (this._watchdogId !== null) {
-      GLib12.source_remove(this._watchdogId);
+      GLib13.source_remove(this._watchdogId);
       this._watchdogId = null;
     }
   }

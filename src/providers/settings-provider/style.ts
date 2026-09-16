@@ -28,7 +28,7 @@ const map = createSettingsMap({
     },
     corderRadius: {
         key: 'border-radius',
-        default: 0
+        default: 22
     },
     showPillOutline: {
         key: 'show-pill-border',

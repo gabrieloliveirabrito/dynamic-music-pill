@@ -72,6 +72,7 @@ export class ExpandedPlayer extends St.Widget {
 
         this._vinyl = new VinylArt();
         this._vinyl.setSquare(host.settings.popup.squareVinyl);
+        this._vinyl.setSpeed(host.settings.popup.vinylSpeed);
         this._info = new TrackInfoBlock();
         this._visualizer = new WaveformVisualizer(80, host.settings, true);
         this._visualizer.setMode(host.settings.style.visualizerAnimation || 1);

@@ -9,6 +9,7 @@ import { TextBlock } from "./components/text-block";
 import { PlaybackStatus } from "@/types/player-types";
 import { WaveformVisualizer } from "@/ui/visualizers";
 import { Color } from "@/types/color";
+import { applyPillBodyStyle } from "./handlers/style";
 
 export type PillDisplayPayload = {
     title?: string;
@@ -79,9 +80,9 @@ export class MusicPill extends St.Widget {
             x_expand: false,
             y_expand: false,
             y_align: Clutter.ActorAlign.CENTER,
-            style: "spacing: 6px;",
         });
         this._body.set_pivot_point(0.5, 0.5);
+        this._applyStyle();
 
         this._artWidget = new CrossfadeArt();
         this._artBin = new St.Bin({
@@ -124,12 +125,23 @@ export class MusicPill extends St.Widget {
         const height = this._settings.pill.dockHeight;
         const width = this._settings.pill.dynamicWidth ? -1 : this._settings.pill.dockWidth;
         this._state.targetWidth = width === -1 ? 250 : width;
+
+        this._state.paddingX = this._settings.style.outerEdgeMargin || 14;
+        const rawPadY = Math.floor(height / 10);
+        this._state.paddingY = Math.max(2, Math.min(8, rawPadY));
+
+        const artSize = this._settings.pill.albumArtSize || 16;
+        this._artWidget.set_size(artSize, artSize);
+        this._artWidget.setRadius(Math.floor(artSize / 2));
+        this._artBin.set_size(artSize, artSize);
+
         this._body.set_height(height);
         if (width > 0) {
             this._body.set_width(width);
         }
         this.set_height(height);
         this._visualizer.setHeightClamped(Math.max(8, height - 8));
+        this._applyStyle();
     }
 
     updateDisplay(payload: PillDisplayPayload): void {
@@ -159,6 +171,20 @@ export class MusicPill extends St.Widget {
         } else {
             this.hideInactive();
         }
+        this._applyStyle();
+    }
+
+    private _applyStyle(): void {
+        applyPillBodyStyle(
+            this._body,
+            this._settings,
+            this._state,
+            this._state.targetColor,
+            this.currentBgAlpha,
+            this._currentStatus === "Playing"
+        );
+        this._visualizer.setColor(this._state.displayedColor);
+        this._artWidget.setRadius(this._state.radius > 0 ? Math.min(this._state.radius, 16) : 8);
     }
 
     setTitle(title: string): void {
